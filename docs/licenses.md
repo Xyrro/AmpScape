@@ -15,6 +15,57 @@ slope, distance-to-road, distance-to-river, gHM) — never the original source t
 | **WDPA** protected areas | monthly | protectedplanet.net, registration + terms acceptance | **Restrictive**: no redistribution of WDPA data, non-commercial only without written permission (protectedplanet.net/en/legal) | **No polygons.** Only derived focal-node masks (rasterised, unlabelled) may be stored, and the datasheet must say so | Phase 4 item; not downloaded in the Phase 2 pilot |
 | OpenStreetMap | — | — | ODbL (share-alike) | **not used** (owner decision 2026-09-05) | replaced by GRIP4, PBL's own database |
 
+## Manifest reconciliation (Phase 8, 2026-09-07)
+
+Every file in `data/sources/manifest.json` (21 entries, 5.45 GB) with its recorded licence and checksum:
+
+| manifest key | size | licence recorded | sha256 | downloaded |
+|---|---|---|---|---|
+| `ghm_v1_1km` | 415 MB | CC BY 4.0 | `b20f0f76a6a235be…` | 2026-09-05 |
+| `grip4_region1` | 909 MB | CC0 / CC BY 4.0 (see docs/licenses.md) | `fa3958e36a8a9bd8…` | 2026-09-05 |
+| `grip4_region2` | 447 MB | CC0 / CC BY 4.0 (see docs/licenses.md) | `3d9abcb589e636a0…` | 2026-09-05 |
+| `grip4_region3` | 242 MB | CC0 / CC BY 4.0 (see docs/licenses.md) | `a774a67acaf15820…` | 2026-09-05 |
+| `grip4_region4` | 1233 MB | CC0 / CC BY 4.0 (see docs/licenses.md) | `550a848f032f0d04…` | 2026-09-05 |
+| `grip4_region5` | 151 MB | CC0 / CC BY 4.0 (see docs/licenses.md) | `4ef0be517b962b67…` | 2026-09-05 |
+| `grip4_region6` | 711 MB | CC0 / CC BY 4.0 (see docs/licenses.md) | `3285978f1ce05edc…` | 2026-09-05 |
+| `grip4_region7` | 59 MB | CC0 / CC BY 4.0 (see docs/licenses.md) | `609d9f8d868aab55…` | 2026-09-05 |
+| `hydrorivers_v10_af` | 108 MB | CC BY 4.0 | `63cc615134d8812b…` | 2026-09-05 |
+| `hydrorivers_v10_ar` | 22 MB | CC BY 4.0 | `fd679ed159594406…` | 2026-09-05 |
+| `hydrorivers_v10_as` | 91 MB | CC BY 4.0 | `29780b0a75f90024…` | 2026-09-05 |
+| `hydrorivers_v10_au` | 49 MB | CC BY 4.0 | `538c87868636c63c…` | 2026-09-05 |
+| `hydrorivers_v10_eu` | 68 MB | CC BY 4.0 | `500da7d36ceee0aa…` | 2026-09-05 |
+| `hydrorivers_v10_gr` | 9 MB | CC BY 4.0 | `436bd112718f14ad…` | 2026-09-05 |
+| `hydrorivers_v10_na` | 66 MB | CC BY 4.0 | `47c2e30041b1a6e0…` | 2026-09-05 |
+| `hydrorivers_v10_sa` | 95 MB | CC BY 4.0 | `38bfdcdfcc0698b1…` | 2026-09-05 |
+| `hydrorivers_v10_si` | 47 MB | CC BY 4.0 | `ea7432be3b350f3e…` | 2026-09-05 |
+| `published_eurac_alps_permeability` | 159 MB | CC BY 4.0 (Zenodo 10.5281/zenodo.6602481) | `333296bf2fdd23b3…` | 2026-09-07 |
+| `published_hawaiian_gallinule_resistance` | 299 MB | CC0 1.0 (Dryad 10.5061/dryad.p90b87p) | `7cb2c8e684a27dbf…` | 2026-09-07 (manual) |
+| `published_raccoon_europe_maps` | 121 MB | CC BY 4.0 (figshare 10.6084/m9.figshare.27311484.v1) | `c7d349831ced3e3f…` | 2026-09-07 |
+| `resolve_ecoregions_2017` | 149 MB | CC BY 4.0 | `be36d6209e443038…` | 2026-09-05 |
+
+Consistency is enforced by `tests/test_licenses.py` (every manifest entry has a licence in the
+permitted set, a sha256, and a row in this file).
+
+## Verification status and unverifiable items
+
+| Source | How the licence was verified | Status |
+|---|---|---|
+| ESA WorldCover 2021 v200 | ESA WorldCover data-access statement (CC BY 4.0) as quoted in search results; bucket is public | verified indirectly — **recommend one manual check of the ESA terms page before publication** |
+| Copernicus DEM GLO-30 | licence PDF (COP-DEM-GLO-30-F) downloaded and read: Art. 4 rights of use, Art. 6 notices | **verified** (text quoted above) |
+| GRIP4 | globio.info page read: "provided under a Creative Commons License (CC-0)"; FAO / UNDP catalogues list CC BY 4.0; one catalogue lists ODbL | **ambiguous** — three different statements exist; we attribute as CC BY 4.0 and store only distance/class rasters. **Cannot be resolved without asking PBL**; flagged for the owner |
+| HydroRIVERS v1.0 | hydrosheds.org licence page (CC BY 4.0) | verified via the site text as returned by search; **recommend one manual read of the PDF licence** |
+| gHM v1 | figshare API: licence CC BY 4.0 | **verified** |
+| RESOLVE Ecoregions 2017 | ecoregions.appspot.com statement (CC BY 4.0) via search snippet | verified indirectly — **recommend one manual check** |
+| Eurac Alps permeability | Zenodo API: `cc-by-4.0` | **verified** |
+| Raccoon Europe maps | figshare API: CC BY 4.0 | **verified** |
+| Hawaiian gallinule layers | Dryad API: CC0 1.0 | **verified** |
+| WDPA | protectedplanet.net legal page | **not redistributable**; not downloaded, not used |
+
+Nothing in the manifest has an unknown licence. The only genuinely unverifiable item is the exact
+GRIP4 licence (CC0 vs CC BY 4.0 vs ODbL statements from different catalogues); treating it as CC BY
+4.0 with attribution is the conservative reading among the two Creative Commons statements, and
+storing only non-reversible derived rasters limits exposure under any of them.
+
 ## Combined data licence
 
 All stored covariates derive from CC BY 4.0 sources or the Copernicus WorldDEM-30 licence

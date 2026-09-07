@@ -53,7 +53,11 @@ Verified from `Circuitscape.jl 5.17.1/src/raster/pairwise.jl::construct_graph` a
    ‖L v − b‖₂ / ‖b‖₂ computed in Julia on the exact graph from the full-precision voltages
    (QC threshold 1e-6: CHOLMOD typically gives ≤ 1e-11 and the double-precision floor for
    contrast-10⁴ systems is ~1e-8, while CG+AMG gives 1e-6–3e-5); the same residual from the stored
-   float32 maps is recorded for information only.
+   float32 maps is recorded for information only. For short-circuited focal regions the residual is
+   that of the collapsed system Circuitscape solves. When the achieved residual exceeds 1e-8, one step
+   of CHOLMOD iterative refinement is applied and, for those samples, current maps are regenerated from
+   the refined voltages by a validated re-implementation of Circuitscape's node-current formula (float32
+   agreement with Circuitscape's own maps), recorded in `solver_params.refinement`.
 5. **Physics.** For a current vector b (injections, Σb = 0 when no ground, or with grounded
    nodes removed), voltages solve L v = b. Branch current i_ij = g_ij (v_i − v_j). Node current
    density (Circuitscape's "current map", `out.jl::get_node_currents`) is the total current

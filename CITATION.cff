@@ -1,13 +1,138 @@
 cff-version: 1.2.0
-message: "If you use AmpScape, please cite it as below."
+message: "If you use AmpScape, please cite the dataset and the upstream sources listed under references."
 title: "AmpScape: a benchmark for learned surrogates of circuit-theoretic landscape connectivity"
 type: dataset
 authors:
   - family-names: Xiao
     given-names: Yao
-version: 0.1.0-mini
-date-released: "2026-09-06"
+version: 0.2.0-mini
+date-released: "2026-09-07"
 repository-code: "https://github.com/Xyrro/AmpScape"
 url: "https://huggingface.co/datasets/Xirro/AmpScape"
 license: CC-BY-4.0
-keywords: [landscape connectivity, Circuitscape, Omniscape, surrogate models, neural operators, benchmark]
+license-url: "https://creativecommons.org/licenses/by/4.0/"
+keywords: [landscape connectivity, Circuitscape, Omniscape, surrogate models, neural operators, benchmark, ecology]
+abstract: >
+  Resistance rasters and source configurations paired with exact Circuitscape.jl / Omniscape.jl outputs
+  (current-density maps, voltage maps, effective resistances, omnidirectional connectivity) on synthetic
+  and real landscapes, with official spatial splits and out-of-distribution test sets, for training and
+  comparing learned surrogates of circuit-theoretic connectivity.
+references:
+  - type: software
+    title: "Circuitscape.jl"
+    version: "5.17.1"
+    authors:
+      - family-names: Anantharaman
+        given-names: Ranjan
+      - family-names: Hall
+        given-names: Kimberly
+      - family-names: Shah
+        given-names: Viral B.
+      - family-names: Edelman
+        given-names: Alan
+    doi: 10.21105/jcon.00058
+  - type: software
+    title: "Omniscape.jl"
+    version: "0.6.2"
+    authors:
+      - family-names: Landau
+        given-names: Vincent A.
+      - family-names: Shah
+        given-names: Viral B.
+      - family-names: Anantharaman
+        given-names: Ranjan
+      - family-names: Hall
+        given-names: Kimberly R.
+    doi: 10.21105/joss.02829
+  - type: data
+    title: "ESA WorldCover 10 m 2021 v200"
+    authors:
+      - name: "ESA WorldCover project / Zanaga et al."
+    year: 2022
+    doi: 10.5281/zenodo.7254221
+    license: CC-BY-4.0
+  - type: data
+    title: "Copernicus DEM GLO-30 (WorldDEM-30)"
+    authors:
+      - name: "European Space Agency; DLR e.V. 2010-2014; Airbus Defence and Space GmbH 2014-2018"
+    notes: "provided under COPERNICUS by the European Union and ESA; all rights reserved; see docs/licenses.md for the mandatory notices"
+  - type: article
+    title: "Global patterns of current and future road infrastructure (GRIP4)"
+    authors:
+      - family-names: Meijer
+        given-names: Johan R.
+      - family-names: Huijbregts
+        given-names: Mark A. J.
+      - family-names: Schotten
+        given-names: Kees C. G. J.
+      - family-names: Schipper
+        given-names: Aafke M.
+    journal: "Environmental Research Letters"
+    volume: 13
+    year: 2018
+    doi: 10.1088/1748-9326/aabd42
+  - type: article
+    title: "Global river hydrography and network routing: baseline data and new approaches to study the world's large river systems (HydroRIVERS)"
+    authors:
+      - family-names: Lehner
+        given-names: Bernhard
+      - family-names: Grill
+        given-names: Günther
+    journal: "Hydrological Processes"
+    volume: 27
+    year: 2013
+    doi: 10.1002/hyp.9740
+  - type: article
+    title: "Managing the middle: A shift in conservation priorities based on the global human modification gradient (gHM)"
+    authors:
+      - family-names: Kennedy
+        given-names: Christina M.
+      - family-names: Oakleaf
+        given-names: James R.
+      - family-names: Theobald
+        given-names: David M.
+      - family-names: Baruch-Mordo
+        given-names: Sharon
+      - family-names: Kiesecker
+        given-names: Joseph
+    journal: "Global Change Biology"
+    volume: 25
+    year: 2019
+    doi: 10.1111/gcb.14549
+  - type: article
+    title: "An Ecoregion-Based Approach to Protecting Half the Terrestrial Realm (RESOLVE Ecoregions 2017)"
+    authors:
+      - family-names: Dinerstein
+        given-names: Eric
+    journal: "BioScience"
+    volume: 67
+    year: 2017
+    doi: 10.1093/biosci/bix014
+  - type: data
+    title: "Maps of ecosystem multifunctionality and ecological connectivity for identifying Green Infrastructure networks in the European Alps"
+    authors:
+      - family-names: Marsoner
+        given-names: Thomas
+      - family-names: Simion
+        given-names: Heidi
+      - family-names: Giombini
+        given-names: Valentina
+      - family-names: Egarter Vigl
+        given-names: Lukas
+    year: 2022
+    doi: 10.5281/zenodo.6602481
+    license: CC-BY-4.0
+  - type: data
+    title: "Dataset and species distribution modeling procedure performed in 'Crossing borders: Connectivity analyses reveal potential patterns of range expansion of the Northern raccoon in Europe'"
+    authors:
+      - name: "figshare record authors (see DOI)"
+    year: 2025
+    doi: 10.6084/m9.figshare.27311484.v1
+    license: CC-BY-4.0
+  - type: data
+    title: "Data from: Landscape genetics identifies streams and drainage infrastructure as dispersal corridors for an endangered wetland bird"
+    authors:
+      - name: "Dryad record authors (van Rees et al.; see DOI)"
+    year: 2020
+    doi: 10.5061/dryad.p90b87p
+    license: CC0-1.0

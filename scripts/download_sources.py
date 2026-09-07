@@ -65,6 +65,7 @@ def main() -> None:
     ap.add_argument("--only", nargs="*", help="subset of source keys")
     ap.add_argument("--dest", default=os.path.join(os.environ.get("AMPSCAPE_DATA", "data"), "sources"))
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--register", action="store_true", help="hash files already present on disk (e.g. manual downloads) without fetching")
     args = ap.parse_args()
     dest = pathlib.Path(args.dest)
     dest.mkdir(parents=True, exist_ok=True)
@@ -78,6 +79,15 @@ def main() -> None:
         out = dest / src["file"]
         if out.exists() and k in manifest and manifest[k].get("bytes") == out.stat().st_size:
             print(f"[skip] {k}: {out.name} ({out.stat().st_size/1e6:.0f} MB)")
+            continue
+        if args.register:
+            if not out.exists():
+                print(f"[miss] {k}: {out} not present; skipped")
+                continue
+            manifest[k] = {"url": src["url"], "file": out.name, "bytes": out.stat().st_size, "sha256": sha256(out), "license": src["license"],
+                           "downloaded_utc": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "note": "manual download registered"}
+            manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
+            print(f"[reg ] {k}: {out.stat().st_size/1e6:.0f} MB sha256={manifest[k]['sha256'][:12]}")
             continue
         print(f"[get ] {k}: {src['url']}")
         if args.dry_run:

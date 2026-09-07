@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Phase 8 — 2026-09-07
+- Licences and provenance: `docs/licenses.md` reconciled with the full source manifest (21 files) incl. the published
+  resistance rasters, verification log and unverifiable-items list; full `CITATION.cff`; redistribution terms in the
+  dataset card; `tests/test_licenses.py`; downloader `--register` for manual downloads (Dryad archive registered).
+
 ### Phase 7 — 2026-09-06
 - Owner decisions on the contrast probe: CHOLMOD iterative refinement (`refine_voltage!`, our own CHOLMOD factorisation of the
   reduced/collapsed system, maps regenerated via `node_current_map`), CG baseline only for test/OOD samples (plan-time
