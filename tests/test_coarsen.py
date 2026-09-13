@@ -30,3 +30,12 @@ def test_upsample_shape_and_constant():
     a = np.full((2, 2), 3.0)
     up = upsample(a, 2, (4, 4))
     assert up.shape == (4, 4) and np.allclose(up, 3.0)
+
+
+def test_coarsen_advanced_ground_wins_and_renormalises():
+    from ampscape.models.coarsen import coarsen_advanced
+    S = np.zeros((4, 4)); S[0, 0] = 0.5; S[2, 2] = 0.5          # one source block overlaps the ground
+    G = np.zeros((4, 4)); G[1, 1] = 1
+    sc, gr = coarsen_advanced(S, G, np.zeros((2, 2), bool), 2)
+    assert gr[0, 0] and not gr[1, 1]
+    assert sc[0, 0] == 0 and np.isclose(sc[1, 1], 1.0) and np.isclose(sc.sum(), 1.0)

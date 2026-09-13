@@ -3,11 +3,13 @@ coarse grid, upsample the outputs back.
 
 Coarsening rules (documented): resistance → geometric mean over f×f blocks; NoData → block is NoData if
 more than half of it is; focal labels → any pixel of the block carries the label (a region may grow);
-source strength → block sum (T3, keeps Σ S = 1) or block mean (T4); ground → any. Omniscape radius and
+source strength → block sum (T3, keeps Σ S = 1) or block mean (T4); ground → any, and a block that holds both
+source and ground becomes ground only (Circuitscape leaves such nodes ungrounded), sources renormalised. Omniscape radius and
 block size are divided by f (block rounded to the nearest odd ≥ 1). Outputs: current maps are
 upsampled bilinearly and, for pairwise/advanced maps, divided by f (a coarse node collects the flow crossing f fine
 pixels of width; Omniscape maps are left unscaled because their sources were mean-pooled); coarse focal pixels are
-in-filled from their nearest non-focal neighbour before upsampling; focal
+in-filled from their nearest non-focal neighbour before upsampling; for T3 the coarse injection (block-summed sources)
+is removed before scaling and the fine injection added back (node current = through-flow + injection); focal
 pixels are reset to the exact 1 A per pair; Reff is taken as is (same focal labels). Inference time = coarsening +
 coarse solve + upsampling.
 """
@@ -54,6 +56,30 @@ def upsample(a: np.ndarray, f: int, shape: tuple[int, int]) -> np.ndarray:
     return out
 
 
+def coarsen_nodata(R: np.ndarray, nd: np.ndarray, f: int) -> tuple[np.ndarray, np.ndarray]:
+    """Geometric-mean resistance and majority NoData of a fine landscape at 1/f."""
+    Rc = block_reduce(np.where(nd, np.nan, R), f, "gmean")
+    ndc = block_reduce(nd.astype(float), f, "majority_bool") | ~np.isfinite(Rc)
+    return np.where(ndc, 1.0, np.nan_to_num(Rc, nan=1.0)).astype(np.float32), ndc
+
+
+def coarsen_advanced(S: np.ndarray, G: np.ndarray, ndc: np.ndarray, f: int) -> tuple[np.ndarray, np.ndarray]:
+    """Coarse T3 sources (block sum) and ground (any); ground wins where a block holds both, sources renormalised.
+
+    Circuitscape leaves a node that is both source and ground ungrounded (verified on the mini: 27 of 32 coarse
+    ground nodes sat at up to 4.7 V), so mixed blocks must be resolved before the coarse solve.
+    """
+    sc = block_reduce(S.astype(np.float64), f, "sum")
+    gr = block_reduce(G.astype(float), f, "any") > 0
+    sc[ndc] = 0
+    gr[ndc] = False
+    total = sc.sum()
+    sc[gr] = 0
+    if sc.sum() > 0 and total > 0:
+        sc *= total / sc.sum()
+    return sc, gr
+
+
 def write_coarse_inputs(final_h5: str, out_h5: str, sample_ids: list[str], f: int = 4) -> dict[str, dict]:
     """Build a Julia-solvable inputs shard at 1/f resolution from a final shard; returns per-sample timings."""
     timings = {}
@@ -64,9 +90,7 @@ def write_coarse_inputs(final_h5: str, out_h5: str, sample_ids: list[str], f: in
             gs = fi[sid]
             R = gs["inputs"]["resistance"][...]
             nd = gs["inputs"]["nodata_mask"][...] > 0
-            Rc = block_reduce(np.where(nd, np.nan, R), f, "gmean")
-            ndc = block_reduce(nd.astype(float), f, "majority_bool") | ~np.isfinite(Rc)
-            Rc = np.where(ndc, 1.0, np.nan_to_num(Rc, nan=1.0)).astype(np.float32)
+            Rc, ndc = coarsen_nodata(R, nd, f)
             g = g_all.create_group(sid)
             meta = json.loads(gs.attrs["meta"])
             g.attrs["tier"] = meta["tier"]
@@ -87,15 +111,14 @@ def write_coarse_inputs(final_h5: str, out_h5: str, sample_ids: list[str], f: in
                     fc = coarsen_labels(gc["inputs"]["focal_mask"][...], f)
                     fc[ndc] = 0
                     gco.create_dataset("focal_mask", data=fc, **GZIP)
-                if "source_strength" in gc["inputs"]:
-                    how = "sum" if kind == "advanced" else "mean"
-                    sc = block_reduce(gc["inputs"]["source_strength"][...].astype(np.float64), f, how)
+                if kind == "advanced":
+                    sc, gr = coarsen_advanced(gc["inputs"]["source_strength"][...], gc["inputs"]["ground"][...], ndc, f)
+                    gco.create_dataset("source_strength", data=sc.astype(np.float32), **GZIP)
+                    gco.create_dataset("ground", data=gr.astype(np.int8), **GZIP)
+                elif "source_strength" in gc["inputs"]:
+                    sc = block_reduce(gc["inputs"]["source_strength"][...].astype(np.float64), f, "mean")
                     sc[ndc] = 0
                     gco.create_dataset("source_strength", data=sc.astype(np.float32), **GZIP)
-                if "ground" in gc["inputs"]:
-                    gr = block_reduce(gc["inputs"]["ground"][...].astype(float), f, "any") > 0
-                    gr[ndc] = False
-                    gco.create_dataset("ground", data=gr.astype(np.int8), **GZIP)
                 if kind == "omniscape":
                     gco.attrs["source_threshold"] = float(gc.attrs.get("source_meta", "{}") and json.loads(gc.attrs["source_meta"]).get("source_threshold", 0.0))
             timings[sid] = time.perf_counter() - t0
@@ -134,9 +157,19 @@ def write_predictions(final_h5: str, coarse_outputs_h5: str, pred_h5: str, f: in
                     focal = fi[sid]["configs"][cname]["inputs"]["focal_mask"][...]
                     focal_c = coarsen_labels(focal, f)
                 pi = go["pair_index"][...] if "pair_index" in go else None
+                s_fine = None
+                if cname == "advanced" and cname in fi[sid]["configs"]:
+                    s_fine = fi[sid]["configs"][cname]["inputs"]["source_strength"][...].astype(np.float64)
+                    _, ndc = coarsen_nodata(fi[sid]["inputs"]["resistance"][...], fi[sid]["inputs"]["nodata_mask"][...] > 0, f)
+                    s_coarse, _ = coarsen_advanced(s_fine, fi[sid]["configs"][cname]["inputs"]["ground"][...], ndc, f)
                 for k in go:
                     a = go[k][...]
                     if k in ("cum_current", "current", "voltage", "flow_potential", "normalized", "pairwise_current"):
+                        if k == "current" and s_fine is not None:
+                            # node current = max(inflow, outflow) = inflow + injected at source nodes; the coarse node
+                            # injects the block sum (f^2 fine sources) while its through-flow scales with f -> remove the
+                            # coarse injection before scaling and add back the fine injection afterwards
+                            a = a - s_coarse[: a.shape[0], : a.shape[1]]
                         if k in ("cum_current", "current", "pairwise_current") and focal is not None:
                             if a.ndim == 3:
                                 a = np.stack([infill_focal(x, np.isin(focal_c, pi[q]) if pi is not None else focal_c)
@@ -154,6 +187,8 @@ def write_predictions(final_h5: str, coarse_outputs_h5: str, pred_h5: str, f: in
                             # divide by f for current per fine pixel; focal pixels (exactly 1 A per pair) are restored
                             # below. Omniscape sources were mean-pooled, so its maps are already per-pixel scale.
                             up = up / f
+                            if k == "current" and s_fine is not None:
+                                up = np.maximum(up + s_fine, 0.0)
                         g.create_dataset(k, data=up.astype(np.float32), **GZIP)
                     elif k == "reff":
                         g.create_dataset(k, data=a.astype(np.float64))
