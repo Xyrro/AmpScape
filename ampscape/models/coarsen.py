@@ -6,7 +6,8 @@ more than half of it is; focal labels → any pixel of the block carries the lab
 source strength → block sum (T3, keeps Σ S = 1) or block mean (T4); ground → any. Omniscape radius and
 block size are divided by f (block rounded to the nearest odd ≥ 1). Outputs: current maps are
 upsampled bilinearly and, for pairwise/advanced maps, divided by f (a coarse node collects the flow crossing f fine
-pixels of width; Omniscape maps are left unscaled because their sources were mean-pooled); focal
+pixels of width; Omniscape maps are left unscaled because their sources were mean-pooled); coarse focal pixels are
+in-filled from their nearest non-focal neighbour before upsampling; focal
 pixels are reset to the exact 1 A per pair; Reff is taken as is (same focal labels). Inference time = coarsening +
 coarse solve + upsampling.
 """
@@ -101,6 +102,19 @@ def write_coarse_inputs(final_h5: str, out_h5: str, sample_ids: list[str], f: in
     return timings
 
 
+def infill_focal(a: np.ndarray, focal_coarse: np.ndarray) -> np.ndarray:
+    """Replace coarse focal pixels by the value of the nearest non-focal coarse pixel.
+
+    A coarse focal node carries the full injected current of its pair; upsampled naively it stamps a block of f x f
+    fine pixels (a strip f fine pixels wide) with that value, of which only the true focal pixels should carry it.
+    """
+    m = focal_coarse > 0
+    if not m.any() or m.all():
+        return a
+    idx = ndimage.distance_transform_edt(m, return_distances=False, return_indices=True)
+    return a[tuple(idx)]
+
+
 def write_predictions(final_h5: str, coarse_outputs_h5: str, pred_h5: str, f: int, coarsen_time: dict[str, float],
                       append: bool = False) -> int:
     """Upsample coarse solver outputs into the predictions format; inference_time = coarsen + solve + upsample."""
@@ -115,9 +129,20 @@ def write_predictions(final_h5: str, coarse_outputs_h5: str, pred_h5: str, f: in
                 st = json.loads(go.attrs["stats"])
                 t0 = time.perf_counter()
                 g = gp.require_group(cname)
+                focal = None
+                if cname in fi[sid]["configs"] and "focal_mask" in fi[sid]["configs"][cname]["inputs"]:
+                    focal = fi[sid]["configs"][cname]["inputs"]["focal_mask"][...]
+                    focal_c = coarsen_labels(focal, f)
+                pi = go["pair_index"][...] if "pair_index" in go else None
                 for k in go:
                     a = go[k][...]
                     if k in ("cum_current", "current", "voltage", "flow_potential", "normalized", "pairwise_current"):
+                        if k in ("cum_current", "current", "pairwise_current") and focal is not None:
+                            if a.ndim == 3:
+                                a = np.stack([infill_focal(x, np.isin(focal_c, pi[q]) if pi is not None else focal_c)
+                                              for q, x in enumerate(a)])
+                            else:
+                                a = infill_focal(a, focal_c)
                         if a.ndim == 3:
                             up = np.stack([upsample(x, f, shape) for x in a])
                         else:
@@ -134,11 +159,9 @@ def write_predictions(final_h5: str, coarse_outputs_h5: str, pred_h5: str, f: in
                         g.create_dataset(k, data=a.astype(np.float64))
                     elif k in ("labels", "pair_index"):
                         g.create_dataset(k, data=a)
-                if cname in fi[sid]["configs"] and "focal_mask" in fi[sid]["configs"][cname]["inputs"]:
-                    focal = fi[sid]["configs"][cname]["inputs"]["focal_mask"][...]
+                if focal is not None:
                     if "pairwise_current" in g:
                         pc = g["pairwise_current"][...]
-                        pi = go["pair_index"][...] if "pair_index" in go else None
                         for q in range(pc.shape[0]):
                             labs = pi[q] if pi is not None else np.unique(focal[focal > 0])
                             pc[q][np.isin(focal, labs)] = 1.0
