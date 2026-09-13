@@ -5,8 +5,10 @@ Coarsening rules (documented): resistance → geometric mean over f×f blocks; N
 more than half of it is; focal labels → any pixel of the block carries the label (a region may grow);
 source strength → block sum (T3, keeps Σ S = 1) or block mean (T4); ground → any. Omniscape radius and
 block size are divided by f (block rounded to the nearest odd ≥ 1). Outputs: current maps are
-upsampled bilinearly; Reff is taken as is (same focal labels). Inference time = coarsening + coarse
-solve + upsampling.
+upsampled bilinearly and, for pairwise/advanced maps, divided by f (a coarse node collects the flow crossing f fine
+pixels of width; Omniscape maps are left unscaled because their sources were mean-pooled); focal
+pixels are reset to the exact 1 A per pair; Reff is taken as is (same focal labels). Inference time = coarsening +
+coarse solve + upsampling.
 """
 
 from __future__ import annotations
@@ -122,13 +124,30 @@ def write_predictions(final_h5: str, coarse_outputs_h5: str, pred_h5: str, f: in
                             up = upsample(a, f, shape)
                         if k == "cum_current" and cname == "advanced":
                             continue
-                        if k in ("cum_current", "current", "pairwise_current"):
-                            up = up / (f * f) if False else up      # node currents are per node: no area scaling (documented)
+                        if k in ("cum_current", "current", "pairwise_current") and cname != "omniscape":
+                            # pairwise / advanced: a coarse node collects the flow crossing a width of f fine pixels ->
+                            # divide by f for current per fine pixel; focal pixels (exactly 1 A per pair) are restored
+                            # below. Omniscape sources were mean-pooled, so its maps are already per-pixel scale.
+                            up = up / f
                         g.create_dataset(k, data=up.astype(np.float32), **GZIP)
                     elif k == "reff":
                         g.create_dataset(k, data=a.astype(np.float64))
                     elif k in ("labels", "pair_index"):
                         g.create_dataset(k, data=a)
+                if cname in fi[sid]["configs"] and "focal_mask" in fi[sid]["configs"][cname]["inputs"]:
+                    focal = fi[sid]["configs"][cname]["inputs"]["focal_mask"][...]
+                    if "pairwise_current" in g:
+                        pc = g["pairwise_current"][...]
+                        pi = go["pair_index"][...] if "pair_index" in go else None
+                        for q in range(pc.shape[0]):
+                            labs = pi[q] if pi is not None else np.unique(focal[focal > 0])
+                            pc[q][np.isin(focal, labs)] = 1.0
+                        g["pairwise_current"][...] = pc
+                        g["cum_current"][...] = pc.sum(axis=0)
+                    elif "cum_current" in g and cname.startswith("wall"):
+                        c = g["cum_current"][...]
+                        c[focal > 0] = 1.0
+                        g["cum_current"][...] = c
                 g.attrs["inference_time_s"] = float(coarsen_time.get(sid, 0.0) + st["wall_s"] + (time.perf_counter() - t0))
                 g.attrs["coarse_solver"] = st["solver"]
             n += 1
