@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Phase 9 — 2026-09-13
+- `ampscape/metrics` (pixel, domain, reff, physics, efficiency, acceleration) with hand-computed tests; `ampscape/eval/harness.py`,
+  `scripts/evaluate.py`, `docs/evaluation.md` (predictions format); oracle / zero-predictor anchors.
+- `test_ood_published`: `ampscape/landscapes/published.py`, `scripts/tile_published.py`, planner family `published` (46 tiles solved).
+- Non-learned coarsen×4 baseline (`ampscape/models/coarsen.py`, `scripts/baseline_coarsen.py`) evaluated on the mini test splits.
+
 ### Phase 8 — 2026-09-07
 - Licences and provenance: `docs/licenses.md` reconciled with the full source manifest (21 files) incl. the published
   resistance rasters, verification log and unverifiable-items list; full `CITATION.cff`; redistribution terms in the

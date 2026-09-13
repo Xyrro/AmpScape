@@ -116,7 +116,8 @@ def assign_plan_splits(df: pd.DataFrame, pilot_root: str | None, cfg_path: str |
     fractions = {k: sp[k] for k in ("train", "val", "test_id")}
     seed = int(sp["seed"])
     df = df.copy()
-    df["split"] = [synthetic_split(int(r.seed), seed, fractions) if r.family == "synthetic" else None for r in df.itertuples()]
+    df["split"] = [synthetic_split(int(r.seed), seed, fractions) if r.family == "synthetic" else
+                   ("test_ood_published" if r.family == "published" else None) for r in df.itertuples()]
     real = df[df.family == "real"]
     if len(real) and pilot_root:
         tiles = pd.read_parquet(pathlib.Path(pilot_root) / "tiles.parquet")
@@ -134,8 +135,25 @@ def assign_plan_splits(df: pd.DataFrame, pilot_root: str | None, cfg_path: str |
     demote = ((df.family == "real") & (df.table_id == ood_table)) | ((df.family == "synthetic") & (df.contrast.fillna(0) >= ood_contrast))
     df.loc[demote & df.split.isin(["train", "val"]), "split"] = "test_ood"
     df.loc[(df.tier == "XXL") & df.split.isin(["train", "val"]), "split"] = "test_id"
+    df.loc[df.family == "published", "split"] = "test_ood_published"
     df["cg_baseline"] = ~df.split.isin(["train", "val"])
     return df
+
+
+def plan_published(dataset_id: str, tiles_parquet: str, configs=DEFAULT_CONFIGS, shard_size: int = 10, shard0: int = 0,
+                   seed: int = 20260913) -> list[SampleSpec]:
+    """One sample per published-resistance tile (resistance as given); split = test_ood_published."""
+    tiles = pd.read_parquet(tiles_parquet)
+    out = []
+    by_tier: dict[str, int] = {}
+    for i, r in enumerate(tiles.itertuples()):
+        k = by_tier.get(r.tier, 0)
+        by_tier[r.tier] = k + 1
+        out.append(SampleSpec(sample_uuid(dataset_id, "published", f"{r.tier}:{r.tile_id}"), dataset_id, "published", r.tier,
+                              int(r.size), float(r.pixel_m), seed * 1000 + i, json.dumps(list(configs)), tile_id=r.tile_id,
+                              table_id=f"published:{r.source_id}", generator="published", shard=shard0 + i // shard_size,
+                              split="test_ood_published", cg_baseline=True))
+    return out
 
 
 def to_frame(specs: list[SampleSpec]) -> pd.DataFrame:

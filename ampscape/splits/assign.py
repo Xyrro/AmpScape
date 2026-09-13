@@ -50,6 +50,9 @@ def add_splits(index: pd.DataFrame, build: pathlib.Path, cfg_path: pathlib.Path 
         if r.family == "real":
             splits.append(tile_split.get(r.tile_id, "excluded"))
             blocks.append(tile_block.get(r.tile_id))
+        elif r.family == "published":
+            splits.append("test_ood_published")
+            blocks.append(None)
         else:
             splits.append(synthetic_split(int(r.seed), seed, fractions))
             blocks.append(None)
@@ -58,7 +61,8 @@ def add_splits(index: pd.DataFrame, build: pathlib.Path, cfg_path: pathlib.Path 
     flags = [ood_flags(row, cfg) for row in df.to_dict("records")]
     for k in flags[0]:
         df[k] = [f[k] for f in flags]
-    df["split"] = [apply_holdouts(s, f) for s, f in zip(df.split, flags, strict=True)]
+    df["split"] = [s if s == "test_ood_published" else apply_holdouts(s, f) for s, f in zip(df.split, flags, strict=True)]
+    df["test_ood_published"] = df.split == "test_ood_published"
     # XL: only a share of macro-cells are train/val (amendment C3) — applied by block hash
     xl_share = float(sp.get("xl_trainval_share", 0.25))
     df.loc[(df.tier == "XL") & df.split.isin(["train", "val"]) & (df.block_id.apply(lambda b: (hash((b, seed)) % 1000) / 1000.0 >= xl_share)), "split"] = "test_id"

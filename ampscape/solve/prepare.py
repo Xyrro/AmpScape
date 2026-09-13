@@ -53,6 +53,19 @@ def load_landscape(spec: SampleSpec, pilot_root: str | None):
 
     from ampscape.landscapes.real import read_tile
 
+    if spec.family == "published":
+        root = pathlib.Path(pilot_root)
+        tiles = pd.read_parquet(root / "published_tiles.parquet").set_index("tile_id")
+        t = tiles.loc[spec.tile_id]
+        with rasterio.open(root / t["path"]) as src:
+            R = src.read(1).astype(np.float32)
+            nd = src.read(2) > 0.5
+            prov = json.loads(src.tags()["provenance"])
+        meta = {"generator": "published", "resistance_table_id": spec.table_id, "tile_id": spec.tile_id, "lat": float(t["lat"]),
+                "lon": float(t["lon"]), "crs": f"EPSG:{int(t['epsg'])}", "transform": prov["transform"], "r_max": prov["r_max"],
+                "contrast": float(prov["r_max"] / prov["r_min"]), "published_source": prov}
+        return R, nd, None, None, meta
+
     root = pathlib.Path(pilot_root)
     res = pd.read_parquet(root / "resistance.parquet")
     row = res[(res.tile_id == spec.tile_id) & (res.table_id == spec.table_id)].iloc[0]

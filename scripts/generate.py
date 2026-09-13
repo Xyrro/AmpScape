@@ -72,11 +72,16 @@ def cmd_plan(a) -> None:
                            a.n_real, a.tier, a.seed0, configs=configs or DEFAULT_CONFIGS, shard_size=a.shard_size, shard0=n_shards)
     from ampscape.solve.manifest import assign_plan_splits
 
+    if a.published:
+        from ampscape.solve.manifest import plan_published
+
+        specs += plan_published(a.dataset, str(ROOT / a.published), configs=configs or DEFAULT_CONFIGS, shard_size=a.shard_size,
+                                shard0=(max(sp.shard for sp in specs) + 1) if specs else 0)
     df = assign_plan_splits(to_frame(specs), str(ROOT / a.pilot) if a.n_real else None)
     df.to_parquet(build / "manifest.parquet", index=False)
     print("provisional splits:", df.split.value_counts().to_dict(), "| cg_baseline on", int(df.cg_baseline.sum()), "samples")
     cfg = {"dataset_id": a.dataset, "tier": a.tier, "seed0": a.seed0, "shard_size": a.shard_size, "pilot": a.pilot,
-           "n_synthetic": a.n_synthetic, "n_real": a.n_real, "source_config": a.source_config,
+           "n_synthetic": a.n_synthetic, "n_real": a.n_real, "published": a.published, "source_config": a.source_config,
            "solver_preset": a.solver_preset, "dataset_version": a.dataset_version}
     (build / "build.json").write_text(json.dumps(cfg, indent=1))
     print(f"planned {len(df)} samples in {df.shard.nunique()} shards -> {build}")
@@ -99,7 +104,11 @@ def cmd_prepare(a) -> None:
     for sh in shards:
         p = shard_paths(build, int(sh))
         specs = from_frame(df[df.shard == sh])
-        n = prepare_shard(specs, str(p["inputs"]), scfg, pilot_root=str(ROOT / cfg["pilot"]), overwrite=a.force)
+        fam = {sp.family for sp in specs}
+        root_dir = cfg.get("published") if fam == {"published"} else cfg["pilot"]
+        if root_dir and root_dir.endswith(".parquet"):
+            root_dir = str(pathlib.Path(root_dir).parent)          # published_tiles.parquet -> its directory
+        n = prepare_shard(specs, str(p["inputs"]), scfg, pilot_root=str(ROOT / root_dir), overwrite=a.force)
         print(f"shard {sh}: prepared {n} samples -> {p['inputs'].name}" if n else f"shard {sh}: inputs already present")
 
 
@@ -263,6 +272,7 @@ def main() -> None:
     p.add_argument("--configs", default=None, help="comma-separated subset of configs (default: all)")
     p.add_argument("--k-override", type=int, default=None, help="fix K for the points config (scaling probe)")
     p.add_argument("--contrast-override", type=float, default=None, help="re-map synthetic landscapes to this contrast (probe)")
+    p.add_argument("--published", default=None, help="published_tiles.parquet to add published-resistance samples (test_ood_published)")
     p.set_defaults(func=cmd_plan)
     for name, fn in [("prepare", cmd_prepare), ("finalize", cmd_finalize)]:
         q = sub.add_parser(name)
