@@ -17,7 +17,7 @@ class MPLayer(nn.Module):
 
     def forward(self, h: torch.Tensor, ei: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
         src, dst = ei[0], ei[1]
-        msg = (h[src] - h[dst]) * w[:, None]
+        msg = ((h[src] - h[dst]) * w[:, None]).to(h.dtype)
         agg = torch.zeros_like(h).index_add_(0, dst, msg)
         return h + self.mlp(self.norm(torch.cat([h, agg], dim=1)))
 

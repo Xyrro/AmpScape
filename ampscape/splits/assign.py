@@ -13,7 +13,7 @@ import pathlib
 import pandas as pd
 import yaml
 
-from ampscape.splits.spatial import (
+from ampscape.splits.spatial import apply_tile_holdouts, region_holdouts, (
     BlockGrid,
     apply_holdouts,
     assign_tiles,
@@ -49,10 +49,8 @@ def add_splits(index: pd.DataFrame, build: pathlib.Path, cfg_path: pathlib.Path 
         bj = pathlib.Path(build) / "build.json"
         tiles_root = json.loads(bj.read_text()).get("pilot") if bj.exists() else None
         tiles = pd.concat([tiles, load_parents(tiles_root)], ignore_index=True)
-        ood_cfg = cfg["ood"]["test_ood_region"]
-        ood_blocks = {grid.block_id(r.lat, r.lon) for r in tiles.itertuples()
-                      if r.realm in ood_cfg.get("hold_out_realms", []) or r.biome_num in ood_cfg.get("hold_out_biome_nums", [])}
-        t = assign_tiles(tiles, grid, seed, ood_blocks=ood_blocks, fractions=fractions)
+        ood_blocks, ood_tiles = region_holdouts(tiles, grid, cfg["ood"]["test_ood_region"])
+        t = apply_tile_holdouts(assign_tiles(tiles, grid, seed, ood_blocks=ood_blocks, fractions=fractions), ood_tiles)
         tile_split = dict(zip(t.tile_id, t.split, strict=True))
         tile_block = dict(zip(t.tile_id, t.block_id, strict=True))
     else:

@@ -297,3 +297,23 @@ def summarize(t: pd.DataFrame) -> pd.DataFrame:
 
 __all__ = ["BlockGrid", "assign_blocks", "assign_tiles", "check_no_cross_tier_overlap", "synthetic_split",
            "ood_flags", "apply_holdouts", "summarize", "tile_box", "np"]
+
+
+def region_holdouts(tiles: pd.DataFrame, grid: BlockGrid, cfg: dict) -> tuple[set[str], set[str]]:
+    """(ood_blocks, ood_tiles) for the `test_ood_region` hold-out; `unit` = "tile" (default) or "cell"."""
+    held = {r.tile_id for r in tiles.itertuples()
+            if r.realm in cfg.get("hold_out_realms", []) or r.biome_num in cfg.get("hold_out_biome_nums", [])}
+    if cfg.get("unit", "tile") == "cell":
+        return {grid.block_id(r.lat, r.lon) for r in tiles.itertuples() if r.tile_id in held}, set()
+    return set(), held
+
+
+def apply_tile_holdouts(t: pd.DataFrame, ood_tiles: set[str]) -> pd.DataFrame:
+    """Tile-level ood_region: held-out tiles, and every tile inside a held-out parent region, become ood_region."""
+    if not ood_tiles:
+        return t
+    t = t.copy()
+    ood_regions = {r.region for r in t.itertuples() if r.tile_id in ood_tiles and r.region.startswith("parent:")}
+    hit = t.tile_id.isin(ood_tiles) | t.region.isin(ood_regions)
+    t.loc[hit & (t.split != "excluded"), "split"] = "ood_region"
+    return t

@@ -98,10 +98,19 @@ def plan_real(dataset_id: str, resistance_parquet: str, sources_parquet: str, n:
     return out
 
 
+def parent_regions_enabled(cfg_path: str | None = None) -> bool:
+    import pathlib
+
+    import yaml
+
+    cfg_path = cfg_path or str(pathlib.Path(__file__).resolve().parents[2] / "configs" / "datasets" / "v1_0.yaml")
+    return bool(yaml.safe_load(open(cfg_path))["splits"]["spatial_block"].get("parent_regions", True))
+
+
 def load_parents(tiles_root: str | None) -> pd.DataFrame:
     """Provisional XXL assignment regions (`parents.parquet`, v1.0 tile stream) — frozen centres, no rasters needed."""
     cols = ["tile_id", "tier", "lat", "lon", "size", "pixel_m", "realm", "biome_num"]
-    if not tiles_root:
+    if not tiles_root or not parent_regions_enabled():
         return pd.DataFrame(columns=cols)
     import pathlib
 
@@ -136,10 +145,10 @@ def assign_plan_splits(df: pd.DataFrame, pilot_root: str | None, cfg_path: str |
         tiles = pd.concat([tiles, load_parents(pilot_root)], ignore_index=True)
         sb = sp["spatial_block"]
         grid = BlockGrid(float(sb.get("band_deg", 20.0)), equal_width=(sb.get("grid", "equal_width") == "equal_width"))
-        ood_cfg = cfg["ood"]["test_ood_region"]
-        ood_blocks = {grid.block_id(r.lat, r.lon) for r in tiles.itertuples()
-                      if r.realm in ood_cfg.get("hold_out_realms", []) or r.biome_num in ood_cfg.get("hold_out_biome_nums", [])}
-        t = assign_tiles(tiles, grid, seed, ood_blocks=ood_blocks, fractions=fractions)
+        from ampscape.splits.spatial import apply_tile_holdouts, region_holdouts
+
+        ood_blocks, ood_tiles = region_holdouts(tiles, grid, cfg["ood"]["test_ood_region"])
+        t = apply_tile_holdouts(assign_tiles(tiles, grid, seed, ood_blocks=ood_blocks, fractions=fractions), ood_tiles)
         m = dict(zip(t.tile_id, t.split, strict=True))
         df.loc[df.family == "real", "split"] = [m.get(x, "excluded") for x in real.tile_id]
     ood_table = cfg["ood"]["test_ood_table"]["table"]

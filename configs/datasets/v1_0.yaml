@@ -56,7 +56,13 @@ splits:
   train: 0.8
   val: 0.1
   test_id: 0.1
-  spatial_block: {kind: "hierarchical", grid: "equal_width", band_deg: 20.0, parent_tier: XXL}
+  spatial_block: {kind: "hierarchical", grid: "equal_width", band_deg: 20.0, parent_tier: XXL, parent_regions: false}
+    # parent_regions: false (dev subset, 2026-09-14, OWNER DECISION PENDING): with the real v1.0 XXL centres the 32
+    # XXL footprints (2 048 km each, ≈ 90 % of land) merge into 13 continental components that swallow 72 % of the
+    # S tiles; five held-out parents propagate ood_region to 12 of the 13 components (dev prefix: 1 real S test_id
+    # tile). Until the rule is revised, S–XL tiles are assigned by their macro-cell only; the S-inside-XXL overlap
+    # is ≤ 0.004 % of an XXL tile's area and XXL stays test-only. Alternatives: place XXL centres only in test/OOD
+    # cells, or reduce/merge XXL footprints — see docs/dev_subset.md.
     # Equal-width grid: 20° latitude bands, per band n_lon ≈ 360·cos(lat_c)/20 cells (104 cells globally,
     # ≈ 2 200 km wide at every latitude). XXL tiles are their own assignment regions (overlapping XXL
     # footprints are merged); every smaller tile inherits the assignment of the XXL footprint that fully
@@ -67,7 +73,11 @@ splits:
   xl_trainval_share: 0.25            # C3: 25 % of XL landscapes are train/val (in-distribution), 75 % test
   tier_disjoint_seeds: true          # synthetic seed ranges never overlap across tiers
 ood:
-  test_ood_region:  {hold_out_biomes: ["Montane Grasslands & Shrublands", "Mangroves"], hold_out_biome_nums: [10, 14], hold_out_realms: ["Australasia"]}
+  test_ood_region:  {hold_out_biomes: ["Montane Grasslands & Shrublands", "Mangroves"], hold_out_biome_nums: [10, 14], hold_out_realms: ["Australasia"],
+                     unit: tile}   # tile: a tile is ood_region when ITS OWN biome/realm is held out (an XXL parent in a held-out
+                                   # biome carries its children). cell: every tile of a cell that contains a held-out tile (the
+                                   # first implementation; on the dev prefix it made 52 % of real tiles OOD and left no real
+                                   # test_id because mangrove/montane tiles touch 23 of 56 cells — dev report, 2026-09-14)
   test_ood_scale:   {tiers: [XL, XXL], definition: "XL/XXL test landscapes evaluated by models trained on tiers ≤ L only; the 25 % XL train/val slice exists for models that do train at XL (in-distribution XL test = test_id at XL)"}
   test_ood_table:   {table: forest_bird}              # never in train/val
   test_ood_contrast: {contrast: 1000000}              # synthetic contrast 10^6 never in train/val (training includes up to 10^5)
