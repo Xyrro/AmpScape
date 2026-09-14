@@ -28,27 +28,30 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from ampscape.data.dataset import AmpScapeDataset, compute_norm_stats, load_norm_stats  # noqa: E402
-from ampscape.models import MODEL_CONFIGS, build_model  # noqa: E402
-from ampscape.models.common import TASK_CHANNELS, TASK_TARGET, grid_graph, inverse_target, make_inputs, make_target, masked_mse  # noqa: E402
+from ampscape.models import MODEL_CONFIGS, MODEL_VARIANTS, build_model  # noqa: E402
+from ampscape.models.common import TASK_CHANNELS, TASK_TARGET, coarse_graph, grid_graph, inverse_target, make_inputs, make_target, masked_mse, n_channels  # noqa: E402
 
 DEFAULT_LR = {"unet": 1e-3, "fno": 1e-3, "vit": 3e-4, "gnn": 1e-3}
 
 
 class Items(torch.utils.data.Dataset):
-    def __init__(self, ds: AmpScapeDataset, task: str, stats: dict, graph: bool):
-        self.ds, self.task, self.stats, self.graph = ds, task, stats, graph
+    def __init__(self, ds: AmpScapeDataset, task: str, stats: dict, graph: bool, extra: tuple[str, ...] = (), multiscale: bool = False):
+        self.ds, self.task, self.stats, self.graph, self.extra, self.multiscale = ds, task, stats, graph, extra, multiscale
 
     def __len__(self):
         return len(self.ds)
 
     def __getitem__(self, i):
         d = self.ds[i]
-        x = make_inputs(d, self.task, self.stats)
+        x = make_inputs(d, self.task, self.stats, self.extra)
         y, m = make_target(d, self.task)
         out = {"x": x, "y": y, "mask": m, "sample_id": d["sample_id"], "config": d["config"]}
         if self.graph:
             idx, ei, w = grid_graph(d["resistance"][0], d["nodata"][0] > 0)
             out.update({"node_index": idx, "edge_index": ei, "edge_weight": w})
+            if self.multiscale:
+                idx_c, ei_c, w_c, f2c = coarse_graph(d["resistance"][0], d["nodata"][0] > 0)
+                out.update({"coarse_edge_index": ei_c, "coarse_edge_weight": w_c, "fine_to_coarse": f2c, "n_coarse": int((idx_c >= 0).sum())})
         return out
 
 
@@ -69,12 +72,28 @@ def collate(batch):
         out["node_index"] = torch.from_numpy(np.stack(idxs))
         out["edge_index"] = torch.from_numpy(np.concatenate(eis, axis=1))
         out["edge_weight"] = torch.from_numpy(np.concatenate(ws))
+        if "coarse_edge_index" in batch[0]:
+            ceis, cws, f2cs, offc = [], [], [], 0
+            for b in batch:
+                ceis.append(b["coarse_edge_index"] + offc)
+                cws.append(b["coarse_edge_weight"])
+                f2c = b["fine_to_coarse"].copy()
+                f2c[f2c >= 0] += offc
+                f2cs.append(f2c)
+                offc += b["n_coarse"]
+            out["coarse_edge_index"] = torch.from_numpy(np.concatenate(ceis, axis=1))
+            out["coarse_edge_weight"] = torch.from_numpy(np.concatenate(cws))
+            out["fine_to_coarse"] = torch.from_numpy(np.concatenate(f2cs))
+            out["n_coarse"] = offc
     return out
 
 
 def forward(model, name, batch, device):
     x = batch["x"].to(device, non_blocking=True)
     if name == "gnn":
+        if "coarse_edge_index" in batch:
+            return model(x, batch["node_index"].to(device), batch["edge_index"].to(device), batch["edge_weight"].to(device),
+                         batch["coarse_edge_index"].to(device), batch["coarse_edge_weight"].to(device), batch["fine_to_coarse"].to(device), batch["n_coarse"])
         return model(x, batch["node_index"].to(device), batch["edge_index"].to(device), batch["edge_weight"].to(device))
     return model(x)
 
@@ -156,6 +175,8 @@ def main():
     ap.add_argument("--published-tiers", default="S", help="comma list; XXL only for fully convolutional models")
     ap.add_argument("--no-amp", action="store_true")
     ap.add_argument("--eval-only", default=None, help="checkpoint path; skip training")
+    ap.add_argument("--variant", default="base", help="key of ampscape.models.MODEL_VARIANTS[model]")
+    ap.add_argument("--extra", default="", help="comma list of extra input channels (dist)")
     a = ap.parse_args()
 
     out = pathlib.Path(a.out)
@@ -166,14 +187,18 @@ def main():
     amp = (not a.no_amp) and a.model != "fno"            # complex FFT weights are not autocast-safe
     lr = a.lr or DEFAULT_LR[a.model]
     graph = a.model == "gnn"
+    extra = tuple(e for e in a.extra.split(",") if e)
+    mcfg = dict(MODEL_VARIANTS[a.model][a.variant])
+    multiscale = bool(mcfg.get("multiscale", False))
+    in_ch = n_channels(a.task, extra)
 
     stats = load_norm_stats(a.root, a.tier) or compute_norm_stats(a.root, a.tier, a.task)
-    cfg = {"model": a.model, "task": a.task, "tier": a.tier, "root": a.root, "model_config": MODEL_CONFIGS[a.model], "lr": lr,
+    cfg = {"model": a.model, "task": a.task, "tier": a.tier, "root": a.root, "model_config": mcfg, "variant": a.variant, "extra_channels": list(extra), "lr": lr,
            "batch": a.batch, "epochs": a.epochs, "weight_decay": a.weight_decay, "seed": a.seed, "amp": amp, "patience": a.patience,
-           "time_budget_min": a.time_budget_min, "input_channels": TASK_CHANNELS[a.task], "target": f"log10({TASK_TARGET[a.task]} + eps*max)",
+           "time_budget_min": a.time_budget_min, "input_channels": in_ch, "target": f"log10({TASK_TARGET[a.task]} + eps*max)",
            "norm_stats": stats["log_resistance"], "device": torch.cuda.get_device_name(0) if device.type == "cuda" else "cpu",
            "git": subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, cwd=ROOT).stdout.strip()}
-    model = build_model(a.model, TASK_CHANNELS[a.task], **MODEL_CONFIGS[a.model]).to(device)
+    model = build_model(a.model, in_ch, **mcfg).to(device)
     cfg["n_params"] = sum(p.numel() for p in model.parameters())
     (out / "config.json").write_text(json.dumps(cfg, indent=1))
 
@@ -185,9 +210,9 @@ def main():
         if a.max_train:
             tr.index = tr.index.iloc[: a.max_train].reset_index(drop=True)
         va = AmpScapeDataset(a.task, "val", a.tier, a.root)
-        dl_tr = torch.utils.data.DataLoader(Items(tr, a.task, stats, graph), batch_size=a.batch, shuffle=True, num_workers=a.workers,
+        dl_tr = torch.utils.data.DataLoader(Items(tr, a.task, stats, graph, extra, multiscale), batch_size=a.batch, shuffle=True, num_workers=a.workers,
                                             collate_fn=collate, pin_memory=True, drop_last=True, persistent_workers=a.workers > 0)
-        dl_va = torch.utils.data.DataLoader(Items(va, a.task, stats, graph), batch_size=a.batch, shuffle=False, num_workers=a.workers, collate_fn=collate)
+        dl_va = torch.utils.data.DataLoader(Items(va, a.task, stats, graph, extra, multiscale), batch_size=a.batch, shuffle=False, num_workers=a.workers, collate_fn=collate)
         opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=a.weight_decay)
         steps = a.epochs * max(len(dl_tr), 1)
         sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: 0.5 * (1 + math.cos(math.pi * min(s / max(steps, 1), 1.0))))
@@ -226,12 +251,12 @@ def main():
         if len(ds) == 0:
             continue
         bs = 1 if tier in ("XL", "XXL") else a.batch
-        dl = torch.utils.data.DataLoader(Items(ds, a.task, stats, graph), batch_size=bs, shuffle=False, num_workers=min(a.workers, 2), collate_fn=collate)
+        dl = torch.utils.data.DataLoader(Items(ds, a.task, stats, graph, extra, multiscale), batch_size=bs, shuffle=False, num_workers=min(a.workers, 2), collate_fn=collate)
         tag = f"{pathlib.Path(root).name}_{tier}_{split}"
         pdir = out / "predictions" / tag
         pdir.mkdir(parents=True, exist_ok=True)
         n = predict(model, a.model, dl, device, a.task, pdir / "predictions.h5", amp)
-        (pdir / "meta.json").write_text(json.dumps({"model": f"{a.model}_{a.task}_{a.tier}", "task": a.task, "tier": tier, "split": split,
+        (pdir / "meta.json").write_text(json.dumps({"model": f"{a.model}-{a.variant}{'+' + '+'.join(extra) if extra else ''}_{a.task}_{a.tier}", "task": a.task, "tier": tier, "split": split,
                                                     "seed": a.seed, "notes": "learned baseline, Phase 10", "train_root": a.root}, indent=1))
         summary["eval"][tag] = evaluate_group(pdir, [split], root, tier)
         print(f"{tag}: {n} predictions ->", {t: {k: round(v, 4) for k, v in d.items() if k in ("mae_log10eps", "rel_l2", "top5_iou") and v is not None}

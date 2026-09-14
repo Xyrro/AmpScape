@@ -3,11 +3,17 @@ license: cc-by-4.0
 pretty_name: AmpScape
 task_categories: [image-to-image, other]
 tags: [landscape-connectivity, circuitscape, omniscape, surrogate-modeling, neural-operators, scientific-ml, ecology]
-size_categories: [n<1K]
+size_categories: [100K<n<1M]
 configs: []   # filled by scripts/push_to_hub.py from the layout (one config per tier × task group)
 ---
 
-# AmpScape (dataset card — draft, mini release)
+# AmpScape
+
+> **v1.0 generation in progress — shards are being added; index and card finalised on completion.**
+> Started 2026-09-15 on Georgia Tech PACE-ICE with streaming upload (each shard is validated, uploaded and
+> checksum-verified before it appears here). Tier order S → M → L → XL → XXL. Until completion, `index/<tier>.parquet`
+> and `splits/full/*.parquet` cover the shards uploaded so far and are re-published as tiers grow; the card, the
+> Croissant file and the baseline tables are updated at the end. Pipeline tag: `v1.0-pipeline`.
 
 AmpScape is a benchmark of **circuit-theoretic landscape connectivity** solved with the reference
 solvers Circuitscape.jl 5.17.1 and Omniscape.jl 0.6.2, for training and fairly comparing learned
@@ -44,11 +50,16 @@ This mini release: tier S only, 250 landscapes (200 synthetic, 50 real), 1 270 s
 
 ## Splits and leakage
 
-Real tiles are assigned by spatial regions shared across tiers (equal-width 20° cells plus XXL
-footprints as their own regions), so no test region at any resolution overlaps a training region at
-another; synthetic landscapes by seed family. OOD sets: held-out biomes/realms, held-out resistance
-table (`forest_bird`), held-out contrast (10⁴), held-out scale (XL/XXL for models trained ≤ L), and a
-synthetic→real flag. **Pilot caveat:** the mini's 50 real tiles over-represent the held-out regions
+Real tiles are assigned by spatial macro-cells shared across tiers (equal-width 20° cells, one seeded
+assignment per cell), so S–XL test regions never overlap S–XL training regions at any resolution;
+synthetic landscapes by seed family. **XXL is test-only and its footprints (2 048 km, 32 tiles covering
+≈ 90 % of land) unavoidably overlap finer-tier training cells — for XXL, `test_ood_scale` therefore isolates
+*resolution* transfer, not spatial novelty; this is disclosed here and in the task specification.** A strict
+subset, `test_ood_scale_strict` (≈ 6 XXL real tiles placed entirely inside non-training cells, zero overlap
+with any training tile at any tier, verified geometrically), isolates both. Region hold-outs are
+tile-level: a tile is `ood_region` when its own biome (Montane Grasslands & Shrublands, Mangroves) or
+realm (Australasia) is held out. Other OOD sets: held-out resistance table (`forest_bird`), held-out
+contrast (10⁶), held-out scale (XL/XXL for models trained ≤ L), and a synthetic→real flag. **Pilot caveat:** the mini's 50 real tiles over-represent the held-out regions
 (20 of 50) because the Phase 2 pilot sampled those strata for coverage; this is not a v1.0 property.
 
 ## Metrics caveat

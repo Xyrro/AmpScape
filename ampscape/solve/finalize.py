@@ -28,6 +28,18 @@ KIND_TASK = {"points": "T1,T2", "wall_to_wall": "T1W", "regions": "T1R", "advanc
 GZIP = {"compression": "gzip", "compression_opts": 4, "shuffle": True}
 
 
+def git_tag() -> str:
+    """Exact tag on HEAD (e.g. v1.0-pipeline), else AMPSCAPE_PIPELINE_TAG, else ""."""
+    import os
+    import subprocess
+
+    try:
+        t = subprocess.run(["git", "describe", "--tags", "--exact-match"], capture_output=True, text=True, cwd=pathlib.Path(__file__).resolve().parents[2]).stdout.strip()
+    except Exception:  # noqa: BLE001
+        t = ""
+    return t or os.environ.get("AMPSCAPE_PIPELINE_TAG", "")
+
+
 def git_sha() -> str:
     try:
         return subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, timeout=10).stdout.strip()
@@ -48,11 +60,13 @@ def finalize_shard(inputs_h5: str, outputs_h5: str, final_h5: str, dataset_versi
     """Write the final shard and return the index rows (one per sample × config)."""
     rows = []
     sha = git_sha()
+    tag = git_tag()
     created = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
     pathlib.Path(final_h5).parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(inputs_h5, "r") as fi, h5py.File(outputs_h5, "r") as fo, h5py.File(final_h5, "w") as ff:
         ff.attrs["dataset_version"] = dataset_version
         ff.attrs["pipeline_git_sha"] = sha
+        ff.attrs["pipeline_tag"] = tag
         ff.attrs["created_at"] = created
         ff.attrs["schema_version"] = "0.1"
         for sid in fi["samples"]:
@@ -122,12 +136,12 @@ def finalize_shard(inputs_h5: str, outputs_h5: str, final_h5: str, dataset_versi
                     "conservation_err": q["conservation_err"],
                     "edge_ratio": q.get("edge_ratio"), "qc_flags": ",".join(q["qc_flags"]), "qc_pass": ok_all,
                     "qc_trainval": ok_trainval, "shard": pathlib.Path(final_h5).name, "dataset_version": dataset_version,
-                    "pipeline_git_sha": sha, "created_at": created,
+                    "pipeline_git_sha": sha, "pipeline_tag": tag, "created_at": created,
                 })
             meta.update({"solver_name": "Circuitscape.jl/Omniscape.jl", "solver_versions": {
                 "julia": stats.get("julia_version"), "circuitscape": stats.get("circuitscape_version"),
                 "omniscape": stats.get("omniscape_version")}, "solver_preset": solver_preset,
-                "qc_flags": sorted(set(sample_flags)), "created_at": created, "pipeline_git_sha": sha,
+                "qc_flags": sorted(set(sample_flags)), "created_at": created, "pipeline_git_sha": sha, "pipeline_tag": tag,
                 "dataset_version": dataset_version})
             gs.attrs["meta"] = json.dumps(meta, default=float)
     return pd.DataFrame(rows)

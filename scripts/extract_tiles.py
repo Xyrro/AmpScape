@@ -65,7 +65,8 @@ def process(spec_d: dict, sources: real.SourcePaths, out: pathlib.Path, versions
     channels, grid, qc = real.extract_tile(spec, sources)
     row = {"tile_id": spec.tile_id, "lat": spec.lat, "lon": spec.lon, "tier": spec.tier, "size": spec.size,
            "pixel_m": spec.pixel_m, "epsg": grid.epsg, "transform": json.dumps(list(grid.transform)[:6]),
-           **{f"qc_{k}": v for k, v in qc.items()},
+           **{f"qc_{k}": v for k, v in qc.items() if k != "resampling"}, "resampling": json.dumps(qc.get("resampling", {})),
+           "strict": bool(spec_d.get("strict", False)),
            **{k: v for k, v in spec.stratum.items() if k in ("biome_num", "biome_name", "realm", "ecoregion_id",
                                                               "ecoregion_name", "ghm", "ghm_tercile", "stratum", "grip_region")},
            "created_utc": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "path": None, "sha256": None}
@@ -90,6 +91,7 @@ def main() -> None:
     ap.add_argument("--first-accepted", type=int, default=None,
                     help="prefix mode (v1.0): walk `selected` in order until this many tiles are accepted; rejected "
                          "tiles are skipped, never replaced from the reserve, so the result is a true prefix")
+    ap.add_argument("--per-specs-manifest", action="store_true", help="write <out>/tiles_<specs-dir-name>.parquet instead of tiles.parquet")
     ap.add_argument("--retry-rejected", action="store_true",
                     help="drop previously rejected rows from the manifest and extract them again")
     args = ap.parse_args()
@@ -98,10 +100,16 @@ def main() -> None:
 
     out = pathlib.Path(args.out)
     specs = json.loads((pathlib.Path(args.specs) / "tile_specs.json").read_text())
+    if specs.get("strict_cells"):                       # test_ood_scale_strict tiles carry a marker into the manifest
+        for s_ in specs["selected"] + specs["reserve"]:
+            s_["strict"] = True
     sources = real.local_sources_from_dir(args.sources)
     versions = source_versions(pathlib.Path(args.sources))
     versions["pipeline_git_sha"] = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    manifest_path = out / "tiles.parquet"
+    ap_tier = (specs["selected"] or specs["reserve"])[0]["tier"] if (specs["selected"] or specs["reserve"]) else "all"
+    tag = pathlib.Path(args.specs).name if pathlib.Path(args.specs).name != pathlib.Path(args.out).name else ap_tier
+    # one manifest per specs directory so that tiers can be extracted concurrently; merge with `build_v1_tiles.py merge`
+    manifest_path = out / (f"tiles_{tag}.parquet" if args.per_specs_manifest else "tiles.parquet")
     done = pd.read_parquet(manifest_path) if manifest_path.exists() else pd.DataFrame()
     if args.retry_rejected and len(done):
         done = done[done["qc_accept"]].reset_index(drop=True)

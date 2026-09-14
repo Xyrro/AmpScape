@@ -84,8 +84,9 @@ def load_landscape(spec: SampleSpec, pilot_root: str | None):
         r_max = float(src.tags().get("r_max", "nan"))
     tiles = pd.read_parquet(root / "tiles.parquet").set_index("tile_id")
     t = tiles.loc[spec.tile_id]
-    cov, _ = read_tile(str(root / t["path"]))
-    meta = {"generator": "real", "resistance_table_id": spec.table_id, "table_version": int(row.table_version),
+    cov, tags = read_tile(str(root / t["path"]))
+    meta = {"generator": "real", "resampling": json.loads(tags["resampling"]) if tags.get("resampling") else None,
+            "resistance_table_id": spec.table_id, "table_version": int(row.table_version),
             "table_sha256": row.table_sha256, "r_max": r_max, "tile_id": spec.tile_id, "lat": float(t["lat"]),
             "lon": float(t["lon"]), "crs": f"EPSG:{int(t['epsg'])}", "transform": json.loads(t["transform"]),
             "biome_num": int(t["biome_num"]), "biome_name": t["biome_name"], "realm": t["realm"],

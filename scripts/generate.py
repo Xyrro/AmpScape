@@ -166,6 +166,15 @@ def cmd_submit(a) -> None:
     a.max_concurrent = a.max_concurrent or prof["limits"].get("max_array_concurrent", 20)
     if not a.skip_precompile:
         precompile_julia()
+    pause_gb = float(prof.get("limits", {}).get("scratch_pause_gb", 0) or 0)
+    if pause_gb and not getattr(a, "ignore_scratch_guard", False):
+        from ampscape.io.sync import scratch_used_gb
+
+        used = scratch_used_gb(pathlib.Path(prof["scratch_root"]) / "data")
+        if used > pause_gb:
+            raise SystemExit(f"scratch guard: {used:.0f} GB under data/ exceeds the {pause_gb:.0f} GB pause threshold — "
+                             "let the sync loop drain uploaded shards before submitting (or --ignore-scratch-guard)")
+        print(f"scratch guard: {used:.0f} GB under data/ (pause at {pause_gb:.0f} GB)")
     shards = sorted(int(s) for s in df.shard.unique())
     todo = [s for s in shards if not shard_paths(build, s)["final"].exists()] if not a.force else shards
     if not todo:
@@ -308,6 +317,7 @@ def main() -> None:
     b.add_argument("--force-solve", action="store_true", help="re-solve listed configs even for complete samples")
     b.add_argument("--dry-run", action="store_true")
     b.add_argument("--skip-precompile", action="store_true")
+    b.add_argument("--ignore-scratch-guard", action="store_true")
     b.set_defaults(func=cmd_submit)
     t = sub.add_parser("status")
     t.add_argument("--build", required=True)

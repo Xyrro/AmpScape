@@ -15,6 +15,7 @@ import yaml
 
 from ampscape.splits.spatial import (
     BlockGrid,
+    _boxes_intersect,
     apply_tile_holdouts,
     region_holdouts,
     apply_holdouts,
@@ -33,6 +34,31 @@ def stable_unit(key: str) -> float:
     return int(hashlib.sha1(key.encode()).hexdigest()[:12], 16) / float(16 ** 12)
 
 
+def strict_scale_flags(df: pd.DataFrame, tiles_root: str | None, grid: BlockGrid, seed: int, fractions: dict, cfg: dict) -> list[bool]:
+    """`test_ood_scale_strict`: XXL tiles sampled in test_id cells (`strict` in the tile manifest) whose box overlaps no
+    train/val tile of any tier in the full v1.0 tile manifest (geometric check; a violation raises)."""
+    flags = [False] * len(df)
+    if not tiles_root:
+        return flags
+    tp = pathlib.Path(tiles_root) / "tiles.parquet"
+    if not tp.exists():
+        return flags
+    t = pd.read_parquet(tp)
+    if "strict" not in t or not t.strict.any():
+        return flags
+    t = t[t.qc_accept][["tile_id", "tier", "lat", "lon", "size", "pixel_m", "realm", "biome_num", "strict"]].drop_duplicates("tile_id")
+    ob, ot = region_holdouts(t, grid, cfg["ood"]["test_ood_region"])
+    a = apply_tile_holdouts(assign_tiles(t, grid, seed, ood_blocks=ob, fractions=fractions), ot)
+    trainval = a[a.split.isin(["train", "val"])]
+    strict_ok = set()
+    for r in a[a.strict & (a.tier == "XXL")].itertuples():
+        hits = [x.tile_id for x in trainval.itertuples() if _boxes_intersect(r.box, x.box)]
+        if hits:
+            raise RuntimeError(f"strict XXL tile {r.tile_id} overlaps train/val tiles {hits[:5]}")
+        strict_ok.add(r.tile_id)
+    return [bool(r.family == "real" and r.tier == "XXL" and r.tile_id in strict_ok) for r in df.itertuples()]
+
+
 def add_splits(index: pd.DataFrame, build: pathlib.Path, cfg_path: pathlib.Path = DEFAULT_CFG) -> pd.DataFrame:
     cfg = yaml.safe_load(open(cfg_path))
     sp = cfg["splits"]
@@ -43,13 +69,13 @@ def add_splits(index: pd.DataFrame, build: pathlib.Path, cfg_path: pathlib.Path 
     df = index.copy()
     # real tiles: one row per tile with centre and size
     real = df[df.family == "real"].drop_duplicates("sample_id")
+    bj = pathlib.Path(build) / "build.json"
+    tiles_root = json.loads(bj.read_text()).get("pilot") if bj.exists() else None
     if len(real):
         tiles = pd.DataFrame({"tile_id": real.tile_id, "tier": real.tier, "lat": real.lat, "lon": real.lon, "size": real.H,
                               "pixel_m": real.pixel_m, "realm": real.realm, "biome_num": real.biome_num}).drop_duplicates("tile_id")
         from ampscape.solve.manifest import load_parents
 
-        bj = pathlib.Path(build) / "build.json"
-        tiles_root = json.loads(bj.read_text()).get("pilot") if bj.exists() else None
         tiles = pd.concat([tiles, load_parents(tiles_root)], ignore_index=True)
         ood_blocks, ood_tiles = region_holdouts(tiles, grid, cfg["ood"]["test_ood_region"])
         t = apply_tile_holdouts(assign_tiles(tiles, grid, seed, ood_blocks=ood_blocks, fractions=fractions), ood_tiles)
@@ -75,6 +101,7 @@ def add_splits(index: pd.DataFrame, build: pathlib.Path, cfg_path: pathlib.Path 
         df[k] = [f[k] for f in flags]
     df["split"] = [s if s == "test_ood_published" else apply_holdouts(s, f) for s, f in zip(df.split, flags, strict=True)]
     df["test_ood_published"] = df.split == "test_ood_published"
+    df["test_ood_scale_strict"] = strict_scale_flags(df, tiles_root, grid, seed, fractions, cfg)
     # XL: only a share of macro-cells are train/val (amendment C3) — applied by block hash
     xl_share = float(sp.get("xl_trainval_share", 0.25))
     df.loc[(df.tier == "XL") & df.split.isin(["train", "val"]) & (df.block_id.apply(lambda b: stable_unit(f"{b}|{seed}") >= xl_share)), "split"] = "test_id"

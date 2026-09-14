@@ -17,8 +17,30 @@ TASK_TARGET = {"T1": "cum_current", "T1W": "cum_current", "T1R": "cum_current", 
 TASK_CONFIG = {"T1": "points", "T1W": "wall_to_wall", "T1R": "regions", "T3": "advanced", "T4": "omniscape"}
 
 
-def make_inputs(d: dict, task: str, stats: dict) -> np.ndarray:
-    """(C, H, W) float32 input stack for one dataset item (numpy)."""
+def source_pixels(d: dict, task: str) -> np.ndarray:
+    if task in ("T1", "T1W", "T1R"):
+        return d["focal"][0] > 0
+    return d["source_strength"][0] > 0
+
+
+def distance_channel(d: dict, task: str) -> np.ndarray:
+    """Euclidean distance (pixels) to the nearest source/focal pixel, divided by max(H, W); 0 at NoData.
+
+    Offered to every model as an optional input (owner tuning pass): it gives local architectures a global cue
+    about where current is injected.
+    """
+    from scipy import ndimage
+
+    src = source_pixels(d, task)
+    nd = d["nodata"][0] > 0
+    if not src.any():
+        return np.zeros(src.shape, np.float32)
+    dist = ndimage.distance_transform_edt(~src) / float(max(src.shape))
+    return np.where(nd, 0.0, dist).astype(np.float32)
+
+
+def make_inputs(d: dict, task: str, stats: dict, extra: tuple[str, ...] = ()) -> np.ndarray:
+    """(C, H, W) float32 input stack for one dataset item (numpy); `extra` may contain "dist"."""
     nd = d["nodata"][0] > 0
     s = stats["log_resistance"]
     lr = (d["log_resistance"][0] - s["mean"]) / s["std"]
@@ -34,7 +56,37 @@ def make_inputs(d: dict, task: str, stats: dict) -> np.ndarray:
         chans.append(d["source_strength"][0].astype(np.float32))
     else:
         raise ValueError(task)
+    if "dist" in extra:
+        chans.append(distance_channel(d, task))
     return np.stack(chans)
+
+
+def n_channels(task: str, extra: tuple[str, ...] = ()) -> int:
+    return TASK_CHANNELS[task] + ("dist" in extra)
+
+
+def coarse_graph(resistance: np.ndarray, nodata: np.ndarray, f: int = 4):
+    """Coarse grid graph (geometric-mean resistance, majority NoData over f×f blocks) + fine→coarse node map.
+
+    Returns (coarse node_index (H/f, W/f), coarse edge_index, coarse edge_weight, fine_to_coarse (N_fine,) int64
+    with -1 where the coarse block is NoData).
+    """
+    H, W = resistance.shape
+    h, w = H // f, W // f
+    R = resistance[: h * f, : w * f].reshape(h, f, w, f)
+    nd = nodata[: h * f, : w * f].reshape(h, f, w, f)
+    valid = ~nd
+    logR = np.where(valid, np.log(np.maximum(R, 1e-12)), 0.0)
+    cnt = valid.sum(axis=(1, 3))
+    Rc = np.exp(logR.sum(axis=(1, 3)) / np.maximum(cnt, 1)).astype(np.float32)
+    ndc = cnt < (f * f) / 2
+    idx_c, ei_c, w_c = grid_graph(Rc, ndc)
+    fine_idx = -np.ones((H, W), np.int64)
+    fine_idx[~nodata] = np.arange(int((~nodata).sum()))
+    blk = np.full((H, W), -1, np.int64)
+    blk[: h * f, : w * f] = np.repeat(np.repeat(idx_c, f, axis=0), f, axis=1)
+    f2c = blk[~nodata]
+    return idx_c, ei_c, w_c, f2c
 
 
 def make_target(d: dict, task: str) -> tuple[np.ndarray, np.ndarray]:

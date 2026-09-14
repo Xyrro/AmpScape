@@ -1,5 +1,7 @@
 # GPU budget (Phase 10 dev runs, L40S, bf16 autocast except FNO)
 
+**External GPU request: 1 000 GPU-hours (owner decision, 2026-09-14)** — covers the conservative 30-epoch scenario below (933 GPU-h) for the ten model × task pairs, three seeds, S–XL, on L40S-class hardware.
+
 | model | task | params (M) | train items | epochs run | best epoch | s / epoch | GPU-h / epoch | training GPU-h |
 |---|---|---|---|---|---|---|---|---|
 | fno | T1 | 2.11 | 1786 | 18 | 6 | 3.5 | 0.0010 | 0.017 |

@@ -14,6 +14,8 @@ Order of precedence (test-most first): ood_region > test_id > val > train.
 from __future__ import annotations
 
 import hashlib
+import json
+import pathlib
 import math
 from dataclasses import dataclass
 
@@ -101,6 +103,17 @@ class BlockGrid:
         return box if box[0] < box[1] and box[2] < box[3] else None
 
 
+FROZEN_ASSIGNMENT = pathlib.Path(__file__).resolve().parents[2] / "configs" / "splits" / "cell_assignment_v1.json"
+
+
+def load_frozen_assignment(seed: int) -> dict[str, str] | None:
+    """Frozen full-grid cell assignment (scripts/freeze_cell_assignment.py) if it exists and matches the seed."""
+    if not FROZEN_ASSIGNMENT.exists():
+        return None
+    d = json.loads(FROZEN_ASSIGNMENT.read_text())
+    return d["assignment"] if int(d["seed"]) == int(seed) else None
+
+
 def assign_blocks(block_ids: list[str], seed: int, fractions: dict[str, float] | None = None,
                   strata: dict[str, str] | None = None) -> dict[str, str]:
     """One seeded assignment per block, stratified (optionally) by ``strata[block_id]`` (e.g. realm).
@@ -172,7 +185,11 @@ def assign_tiles(tiles: pd.DataFrame, grid: BlockGrid, seed: int, ood_blocks: se
     if strata_col and strata_col in t:
         strata = t.groupby("block_id")[strata_col].agg(lambda x: x.mode().iloc[0]).to_dict()
     all_blocks = sorted({b for fb in t.footprint_blocks for b in fb})
-    assign = assign_blocks(all_blocks, seed, fractions, strata)
+    frozen = load_frozen_assignment(seed)
+    if frozen is not None:
+        assign = {b: frozen.get(b, "train") for b in all_blocks}      # v1.0: pure function of (cell, seed)
+    else:
+        assign = assign_blocks(all_blocks, seed, fractions, strata)
 
     def cell_kind(b: str) -> str:
         return "ood_region" if ood_blocks and b in ood_blocks else assign.get(b, "train")

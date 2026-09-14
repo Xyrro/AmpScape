@@ -40,3 +40,38 @@ class GridGNN(nn.Module):
         out = torch.zeros(B, H, W, self.dec[-1].out_features, device=x.device, dtype=h.dtype)
         out[valid] = self.dec(h)
         return out.permute(0, 3, 1, 2)
+
+
+class MultiScaleGridGNN(nn.Module):
+    """Two-level variant (owner tuning pass): message passing on a 4×-coarsened graph (geometric-mean resistance,
+    majority NoData) extends the receptive field 4× per hop; coarse features are scattered back to the fine nodes and
+    refined by fine-graph layers. Depth: `coarse_layers` on the coarse graph, `fine_layers` on the fine graph."""
+
+    def __init__(self, in_channels: int, out_channels: int = 1, dim: int = 64, coarse_layers: int = 12, fine_layers: int = 6, factor: int = 4):
+        super().__init__()
+        self.factor = factor
+        self.enc = nn.Sequential(nn.Linear(in_channels, dim), nn.GELU(), nn.Linear(dim, dim))
+        self.coarse = nn.ModuleList([MPLayer(dim) for _ in range(coarse_layers)])
+        self.fuse = nn.Sequential(nn.Linear(2 * dim, dim), nn.GELU())
+        self.fine = nn.ModuleList([MPLayer(dim) for _ in range(fine_layers)])
+        self.dec = nn.Sequential(nn.Linear(dim, dim), nn.GELU(), nn.Linear(dim, out_channels))
+
+    def forward(self, x, node_index, edge_index, edge_weight, coarse_edge_index, coarse_edge_weight, fine_to_coarse, n_coarse: int):
+        B, C, H, W = x.shape
+        valid = node_index >= 0
+        h = self.enc(x.permute(0, 2, 3, 1)[valid])
+        # mean-pool fine features onto coarse nodes
+        ok = fine_to_coarse >= 0
+        hc = torch.zeros(n_coarse, h.shape[1], device=h.device, dtype=h.dtype).index_add_(0, fine_to_coarse[ok], h[ok])
+        cnt = torch.zeros(n_coarse, device=h.device, dtype=h.dtype).index_add_(0, fine_to_coarse[ok], torch.ones(int(ok.sum()), device=h.device, dtype=h.dtype))
+        hc = hc / cnt.clamp_min(1.0)[:, None]
+        for layer in self.coarse:
+            hc = layer(hc, coarse_edge_index, coarse_edge_weight)
+        back = torch.zeros_like(h)
+        back[ok] = hc[fine_to_coarse[ok]]
+        h = self.fuse(torch.cat([h, back], dim=1))
+        for layer in self.fine:
+            h = layer(h, edge_index, edge_weight)
+        out = torch.zeros(B, H, W, self.dec[-1].out_features, device=x.device, dtype=h.dtype)
+        out[valid] = self.dec(h)
+        return out.permute(0, 3, 1, 2)
