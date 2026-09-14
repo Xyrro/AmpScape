@@ -49,7 +49,36 @@ NS/EW, advanced, Omniscape with the tier's radius/block) and `cg_baseline = true
 peak RSS 9.6 GB — consistent with the XXL_test profile entry). Reference solver CHOLMOD throughout, no fallback;
 residuals ≤ 5.5e-10 (S) and ≤ 3.5e-9 (XXL), no refinement triggered.
 
-TODO_PUBLISHED_QC
+Finalised (`generate.py finalize --quicklooks`, job 5776137): 46 samples / 230 configuration rows, **100 % QC
+pass**, index split `test_ood_published` = 46, quicklooks for every sample (the raccoon XXL tile spans the
+south-eastern Baltic; 13.8 % NoData = sea). The published rasters are included in the manifest and
+`docs/licenses.md` (Phase 8); the build is not on HF yet (mini-only repo; publication route per DECISIONS).
+
+Coarsen-×4 baseline on `test_ood_published` (`data/predictions/coarsen4_published/eval_test_ood_published/`, jobs
+5776137 + 5776269; the XXL coarse solve exposed an ungrounded coarse island → `refine_voltage!` now catches a
+non-positive-definite reduced system and the coarsener drops sources on ungrounded islands):
+
+| task | source (tier) | n | mae_log10eps | rel_l2 | top5_iou | pinch_recall | corridor_dice_q10 | spearman | reff_rel_error | speed-up (mean) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| T1 | Eurac Alps (S) | 30 | 0.155 | 0.483 | 0.474 | 0.275 | 0.714 | 0.898 | 0.176 | 5.4 |
+| T1 | gallinule (S) | 15 | 0.058 | 0.469 | 0.565 | 0.298 | 0.795 | 0.969 | 0.142 | 6.0 |
+| T1 | raccoon (XXL) | 1 | 0.041 | 0.485 | 0.778 | 0.145 | 0.885 | 0.980 | 0.086 | 15.5 |
+| T1W | Eurac Alps (S) | 60 | 0.149 | 0.390 | 0.361 | 0.231 | 0.621 | 0.822 | 0.052 | 2.5 |
+| T1W | gallinule (S) | 30 | 0.044 | 0.236 | 0.296 | 0.309 | 0.525 | 0.666 | 0.018 | 2.7 |
+| T1W | raccoon (XXL) | 2 | 0.048 | 0.154 | 0.637 | 0.186 | 0.814 | 0.970 | 0.025 | 5.5 |
+| T3 | Eurac Alps (S) | 30 | 0.157 | 0.407 | 0.501 | 0.263 | 0.728 | 0.898 | – | 3.0 |
+| T3 | gallinule (S) | 15 | 0.055 | 0.322 | 0.593 | 0.288 | 0.803 | 0.965 | – | 3.3 |
+| T3 | raccoon (XXL) | 1 | 0.048 | 0.138 | 0.781 | 0.224 | 0.898 | 0.987 | – | 11.5 |
+| T4 | Eurac Alps (S) | 30 | 0.456 | 0.748 | 0.490 | 0.326 | 0.724 | 0.928 | – | 59 |
+| T4 | gallinule (S) | 15 | 0.475 | 0.759 | 0.425 | 0.310 | 0.637 | 0.907 | – | 81 |
+| T4 | raccoon (XXL) | 1 | 0.525 | 0.753 | 0.657 | 0.227 | 0.823 | 0.979 | – | 28 |
+
+Overall (230 rows): T1 mae 0.121 / rel-L2 0.479 / top-5 IoU 0.510; T1W 0.113 / 0.335 / 0.346; T3 0.122 / 0.373 /
+0.538; T4 0.463 / 0.752 / 0.472 — the same order as on the mini test splits, with the Eurac Alps tiles (20 m
+native, contrast 10³, strongly textured) the hardest S set. Acceleration on the 68 systems with a stored
+baseline: no gain (iterations 14 → 14 median; XXL T3 35 → 38, the interpolated voltage has a relative residual
+of 3.4e4 on the 3.6 M-node fine graph), i.e. an upsampled coarse solution is not a useful PCG warm start.
+
 
 
 ## 4. Non-learned baseline: coarsen ×4 → CHOLMOD → upsample
@@ -117,4 +146,22 @@ Phase 10 learned baselines.
 
 ## 5. Tests, commits
 
-TODO_TESTS
+- Tests: 122 passing (`pytest --ignore=tests/test_real_network.py`, 3 min); new `tests/test_coarsen.py` (6),
+  `tests/test_metrics.py` (5), `tests/test_metrics_transforms.py`.
+- Compute this phase (ICE, all within the gates): published build 3 × ~18 min + 3 h 0 min (4 CPUs each),
+  baseline/finalize/eval jobs 10–12 min each, warm-start evaluations on the login node (≈ 6 min, Julia
+  start-up dominated); cumulative ICE usage stays far below 500 CPU-h. No downloads, no HF pushes.
+- Harness fixes found while running the baseline (all in `DECISIONS.md`): per-pair focal-current check
+  (the cumulative map carries pass-through current), zero-flow pixels excluded from top-q sets and pinch
+  points (plateaus of zeros were counted as maxima), published tiles' root resolution in `prepare`,
+  the three baseline scale rules, robust refinement.
+- Open: the acceleration track only becomes informative at XL/XXL with a *learned* voltage; a coarse-solve
+  warm start does not help. The metric thresholds (top-q, 7×7 maxima, 3 px) remain conventions
+  (brief §17). GRIP4 licence still awaiting PBL's reply (owner).
+
+## Next step (Phase 10, on confirmation)
+
+Learned baselines on the mini (brief §12): U-Net / FNO-style surrogates for T1/T1W/T3/T4 in log10-ε space,
+a Reff head for T2, training on `train` with the train-only normalisation stats, evaluation through
+`evaluate.py` on `test_id`, `test_ood`, `ood_region` and `test_ood_published`, GPU runs ≤ 20 GPU-h.
+
