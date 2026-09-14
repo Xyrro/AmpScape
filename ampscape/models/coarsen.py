@@ -89,6 +89,7 @@ def coarsen_advanced(S: np.ndarray, G: np.ndarray, ndc: np.ndarray, f: int) -> t
 def write_coarse_inputs(final_h5: str, out_h5: str, sample_ids: list[str], f: int = 4) -> dict[str, dict]:
     """Build a Julia-solvable inputs shard at 1/f resolution from a final shard; returns per-sample timings."""
     timings = {}
+    skipped: list[tuple[str, str]] = []
     with h5py.File(final_h5, "r") as fi, h5py.File(out_h5, "w") as fo:
         g_all = fo.create_group("samples")
         for sid in sample_ids:
@@ -111,14 +112,23 @@ def write_coarse_inputs(final_h5: str, out_h5: str, sample_ids: list[str], f: in
             gc_all = g.create_group("configs")
             for cname, gc in gs["configs"].items():
                 kind = gc.attrs["kind"]
-                gco = gc_all.create_group(cname)
-                gco.attrs["kind"] = kind
                 if "focal_mask" in gc["inputs"]:
                     fc = coarsen_labels(gc["inputs"]["focal_mask"][...], f)
                     fc[ndc] = 0
+                    fine_labels = set(np.unique(gc["inputs"]["focal_mask"][...])) - {0}
+                    if set(np.unique(fc)) - {0} != fine_labels:
+                        skipped.append((sid, cname))        # a focal label vanished under coarsening (NoData majority)
+                        continue
+                gco = gc_all.create_group(cname)
+                gco.attrs["kind"] = kind
+                if "focal_mask" in gc["inputs"]:
                     gco.create_dataset("focal_mask", data=fc, **GZIP)
                 if kind == "advanced":
                     sc, gr = coarsen_advanced(gc["inputs"]["source_strength"][...], gc["inputs"]["ground"][...], ndc, f)
+                    if sc.sum() <= 0 or not gr.any():
+                        del gc_all[cname]
+                        skipped.append((sid, cname))
+                        continue
                     gco.create_dataset("source_strength", data=sc.astype(np.float32), **GZIP)
                     gco.create_dataset("ground", data=gr.astype(np.int8), **GZIP)
                 elif "source_strength" in gc["inputs"]:
@@ -128,6 +138,8 @@ def write_coarse_inputs(final_h5: str, out_h5: str, sample_ids: list[str], f: in
                 if kind == "omniscape":
                     gco.attrs["source_threshold"] = float(gc.attrs.get("source_meta", "{}") and json.loads(gc.attrs["source_meta"]).get("source_threshold", 0.0))
             timings[sid] = time.perf_counter() - t0
+    if skipped:
+        print(f"coarsen: {len(skipped)} configurations undefined on the coarse grid and skipped: {skipped[:5]}{' ...' if len(skipped) > 5 else ''}")
     return timings
 
 
