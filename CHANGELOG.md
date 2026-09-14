@@ -8,7 +8,11 @@
   (`scripts/build_v1_tiles.py`: grid-fit sampling with interior-box snapping, prefix extraction, per-tile random table,
   frozen XXL parents); `hard_case` / `design` index columns; stable XL hash.
 - Learned baselines (`ampscape/models/{unet,fno,vit,gnn}.py`, `common.py`) and `scripts/train.py` (shared inputs, log10-ε
-  targets, masked MSE, AdamW + cosine, early stopping, predictions in the harness format, evaluation through the harness).
+  targets, masked MSE, AdamW + cosine, early stopping, predictions in the harness format, evaluation through the harness);
+  dev runs on T1/T3/T4 (`runs/dev`, `docs/tables/baselines_dev.md`), GPU accounting and v1.0 extrapolation
+  (`scripts/gpu_budget.py`, `docs/tables/gpu_budget.md`), `scripts/collect_baselines.py`; `docs/phase_10_report.md`.
+- Dev subset built (`data/dev/{S,M}`, `docs/dev_subset.md`): 3 000 S + 500 M, 66 CPU-h; region hold-out unit option and
+  XXL parent regions switch in `v1_0.yaml` (owner decisions pending); torch from the cu126 index.
 
 ### Phase 9 — 2026-09-13
 - `ampscape/metrics` (pixel, domain, reff, physics, efficiency, acceleration) with hand-computed tests; `ampscape/eval/harness.py`,

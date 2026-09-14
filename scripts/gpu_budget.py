@@ -71,7 +71,23 @@ def main():
         grand += tot
         lines.append(f"| {r['model']} | {r['task']} | {r['s_per_sample_epoch']*1e3:.2f} ms | {eps['S']} / {eps['M']} / {eps['L']} / {eps['XL']} | "
                      f"{per['S']:.0f} | {per['M']:.0f} | {per['L']:.0f} | {per['XL']:.0f} | **{tot:.0f}** |")
-    lines += ["", f"Grand total for the runs in this table: **{grand:.0f} GPU-h** (L40S-equivalent). ViT rows at L/XL assume windowed "
+    lines += ["", f"Grand total (square-root epoch rule): **{grand:.0f} GPU-h** (L40S-equivalent).", "",
+              "## Conservative scenario: 30 epochs at every tier (or the dev best epoch if larger), 3 seeds", "",
+              "| model | task | S | M | L | XL | total GPU-h |", "|---|---|---|---|---|---|---|"]
+    grand2 = 0.0
+    for r in rows:
+        per = {}
+        for tier, n in LADDER.items():
+            e = max(30, r["best_epoch"])
+            per[tier] = n * TRAIN_SHARE[tier] * e * r["s_per_sample_epoch"] * PIXELS[tier] / PIXELS["S"] / 3600 * SEEDS
+        tot = sum(per.values())
+        grand2 += tot
+        lines.append(f"| {r['model']} | {r['task']} | {per['S']:.0f} | {per['M']:.0f} | {per['L']:.0f} | {per['XL']:.0f} | **{tot:.0f}** |")
+    lines += ["", f"Grand total (30-epoch rule): **{grand2:.0f} GPU-h**. Both scenarios exclude evaluation passes (a few minutes per run "
+              "at S; XL/XXL inference is batch-1 and adds ~1 GPU-h per model), hyper-parameter search, and the physics-informed "
+              "variant. Per-epoch times were measured with small datasets (1.8k items), where fixed per-step overheads dominate: "
+              "the ms/sample figures are upper bounds for well-batched training at scale.", "",
+              f"ViT rows at L/XL assume windowed "
               "attention (global attention at 512² with patch 4 = 16 384 tokens is not feasible); GNN rows assume the same 12-hop "
               "depth (its receptive field, not its cost, is the limit at larger tiers)."]
     out = pathlib.Path(a.out)
