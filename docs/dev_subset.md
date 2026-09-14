@@ -17,7 +17,16 @@ visited for 240 accepted (2 rejected), M 42 for 40; 1 400 resistance rasters. Sh
 
 ## Splits (v1.0 rule, `configs/datasets/v1_0.yaml`, seed 20260906)
 
-TODO_SPLITS
+| tier | landscapes | configs (QC pass) | train | val | test_id | test_ood (forest_bird, contrast 10⁶) | ood_region | of which real tiles train / val / test_id / test_ood / ood_region |
+|---|---|---|---|---|---|---|---|---|
+| S | 3 000 | 15 880 (100 %) | 1 839 | 326 | 351 | 184 | 300 | 110 / 37 / 33 / 147 landscapes from 240 tiles (forest_bird demotes every tile's 5th table) |
+| M | 500 | 2 685 (99.9 %; 2 `residual_high` at contrast 10⁶) | 359 | 31 | 33 | 37 | 40 | 30 / 1 / 1 / — / 8 tiles |
+
+Configurations per landscape: points (T1/T2), wall-to-wall NS + EW (T1W; undefined on 13 + 17 S and 2 + 3 M
+large-NoData landscapes and therefore skipped), advanced (T3), omniscape (T4), regions (T1R on 910 S / 190 M
+landscapes: real tiles with ≥ 2 habitat patches and synthetic patch mosaics). CG baselines on every test/OOD
+sample. Hard cases (S): narrow_corridor 123, large_nodata 95, high_contrast_1e5 71, rmax_saturated 49,
+high_contrast_1e6 39 (= 20.4 % of synthetic). Quicklooks in `data/dev/<tier>/quicklooks`.
 
 ### Two findings that need an owner decision (both only change split *labels*, which are recomputed at finalize)
 
@@ -33,4 +42,14 @@ TODO_SPLITS
 
 ## Cost and storage
 
-TODO_COST
+| item | S (3 000) | M (500) |
+|---|---|---|
+| solve arrays | 30 shards × 100, 1 CPU / 6 GB, 20 concurrent | 13 shards × 40 |
+| median solve s: points / W2W / advanced / omniscape (b = 1 at S, 3 at M) | 0.19 / 0.09 / 0.08 / 50.5 | 0.82 / 0.40 / 0.38 / 103 |
+| mean per landscape | 54.5 s | 112 s |
+| peak RSS | 2.7 GB | 2.6 GB |
+| shards on disk | 3.05 GB | 1.82 GB |
+
+Total **66 CPU-hours** (solve arrays + prepare + finalize, `sacct`), wall-clock ≈ 4 h for both tiers with
+20 concurrent jobs; below the 150 core-hour threshold, so the run was launched without a prior gate report.
+Tiles (`data/tiles/v1`): 238 MB. Predictions of the coarsen-×4 baseline: `data/predictions/dev_coarsen4`.
