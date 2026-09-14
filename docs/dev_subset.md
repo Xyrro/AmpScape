@@ -40,6 +40,14 @@ high_contrast_1e6 39 (= 20.4 % of synthetic). Quicklooks in `data/dev/<tier>/qui
    are assigned by their macro-cell only; XXL stays test-only; the S-inside-XXL overlap is ≤ 0.004 % of an XXL
    tile. Options for v1.0: keep this, place XXL centres only in test/OOD cells, or cap XXL footprint merging.
 
+### Post-freeze note (2026-09-14)
+
+The macro-cell assignment is now frozen for the whole grid (`configs/splits/cell_assignment_v1.json`), which moves
+25 S and 73 M dev split labels (labels only; recomputed at finalize), and the tile reader now applies the C2
+majority rule to S land cover, so the dev subset's **real** half is not bitwise reproducible from the frozen
+pipeline and is regenerated as part of v1.0; the synthetic half is (see the freeze checklist in
+`docs/status/latest.md`).
+
 ## Cost and storage
 
 | item | S (3 000) | M (500) |
