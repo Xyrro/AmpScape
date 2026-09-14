@@ -116,8 +116,11 @@ def write_coarse_inputs(final_h5: str, out_h5: str, sample_ids: list[str], f: in
                     fc = coarsen_labels(gc["inputs"]["focal_mask"][...], f)
                     fc[ndc] = 0
                     fine_labels = set(np.unique(gc["inputs"]["focal_mask"][...])) - {0}
-                    if set(np.unique(fc)) - {0} != fine_labels:
-                        skipped.append((sid, cname))        # a focal label vanished under coarsening (NoData majority)
+                    comp, _ = ndimage.label(~ndc, structure=np.ones((3, 3)))
+                    if set(np.unique(fc)) - {0} != fine_labels or len(set(comp[fc > 0])) != 1:
+                        # a focal label vanished under coarsening (NoData majority), or the coarse focal nodes no longer
+                        # share one component (Circuitscape writes no map for disconnected pairs)
+                        skipped.append((sid, cname))
                         continue
                 gco = gc_all.create_group(cname)
                 gco.attrs["kind"] = kind
