@@ -13,8 +13,10 @@ import pathlib
 import pandas as pd
 import yaml
 
-from ampscape.splits.spatial import apply_tile_holdouts, region_holdouts, (
+from ampscape.splits.spatial import (
     BlockGrid,
+    apply_tile_holdouts,
+    region_holdouts,
     apply_holdouts,
     assign_tiles,
     ood_flags,
