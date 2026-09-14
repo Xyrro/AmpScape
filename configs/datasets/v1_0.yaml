@@ -1,0 +1,139 @@
+# AmpScape v1.0 — complete, compute-agnostic design (docs/dataset_plan.md is generated from this file
+# by scripts/dataset_plan_tables.py). Counts are LANDSCAPES (one landscape = one resistance raster);
+# every landscape is solved for every applicable source configuration / task, so task counts follow.
+dataset_id: ampscape-v1.0
+tiers:
+  S:   {size: 128,  pixel_m: 100}
+  M:   {size: 256,  pixel_m: 100}
+  L:   {size: 512,  pixel_m: 200}
+  XL:  {size: 1024, pixel_m: 500}
+  XXL: {size: 2048, pixel_m: 1000}
+
+# ---- brief §4.3 baseline (landscapes per tier) and the recommended v1.0 ----
+brief_ladder:       {S: 100000, M: 50000, L: 10000, XL: 2000, XXL: 200}
+recommended_ladder: {S: 100000, M: 50000, L: 20000, XL: 4000, XXL: 400}
+family_share:       {synthetic: 0.6, real: 0.4}          # of landscapes per tier
+# real landscapes = tiles × resistance tables (every tile gets every table); tiles per tier follow
+resistance_tables: [generic_hm, large_mammal, amphibian, forest_bird, random_lm]
+random_tables_per_tile: 1        # one seeded random table per tile (seed = tile hash) -> 5 tables per tile
+
+# ---- synthetic generator mix (fraction of synthetic landscapes per tier; same at every tier) ----
+generator_mix:
+  grf: 0.24
+  fractal: 0.16
+  random_cluster: 0.12
+  planar_gradient: 0.04
+  edge_gradient: 0.04
+  distance_gradient: 0.08
+  mosaic: 0.12
+  hard: 0.20                     # named hard-case stratum, see below
+
+# ---- hard-case stratum (share of the 'hard' synthetic slice) ----
+hard_cases:
+  high_contrast_1e5:   0.20      # contrast 10^5 (in training; the prior also draws 10^4 for all generators)
+  high_contrast_1e6:   0.10      # contrast 10^6: test-only pool for test_ood_contrast
+  rmax_saturated:      0.15      # > 50 % of pixels at r_max (near-degenerate, train/val-excluded by QC rule)
+  narrow_corridor:     0.30      # barrier wall(s) with 1–3 gaps of 1–3 px  (NEW generator, Phase 6)
+  large_nodata:        0.25      # NoData fraction 0.25–0.45 with single connected component
+
+# ---- source configurations solved per landscape ----
+configs_per_landscape:
+  points:          {tasks: [T1, T2], per_landscape: 1, families: [synthetic, real]}
+  wall_to_wall_NS: {tasks: [T1W],    per_landscape: 1, families: [synthetic, real]}
+  wall_to_wall_EW: {tasks: [T1W],    per_landscape: 1, families: [synthetic, real]}
+  regions:         {tasks: [T1R],    per_landscape: 0.4, families: [real, synthetic_mosaic]}   # real: where ≥ 2 habitat patches (pilot 38 %);
+                                                                                        # synthetic: patch-mosaic landscapes (C5), patches = lowest-cost class
+  advanced:        {tasks: [T3],     per_landscape: 1, families: [synthetic, real]}
+  omniscape:       {tasks: [T4],     per_landscape: 1, families: [synthetic, real]}
+four_neighbour_ablation: {tier: S, fraction_of_synthetic: 0.05}   # extra solves flagged graph_connectivity = 4
+
+# ---- splits ----
+# Real landscapes: the globe is partitioned into spatial blocks; each block gets ONE assignment
+# (train / val / test_id / ood_region) from the dataset seed, applied at every tier, so a test region at
+# any resolution never overlaps a training region at any other resolution (amendment C1, 2026-09-06).
+# Synthetic landscapes: by seed family (base seed + derived variants share the split).
+splits:
+  train: 0.8
+  val: 0.1
+  test_id: 0.1
+  spatial_block: {kind: "hierarchical", grid: "equal_width", band_deg: 20.0, parent_tier: XXL, parent_regions: false}
+    # parent_regions: false (dev subset, 2026-09-14, OWNER DECISION PENDING): with the real v1.0 XXL centres the 32
+    # XXL footprints (2 048 km each, ≈ 90 % of land) merge into 13 continental components that swallow 72 % of the
+    # S tiles; five held-out parents propagate ood_region to 12 of the 13 components (dev prefix: 1 real S test_id
+    # tile). Until the rule is revised, S–XL tiles are assigned by their macro-cell only; the S-inside-XXL overlap
+    # is ≤ 0.004 % of an XXL tile's area and XXL stays test-only. Alternatives: place XXL centres only in test/OOD
+    # cells, or reduce/merge XXL footprints — see docs/dev_subset.md.
+    # Equal-width grid: 20° latitude bands, per band n_lon ≈ 360·cos(lat_c)/20 cells (104 cells globally,
+    # ≈ 2 200 km wide at every latitude). XXL tiles are their own assignment regions (overlapping XXL
+    # footprints are merged); every smaller tile inherits the assignment of the XXL footprint that fully
+    # contains it, or of the single grid cell that contains it; tiles straddling two regions are excluded
+    # and resampled. Verified: 0 geometric train/val–test overlaps across tiers, XXL placeable at every
+    # latitude, S–L placeable ≥ 88 %, XL 65–86 % (uniform in latitude).
+  seed: 20260906
+  xl_trainval_share: 0.25            # C3: 25 % of XL landscapes are train/val (in-distribution), 75 % test
+  tier_disjoint_seeds: true          # synthetic seed ranges never overlap across tiers
+ood:
+  test_ood_region:  {hold_out_biomes: ["Montane Grasslands & Shrublands", "Mangroves"], hold_out_biome_nums: [10, 14], hold_out_realms: ["Australasia"],
+                     unit: tile}   # tile: a tile is ood_region when ITS OWN biome/realm is held out (an XXL parent in a held-out
+                                   # biome carries its children). cell: every tile of a cell that contains a held-out tile (the
+                                   # first implementation; on the dev prefix it made 52 % of real tiles OOD and left no real
+                                   # test_id because mangrove/montane tiles touch 23 of 56 cells — dev report, 2026-09-14)
+  test_ood_scale:   {tiers: [XL, XXL], definition: "XL/XXL test landscapes evaluated by models trained on tiers ≤ L only; the 25 % XL train/val slice exists for models that do train at XL (in-distribution XL test = test_id at XL)"}
+  test_ood_table:   {table: forest_bird}              # never in train/val
+  test_ood_contrast: {contrast: 1000000}              # synthetic contrast 10^6 never in train/val (training includes up to 10^5)
+  test_ood_synth2real: {flag: true}                   # subset flags, no extra samples
+
+# ---- resampling rules per source layer per tier (C2; recorded in every sample's provenance as `resampling`) ----
+resampling:
+  landcover:      {source_res_m: 10,   rule: majority}     # WorldCover class: modal class over the target pixel footprint
+  elevation:      {source_res_m: 30,   rule: mean}         # Copernicus DEM: area mean (bilinear at S where 100 m ≈ 3 source px)
+  slope:          {source_res_m: 30,   rule: derived_after}  # computed from the resampled elevation on the target grid
+  road_distance:  {source_res_m: vector, rule: min}        # rasterise roads at the target grid with all_touched, then EDT (= min distance)
+  road_class:     {source_res_m: vector, rule: nearest_feature}
+  river_distance: {source_res_m: vector, rule: min}
+  river_order:    {source_res_m: vector, rule: nearest_feature}
+  ghm:            {source_res_m: 1000, rule: mean}         # bilinear when target ≤ 1 km, area mean when target > 1 km
+  notes: "majority for categorical, mean for continuous fields, min for distances; S tier (100 m) uses bilinear for continuous
+          30 m/1 km sources; M–XXL use GDAL average/mode resampling over the exact footprint"
+
+# ---- download subsets (C4; PGLearn-style, nested: mini ⊂ core ⊂ full, fixed splits) ----
+subsets:
+  mini: {target_gb: 0.5, tiers: [S], landscapes: 500, description: "quick start; all tasks and families"}
+  core: {target_gb: 50, tiers: [S, M, L], description: "all tasks and families, S–L, stratified subsample with all OOD sets"}
+  full: {target_gb: 810, tiers: [S, M, L, XL, XXL]}
+hf_layout: "data/{tier}/{task_group}/shard-NNNNN.h5 + index/{tier}.parquet + splits/{subset}/{split}.parquet, so any tier or task group downloads alone"
+
+# ---- per-tier Omniscape geometry ----
+# Fidelity study (docs/dataset_plan.md §7): coarsening XL 17→33 changes cum_current by 2.5–2.9 % rel. L2,
+# XXL 33→65 by 5.9–11.9 %; the Phase-5 blocks themselves deviate from the exact block-1 solution by
+# 4.5 % (S, b/r 0.19) and 2.0 % (M, b/r 0.16). Recommended rule: block = largest odd integer ≤ radius/10
+# (b/r ≤ 0.10; S is exact). `phase5` is kept for cost comparison.
+omniscape_choice: fidelity
+omniscape_options:
+  phase5:      # b = odd nearest radius/8 (b/r 0.13–0.19)
+    S:   {radius: 16,  block_size: 3}
+    M:   {radius: 32,  block_size: 5}
+    L:   {radius: 64,  block_size: 9}
+    XL:  {radius: 128, block_size: 17}
+    XXL: {radius: 256, block_size: 33}
+  fidelity:    # b = largest odd ≤ radius/10 (b/r 0.06–0.10)
+    S:   {radius: 16,  block_size: 1}
+    M:   {radius: 32,  block_size: 3}
+    L:   {radius: 64,  block_size: 5}
+    XL:  {radius: 128, block_size: 11}
+    XXL: {radius: 256, block_size: 25}
+
+# ---- measured costs (Phase 5, CHOLMOD, single-threaded solves; seconds per solve) ----
+cost_measured:
+  points:       {S: 0.171, M: 0.87, L: 4.11, XL: 13.3, XXL: 70.9}
+  wall_to_wall: {S: 0.079}            # scales ∝ pixels (b = 1.00)
+  regions:      {S: 0.214}
+  advanced:     {S: 0.074}            # scales ∝ pixels
+  omniscape_by_option:               # seconds per solve; phase5 measured at S/M/L/XL/XXL; fidelity: S b1 and M b1
+    phase5:   {S: 6.19, M: 48.3, L: 178, XL: 794, XXL: 5517}     #   measured; XXL = median of 4 solves (4274-7488 s)
+    fidelity: {S: 52.5, M: 134, L: 577, XL: 1896, XXL: 9613}     #   L/XL/XXL scaled by (b_phase5/b_fid)^2 (law confirmed: XL 17->33 predicted x0.265, measured x0.28)
+  overhead_fraction: 0.15             # Julia load/JIT, I/O, QC, finalize
+peak_rss_mb:    {S: 1450, M: 1360, L: 1620, XL: 3290, XXL: 9520}
+storage_mb_per_landscape:              # compressed HDF5, all configs, K ≤ 4 pair maps for ~half the point samples
+  synthetic: {S: 0.93, M: 3.0, L: 11, XL: 41, XXL: 140}
+  real:      {S: 1.4,  M: 4.5, L: 16, XL: 60, XXL: 200}      # + 8 covariate channels
