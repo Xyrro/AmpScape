@@ -35,8 +35,13 @@ def load_landscape(spec: SampleSpec, pilot_root: str | None):
     if spec.family == "synthetic":
         from ampscape.landscapes.synthetic import sample_landscape
 
-        ls = sample_landscape(spec.seed, (spec.size, spec.size))
         extra = json.loads(spec.extra or "{}")
+        if extra.get("design") == "v1":
+            from ampscape.landscapes.synthetic import sample_landscape_v1
+
+            ls = sample_landscape_v1(spec.seed, (spec.size, spec.size))
+        else:
+            ls = sample_landscape(spec.seed, (spec.size, spec.size))
         R, contrast, params = ls.resistance, ls.contrast, ls.params
         if "contrast_override" in extra:           # probes: re-map the same cost field to a fixed contrast
             from ampscape.landscapes.synthetic import field_to_resistance
@@ -47,7 +52,11 @@ def load_landscape(spec: SampleSpec, pilot_root: str | None):
             params = dict(ls.params, contrast=contrast, contrast_override=True)
         meta = {"generator": ls.generator, "generator_params": params, "contrast": contrast,
                 "resistance_table_id": None}
-        return R, ls.nodata_mask, None, None, meta
+        lc = None
+        if "patch_mosaic" in params and "regions" in spec.config_list():
+            # C5: focal regions on synthetic patch mosaics = the lowest-cost class (cost 0 -> R = 1), as habitat class 10
+            lc = np.where((R <= 1.0) & ~ls.nodata_mask, 10, 0).astype(np.int16)
+        return R, ls.nodata_mask, lc, None, meta
     import pandas as pd
     import rasterio
 

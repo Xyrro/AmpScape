@@ -128,7 +128,7 @@ def sample_points(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, rng: np.
 # ---------------------------------------------------------------------------
 # T1W: wall-to-wall strips
 # ---------------------------------------------------------------------------
-def sample_wall_to_wall(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, orientation: str) -> SourceSample:
+def sample_wall_to_wall(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, orientation: str) -> SourceSample | None:
     """Two edge strips (label 1 = north or west, 2 = south or east) restricted to the largest component."""
     if orientation not in ("NS", "EW"):
         raise ValueError("orientation must be NS or EW")
@@ -147,7 +147,8 @@ def sample_wall_to_wall(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, or
     for lab in (1, 2):
         rc = np.argwhere(mask == lab)
         if len(rc) == 0:
-            raise RuntimeError(f"strip {lab} has no valid pixels in the largest component")
+            return None          # strip entirely NoData / outside the largest component (large-NoData or coastal
+                                 # landscapes): the wall-to-wall configuration is not defined for this landscape
         table.append({"label": lab, "row": int(round(rc[:, 0].mean())), "col": int(round(rc[:, 1].mean())),
                       "kind": "strip", "placement": "strip", "n_pixels": int(len(rc)), "wkt": _region_wkt(mask == lab)})
     meta = {"orientation": orientation, "strip_width_px": w, "k": 2, "placement": "strip",
@@ -230,41 +231,50 @@ def suitability_field(R: np.ndarray, nodata: np.ndarray, comp: np.ndarray, sc: S
     return src, meta
 
 
-def sample_advanced(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, rng: np.random.Generator) -> SourceSample:
+def sample_advanced(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, rng: np.random.Generator) -> SourceSample | None:
     """T3: source-strength raster (sum = normalize_total) and ground raster; grounds never overlap sources."""
     H, W = R.shape
     comp, labels = _largest_component_mask(R, nodata)
     src, smeta = suitability_field(R, nodata, comp, cfg.advanced.source, rng)
     gc = cfg.advanced.ground
     mode = str(rng.choice(gc.modes))
-    ground = np.zeros((H, W), dtype=np.int8)
     ew = gc.edge_width_px
-    if mode == "edge":
-        side = str(rng.choice(["N", "S", "E", "W"]))
-        sl = {"N": (slice(0, ew), slice(None)), "S": (slice(H - ew, H), slice(None)),
-              "W": (slice(None), slice(0, ew)), "E": (slice(None), slice(W - ew, W))}[side]
-        ground[sl] = 1
-        gmeta = {"mode": mode, "side": side}
-    elif mode == "all_edges":
-        ground[:ew, :] = 1
-        ground[H - ew:, :] = 1
-        ground[:, :ew] = 1
-        ground[:, W - ew:] = 1
-        gmeta = {"mode": mode}
+    # the drawn ground mode may be undefined on the largest component (an all-NoData edge on a large-NoData or coastal
+    # landscape): fall back to the other modes in a fixed order and give up (None) only if every mode is degenerate
+    for m in [mode] + [x for x in ("all_edges", "patches") if x != mode]:
+        ground = np.zeros((H, W), dtype=np.int8)
+        if m == "edge":
+            side = str(rng.choice(["N", "S", "E", "W"]))
+            sl = {"N": (slice(0, ew), slice(None)), "S": (slice(H - ew, H), slice(None)),
+                  "W": (slice(None), slice(0, ew)), "E": (slice(None), slice(W - ew, W))}[side]
+            ground[sl] = 1
+            gmeta = {"mode": m, "side": side}
+        elif m == "all_edges":
+            ground[:ew, :] = 1
+            ground[H - ew:, :] = 1
+            ground[:, :ew] = 1
+            ground[:, W - ew:] = 1
+            gmeta = {"mode": m}
+        else:
+            n_p = int(rng.integers(gc.n_patches_range[0], gc.n_patches_range[1] + 1))
+            rc = np.argwhere(comp)
+            yy, xx = np.mgrid[0:H, 0:W]
+            centres = []
+            for _ in range(n_p):
+                cy, cx = (int(v) for v in rc[rng.integers(len(rc))])
+                ground[(yy - cy) ** 2 + (xx - cx) ** 2 <= gc.patch_radius_px**2] = 1
+                centres.append((cy, cx))
+            gmeta = {"mode": m, "n_patches": n_p, "centres": centres, "radius_px": gc.patch_radius_px}
+        ground[~comp] = 0
+        s_try = src.copy()
+        s_try[ground > 0] = 0.0
+        if ground.sum() > 0 and s_try.sum() > 0:
+            src = s_try
+            if m != mode:
+                gmeta["fallback_from"] = mode
+            break
     else:
-        n_p = int(rng.integers(gc.n_patches_range[0], gc.n_patches_range[1] + 1))
-        rc = np.argwhere(comp)
-        yy, xx = np.mgrid[0:H, 0:W]
-        centres = []
-        for _ in range(n_p):
-            cy, cx = (int(v) for v in rc[rng.integers(len(rc))])
-            ground[(yy - cy) ** 2 + (xx - cx) ** 2 <= gc.patch_radius_px**2] = 1
-            centres.append((cy, cx))
-        gmeta = {"mode": mode, "n_patches": n_p, "centres": centres, "radius_px": gc.patch_radius_px}
-    ground[~comp] = 0
-    src[ground > 0] = 0.0
-    if ground.sum() == 0 or src.sum() <= 0:
-        raise RuntimeError("degenerate advanced configuration (no ground or no source in the largest component)")
+        return None
     nt = cfg.advanced.source.normalize_total
     if nt:
         src = src * (nt / src.sum())
@@ -298,6 +308,7 @@ def generate_all(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, seed: int
         "advanced": sample_advanced(R, nodata, cfg, np.random.default_rng(kids[1])),
         "omniscape": sample_omniscape(R, nodata, cfg, np.random.default_rng(kids[2])),
     }
+    out = {k: v for k, v in out.items() if v is not None}     # wall_to_wall may be undefined (empty strip)
     if landcover is not None:
         reg = sample_regions(R, nodata, landcover, cfg, np.random.default_rng(kids[3]))
         if reg is not None:

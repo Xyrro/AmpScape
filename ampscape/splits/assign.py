@@ -24,6 +24,13 @@ from ampscape.splits.spatial import (
 DEFAULT_CFG = pathlib.Path(__file__).resolve().parents[2] / "configs" / "datasets" / "v1_0.yaml"
 
 
+def stable_unit(key: str) -> float:
+    """Deterministic pseudo-uniform in [0, 1) from a string (sha1; Python's hash() is salted per process)."""
+    import hashlib
+
+    return int(hashlib.sha1(key.encode()).hexdigest()[:12], 16) / float(16 ** 12)
+
+
 def add_splits(index: pd.DataFrame, build: pathlib.Path, cfg_path: pathlib.Path = DEFAULT_CFG) -> pd.DataFrame:
     cfg = yaml.safe_load(open(cfg_path))
     sp = cfg["splits"]
@@ -37,6 +44,11 @@ def add_splits(index: pd.DataFrame, build: pathlib.Path, cfg_path: pathlib.Path 
     if len(real):
         tiles = pd.DataFrame({"tile_id": real.tile_id, "tier": real.tier, "lat": real.lat, "lon": real.lon, "size": real.H,
                               "pixel_m": real.pixel_m, "realm": real.realm, "biome_num": real.biome_num}).drop_duplicates("tile_id")
+        from ampscape.solve.manifest import load_parents
+
+        bj = pathlib.Path(build) / "build.json"
+        tiles_root = json.loads(bj.read_text()).get("pilot") if bj.exists() else None
+        tiles = pd.concat([tiles, load_parents(tiles_root)], ignore_index=True)
         ood_cfg = cfg["ood"]["test_ood_region"]
         ood_blocks = {grid.block_id(r.lat, r.lon) for r in tiles.itertuples()
                       if r.realm in ood_cfg.get("hold_out_realms", []) or r.biome_num in ood_cfg.get("hold_out_biome_nums", [])}
@@ -65,7 +77,7 @@ def add_splits(index: pd.DataFrame, build: pathlib.Path, cfg_path: pathlib.Path 
     df["test_ood_published"] = df.split == "test_ood_published"
     # XL: only a share of macro-cells are train/val (amendment C3) — applied by block hash
     xl_share = float(sp.get("xl_trainval_share", 0.25))
-    df.loc[(df.tier == "XL") & df.split.isin(["train", "val"]) & (df.block_id.apply(lambda b: (hash((b, seed)) % 1000) / 1000.0 >= xl_share)), "split"] = "test_id"
+    df.loc[(df.tier == "XL") & df.split.isin(["train", "val"]) & (df.block_id.apply(lambda b: stable_unit(f"{b}|{seed}") >= xl_share)), "split"] = "test_id"
     df.loc[(df.tier == "XXL") & df.split.isin(["train", "val"]), "split"] = "test_id"
     df["qc_trainval"] = df.qc_trainval & df.split.isin(["train", "val"])
     out = pathlib.Path(build) / "splits"

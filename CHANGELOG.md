@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Dev subset + Phase 10 — 2026-09-14
+- v1.0 planner (`ampscape/solve/plan_v1.py`, `scripts/plan_v1.py`): per-tier prefix streams; v1.0 synthetic sampler with the
+  hard-case stratum (`sample_landscape_v1`, `corridor_walls`); T1R on synthetic mosaics; v1.0 tile stream
+  (`scripts/build_v1_tiles.py`: grid-fit sampling with interior-box snapping, prefix extraction, per-tile random table,
+  frozen XXL parents); `hard_case` / `design` index columns; stable XL hash.
+- Learned baselines (`ampscape/models/{unet,fno,vit,gnn}.py`, `common.py`) and `scripts/train.py` (shared inputs, log10-ε
+  targets, masked MSE, AdamW + cosine, early stopping, predictions in the harness format, evaluation through the harness).
+
 ### Phase 9 — 2026-09-13
 - `ampscape/metrics` (pixel, domain, reff, physics, efficiency, acceleration) with hand-computed tests; `ampscape/eval/harness.py`,
   `scripts/evaluate.py`, `docs/evaluation.md` (predictions format); oracle / zero-predictor anchors.

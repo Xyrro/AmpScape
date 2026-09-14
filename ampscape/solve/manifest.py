@@ -98,6 +98,17 @@ def plan_real(dataset_id: str, resistance_parquet: str, sources_parquet: str, n:
     return out
 
 
+def load_parents(tiles_root: str | None) -> pd.DataFrame:
+    """Provisional XXL assignment regions (`parents.parquet`, v1.0 tile stream) — frozen centres, no rasters needed."""
+    cols = ["tile_id", "tier", "lat", "lon", "size", "pixel_m", "realm", "biome_num"]
+    if not tiles_root:
+        return pd.DataFrame(columns=cols)
+    import pathlib
+
+    p = pathlib.Path(tiles_root) / "parents.parquet"
+    return pd.read_parquet(p)[cols] if p.exists() else pd.DataFrame(columns=cols)
+
+
 def assign_plan_splits(df: pd.DataFrame, pilot_root: str | None, cfg_path: str | None = None) -> pd.DataFrame:
     """Provisional split per sample at plan time (same rules as ampscape.splits.assign.add_splits).
 
@@ -122,6 +133,7 @@ def assign_plan_splits(df: pd.DataFrame, pilot_root: str | None, cfg_path: str |
     if len(real) and pilot_root:
         tiles = pd.read_parquet(pathlib.Path(pilot_root) / "tiles.parquet")
         tiles = tiles[tiles.tile_id.isin(real.tile_id)][["tile_id", "tier", "lat", "lon", "size", "pixel_m", "realm", "biome_num"]].drop_duplicates("tile_id")
+        tiles = pd.concat([tiles, load_parents(pilot_root)], ignore_index=True)
         sb = sp["spatial_block"]
         grid = BlockGrid(float(sb.get("band_deg", 20.0)), equal_width=(sb.get("grid", "equal_width") == "equal_width"))
         ood_cfg = cfg["ood"]["test_ood_region"]

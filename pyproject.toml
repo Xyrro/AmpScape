@@ -81,3 +81,17 @@ markers = [
   "julia: tests that require the Julia solver package",
   "gpu: tests that require a GPU",
 ]
+
+# PACE-ICE GPU nodes run driver 575 / CUDA 12.9: PyPI's torch 2.14 wheel is built for CUDA 13.0 and refuses to
+# initialise, so torch/torchvision come from the cu126 index (the only 2.14.0 CUDA-12 build published) (docs/compute_env.md).
+[tool.uv]
+environments = ["sys_platform == 'linux'"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu126" }
+torchvision = { index = "pytorch-cu126" }
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true

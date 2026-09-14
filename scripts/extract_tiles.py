@@ -87,6 +87,9 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--refresh", action="store_true",
                     help="re-extract every tile already in the manifest (same tile set, new code)")
+    ap.add_argument("--first-accepted", type=int, default=None,
+                    help="prefix mode (v1.0): walk `selected` in order until this many tiles are accepted; rejected "
+                         "tiles are skipped, never replaced from the reserve, so the result is a true prefix")
     ap.add_argument("--retry-rejected", action="store_true",
                     help="drop previously rejected rows from the manifest and extract them again")
     args = ap.parse_args()
@@ -115,6 +118,26 @@ def main() -> None:
     if args.limit:
         todo = todo[: args.limit]
     rows = list(done.to_dict("records")) if len(done) else []
+    if args.first_accepted:
+        tier = specs["selected"][0]["tier"]
+        n_ok = sum(1 for r in rows if r["qc_accept"] and r["tier"] == tier)
+        ordered = [s for s in specs["selected"] if s["tile_id"] not in done_ids]
+        pos = 0
+        while n_ok < args.first_accepted and pos < len(ordered):
+            batch = ordered[pos: pos + max(args.workers * 4, args.first_accepted - n_ok)]
+            pos += len(batch)
+            print(f"prefix mode: {n_ok}/{args.first_accepted} accepted, extracting {len(batch)} more")
+            new = Parallel(n_jobs=args.workers, prefer="threads")(delayed(process)(s, sources, out, versions) for s in batch)
+            for r in new:
+                if n_ok < args.first_accepted:
+                    rows.append(r)
+                    n_ok += int(bool(r["qc_accept"]))
+                if not r["qc_accept"]:
+                    print(f"  rejected {r['tile_id']}: unusable={r['qc_frac_unusable']:.2f} dem_nan={r['qc_frac_dem_nan']:.2f}")
+            pd.DataFrame(rows).to_parquet(manifest_path, index=False)
+        print(f"prefix mode done: {n_ok} accepted, {sum(1 for r in rows if not r['qc_accept'])} rejected, "
+              f"{pos} of {len(ordered)} selected tiles visited")
+        return
     n_target = max(len(specs["selected"]), len(todo))
     round_ = 0
     while todo:

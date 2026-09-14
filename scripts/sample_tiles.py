@@ -18,6 +18,7 @@ import pathlib
 
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 
 from ampscape.landscapes import sampling
 
@@ -37,6 +38,8 @@ def main() -> None:
     ap.add_argument("--tier", default="S")
     ap.add_argument("--size", type=int, default=128)
     ap.add_argument("--pixel-m", type=float, default=100.0)
+    ap.add_argument("--grid-fit", action="store_true", help="drop candidates whose tile straddles two split macro-cells (v1.0 rule)")
+    ap.add_argument("--band-deg", type=float, default=20.0)
     args = ap.parse_args()
 
     src = pathlib.Path(args.sources)
@@ -56,6 +59,50 @@ def main() -> None:
     pts["grip_region"] = [sampling.grip_region(r, la, lo) for r, la, lo in zip(pts["REALM"], pts["lat"], pts["lon"], strict=True)]
     if args.grip_regions:
         pts = pts[pts["grip_region"].isin(args.grip_regions)].reset_index(drop=True)
+    if args.grid_fit:
+        # v1.0 rule (dataset plan §5 iv): a tile must sit inside one split macro-cell. Candidates that straddle are
+        # snapped to the nearest centre of the cell's interior box (matters for XL/XXL, whose footprints are a
+        # large fraction of a cell), re-attributed (ecoregion, gHM) at the new centre, and dropped if that fails.
+        from shapely.geometry import Point
+
+        from ampscape.splits.spatial import BlockGrid
+
+        grid = BlockGrid(args.band_deg, equal_width=True)
+        half = args.size * args.pixel_m / 2.0
+        lat2, lon2, moved = [], [], []
+        for la, lo in zip(pts["lat"], pts["lon"], strict=True):
+            la, lo = float(la), float(lo)
+            if grid.fits(la, lo, half):
+                lat2.append(la); lon2.append(lo); moved.append(False)
+                continue
+            box = grid.interior_bounds(grid.block_id(la, lo), half)
+            if box is None:
+                lat2.append(np.nan); lon2.append(np.nan); moved.append(True)
+                continue
+            la2, lo2 = min(max(la, box[0]), box[1]), min(max(lo, box[2]), box[3])
+            ok = grid.fits(la2, lo2, half)
+            lat2.append(la2 if ok else np.nan); lon2.append(lo2 if ok else np.nan); moved.append(True)
+        moved = np.array(moved)
+        pts["lat"], pts["lon"] = lat2, lon2
+        pts = pts[np.isfinite(pts["lat"])].reset_index(drop=True)
+        moved = moved[np.isfinite(np.array(lat2))]
+        if moved.any():
+            mv = pts[moved].copy()
+            mv = gpd.GeoDataFrame(mv[["lat", "lon", "ghm"]], geometry=[Point(x, y) for x, y in zip(mv["lon"], mv["lat"], strict=True)], crs="EPSG:4326")
+            keep_cols = ["ECO_ID", "ECO_NAME", "BIOME_NUM", "BIOME_NAME", "REALM", "geometry"]
+            ecoj = eco[keep_cols]
+            ecoj = ecoj[(ecoj["REALM"] != "Antarctica") & (ecoj["BIOME_NUM"] != 98) & (ecoj["BIOME_NUM"] != 99)]
+            rej = gpd.sjoin(mv, ecoj, how="inner", predicate="within")
+            rej = rej[~rej.index.duplicated()]
+            rej["ghm"] = sampling.sample_ghm(str(ghm_path), rej["lat"].to_numpy(), rej["lon"].to_numpy())
+            rej = rej[np.isfinite(rej["ghm"])]
+            pts = pd.concat([pts[~moved], rej.drop(columns=["index_right"], errors="ignore")], ignore_index=True)
+            pts["ghm_tercile"] = sampling.assign_terciles(pts["ghm"].to_numpy(), edges)[0]
+            pts["grip_region"] = [sampling.grip_region(r, la, lo) for r, la, lo in zip(pts["REALM"], pts["lat"], pts["lon"], strict=True)]
+            if args.grip_regions:
+                pts = pts[pts["grip_region"].isin(args.grip_regions)].reset_index(drop=True)
+        print(f"grid-fit: {int((~moved).sum())} candidates fit as drawn, {int(moved.sum())} snapped into a cell's interior box "
+              f"and re-attributed, {len(pts)} kept")
 
     cands = [sampling.Candidate(float(r.lat), float(r.lon), int(r.BIOME_NUM), str(r.BIOME_NAME), str(r.REALM),
                                 int(r.ECO_ID), str(r.ECO_NAME), float(r.ghm), int(r.ghm_tercile),
@@ -69,7 +116,7 @@ def main() -> None:
                 "tier": args.tier, "size": args.size, "pixel_m": args.pixel_m, "stratum": c.to_dict()}
 
     specs = {
-        "seed": args.seed, "ghm_tercile_edges": edges, "n_candidates_attributed": len(cands),
+        "seed": args.seed, "grid_fit": bool(args.grid_fit), "ghm_tercile_edges": edges, "n_candidates_attributed": len(cands),
         "selected": [spec(i, c) for i, c in enumerate(selected)],
         "reserve": [spec(1000 + i, c) for i, c in enumerate(reserve)],
     }

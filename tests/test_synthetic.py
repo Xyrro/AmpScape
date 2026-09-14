@@ -129,3 +129,46 @@ def test_sample_landscape_deterministic_and_regenerable():
 def test_prior_covers_all_generators():
     seen = {syn.sample_landscape(s, (32, 32)).generator for s in range(60)}
     assert seen == set(syn.DEFAULT_PRIOR["generator_weights"])
+
+
+# ---- v1.0 sampler (hard-case stratum, dataset plan §3) ----
+def test_v1_sampler_strata_and_contracts():
+    from collections import Counter
+
+    hc, contrasts = Counter(), Counter()
+    for s in range(100_000_000, 100_000_300):
+        ls = syn.sample_landscape_v1(s, (64, 64))
+        hc[ls.params["hard_case"]] += 1
+        contrasts[ls.contrast] += 1
+        assert ls.resistance.shape == (64, 64) and 1.0 <= ls.resistance.min() and ls.resistance.max() <= ls.contrast
+        assert ls.resistance[ls.nodata_mask].max(initial=1.0) == 1.0
+        if ls.params["hard_case"] == "rmax_saturated":
+            v = ~ls.nodata_mask
+            assert (ls.resistance[v] >= 0.999 * ls.contrast).mean() > 0.5
+        if ls.params["hard_case"] == "large_nodata":
+            assert 0.2 <= ls.nodata_mask.mean() <= 0.5
+        if ls.params["hard_case"] is None:
+            assert ls.contrast <= 10_000
+    assert 0.1 < (300 - hc[None]) / 300 < 0.3           # ≈ 20 % hard
+    assert contrasts[1_000_000] > 0 and contrasts[100_000] > 0
+
+
+def test_v1_sampler_deterministic_and_regenerable():
+    a = syn.sample_landscape_v1(100_000_042, (64, 64))
+    b = syn.sample_landscape_v1(100_000_042, (64, 64))
+    assert np.array_equal(a.resistance, b.resistance) and a.params == b.params
+    assert syn.regenerate_v1(a.params, 100_000_042).params == a.params
+    assert not np.array_equal(a.resistance, syn.sample_landscape(100_000_042, (64, 64)).resistance)
+
+
+def test_corridor_walls_span_and_gaps():
+    from scipy import ndimage
+
+    rng = np.random.default_rng(3)
+    mask, walls = syn.corridor_walls((96, 96), 1, rng)
+    assert len(walls) == 1 and 1 <= len(walls[0]["gaps"]) <= 3
+    # with the gaps closed the wall splits the raster into >= 2 components; with gaps it stays connected
+    closed, _ = syn.corridor_walls((96, 96), 1, np.random.default_rng(3), gaps_range=(0, 0))
+    _, n_closed = ndimage.label(~closed, structure=np.ones((3, 3)))
+    _, n_open = ndimage.label(~mask, structure=np.ones((3, 3)))
+    assert n_closed >= 2 and n_open == 1

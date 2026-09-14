@@ -383,15 +383,12 @@ def generate_field(name: str, shape: Shape, params: dict, rng: np.random.Generat
     raise ValueError(f"unknown generator {name!r}")
 
 
-def sample_landscape(seed: int, shape: Shape, prior: dict | None = None) -> SyntheticLandscape:
-    """Draw one synthetic landscape from the documented prior. Deterministic in ``seed``."""
-    prior = DEFAULT_PRIOR if prior is None else prior
-    h, w = _check_shape(shape)
-    rng = np.random.default_rng(int(seed))
+def _draw_body(rng: np.random.Generator, h: int, w: int, prior: dict, name: str,
+               nodata_fraction: tuple[float, float] | None = None) -> tuple[np.ndarray, np.ndarray, dict]:
+    """Base field + overlays + NoData for generator ``name`` (shared by the default and v1.0 samplers).
 
-    names = list(prior["generator_weights"])
-    weights = np.array([prior["generator_weights"][n] for n in names], dtype=float)
-    name = str(rng.choice(names, p=weights / weights.sum()))
+    The RNG call order is the one of the Phase-2 sampler, so :func:`sample_landscape` is unchanged bitwise.
+    """
     gp = prior[name]
     params: dict = {"shape": [h, w], "generator": name}
     if name == "grf":
@@ -443,13 +440,26 @@ def sample_landscape(seed: int, shape: Shape, prior: dict | None = None) -> Synt
         params["barriers"] = bparams
 
     # NoData
-    if rng.uniform() < prior["p_nodata"]:
+    if nodata_fraction is not None or rng.uniform() < prior["p_nodata"]:
         npz = prior["nodata"]
-        nparams = {"fraction": _u(rng, npz["fraction"]), "length_scale": _u(rng, npz["length_scale"])}
+        nparams = {"fraction": _u(rng, nodata_fraction or npz["fraction"]), "length_scale": _u(rng, npz["length_scale"])}
         nodata = random_nodata((h, w), nparams["fraction"], nparams["length_scale"], rng)
         params["nodata"] = nparams
     else:
         nodata = np.zeros((h, w), dtype=bool)
+    return fld, nodata, params
+
+
+def sample_landscape(seed: int, shape: Shape, prior: dict | None = None) -> SyntheticLandscape:
+    """Draw one synthetic landscape from the documented prior. Deterministic in ``seed``."""
+    prior = DEFAULT_PRIOR if prior is None else prior
+    h, w = _check_shape(shape)
+    rng = np.random.default_rng(int(seed))
+
+    names = list(prior["generator_weights"])
+    weights = np.array([prior["generator_weights"][n] for n in names], dtype=float)
+    name = str(rng.choice(names, p=weights / weights.sum()))
+    fld, nodata, params = _draw_body(rng, h, w, prior, name)
 
     cw = np.asarray(prior.get("contrast_weights", [1] * len(prior["contrast"])), dtype=float)
     contrast = int(rng.choice(prior["contrast"], p=cw / cw.sum()))
@@ -458,6 +468,114 @@ def sample_landscape(seed: int, shape: Shape, prior: dict | None = None) -> Synt
     resistance = field_to_resistance(fld, contrast, prior["mapping"])
     resistance[nodata] = 1.0
     return SyntheticLandscape(resistance, nodata, fld.astype(np.float32), name, params, int(seed))
+
+
+# ---------------------------------------------------------------------------
+# v1.0 sampler: generator mix + named hard-case stratum (configs/datasets/v1_0.yaml, dataset plan §2.2/§3)
+# ---------------------------------------------------------------------------
+V1_BASE_CONTRASTS: tuple[int, ...] = (10, 100, 1000, 10_000)      # non-hard landscapes; 10^5 / 10^6 only via the hard stratum
+V1_CORRIDOR_CONTRASTS: tuple[int, ...] = (100, 1000, 10_000)
+V1_MIX: dict = {"grf": 0.24, "fractal": 0.16, "random_cluster": 0.12, "planar_gradient": 0.04, "edge_gradient": 0.04,
+                "distance_gradient": 0.08, "mosaic": 0.12, "hard": 0.20}
+V1_HARD: dict = {"high_contrast_1e5": 0.20, "high_contrast_1e6": 0.10, "rmax_saturated": 0.15, "narrow_corridor": 0.30,
+                 "large_nodata": 0.25}
+V1_LARGE_NODATA_FRACTION: tuple[float, float] = (0.25, 0.45)
+V1_SATURATION_FRACTION: tuple[float, float] = (0.55, 0.75)        # share of valid pixels at r_max
+
+
+def corridor_walls(shape: Shape, n_walls: int, rng: np.random.Generator, width_px: int = 2,
+                   gaps_range: tuple[int, int] = (1, 3), gap_px_range: tuple[int, int] = (1, 3),
+                   min_gap_spacing_px: int = 8) -> tuple[np.ndarray, list[dict]]:
+    """Barrier walls spanning the raster, each opened by 1–3 gaps of 1–3 px (dataset plan §3, ``narrow_corridor``).
+
+    Every wall runs through a random anchor at an orientation within ±15° of horizontal or vertical, so it
+    separates the raster into two sides and all flow across it must pass through the gaps.
+    """
+    h, w = _check_shape(shape)
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float64)
+    mask = np.zeros((h, w), dtype=bool)
+    walls = []
+    for _ in range(int(n_walls)):
+        horizontal = bool(rng.uniform() < 0.5)
+        th = math.radians((0.0 if horizontal else 90.0) + rng.uniform(-15.0, 15.0))
+        dx, dy = math.cos(th), math.sin(th)
+        ay = rng.uniform(0.15 * h, 0.85 * h)
+        ax = rng.uniform(0.15 * w, 0.85 * w)
+        perp = -(xx - ax) * dy + (yy - ay) * dx
+        along = (xx - ax) * dx + (yy - ay) * dy
+        wall = np.abs(perp) <= width_px / 2.0
+        span = along[wall]
+        lo, hi = float(span.min()), float(span.max())
+        n_gaps = int(rng.integers(gaps_range[0], gaps_range[1] + 1))
+        centres: list[float] = []
+        for _ in range(200):
+            if len(centres) >= n_gaps:
+                break
+            c = float(rng.uniform(lo + 4.0, hi - 4.0))
+            if all(abs(c - o) >= min_gap_spacing_px for o in centres):
+                centres.append(c)
+        gaps = []
+        for c in centres:
+            g = int(rng.integers(gap_px_range[0], gap_px_range[1] + 1))
+            wall &= ~((along >= c - g / 2.0) & (along < c + g / 2.0))
+            gaps.append({"along": c, "px": g})
+        mask |= wall
+        walls.append({"anchor": [ay, ax], "orientation_deg": math.degrees(th), "gaps": gaps})
+    return mask, walls
+
+
+def sample_landscape_v1(seed: int, shape: Shape, prior: dict | None = None) -> SyntheticLandscape:
+    """Draw one landscape from the v1.0 design: base mix without the hard share, contrast in {10..10^4};
+    with probability ``V1_MIX['hard']`` one of the named hard cases. ``params['hard_case']`` records it
+    (None otherwise). Deterministic in ``seed``; a different stream from :func:`sample_landscape`."""
+    prior = DEFAULT_PRIOR if prior is None else prior
+    h, w = _check_shape(shape)
+    rng = np.random.default_rng(int(seed))
+    hard = rng.uniform() < V1_MIX["hard"]
+    base_names = [n for n in V1_MIX if n != "hard"]
+    bw = np.array([V1_MIX[n] for n in base_names], dtype=float)
+    name = str(rng.choice(base_names, p=bw / bw.sum()))
+    case = None
+    if hard:
+        cases = list(V1_HARD)
+        hw = np.array([V1_HARD[c] for c in cases], dtype=float)
+        case = str(rng.choice(cases, p=hw / hw.sum()))
+    nd_frac = V1_LARGE_NODATA_FRACTION if case == "large_nodata" else None
+    fld, nodata, params = _draw_body(rng, h, w, prior, name, nodata_fraction=nd_frac)
+    params["hard_case"] = case
+    params["design"] = "v1.0"
+    if case == "high_contrast_1e5":
+        contrast = 100_000
+    elif case == "high_contrast_1e6":
+        contrast = 1_000_000
+    elif case == "narrow_corridor":
+        n_walls = int(rng.integers(1, 4))
+        wmask, walls = corridor_walls((h, w), n_walls, rng)
+        fld = fld.copy()
+        fld[wmask] = 1.0
+        params["corridor"] = {"n_walls": n_walls, "width_px": 2, "walls": walls}
+        contrast = int(rng.choice(V1_CORRIDOR_CONTRASTS))
+    elif case == "rmax_saturated":
+        sat = _u(rng, V1_SATURATION_FRACTION)
+        valid = ~nodata
+        q = float(np.quantile(fld[valid], 1.0 - sat)) if valid.any() else 1.0
+        fld = np.where(fld >= q, 1.0, fld).astype(np.float32)
+        params["saturation"] = {"target_fraction": sat, "threshold": q}
+        contrast = int(rng.choice(V1_BASE_CONTRASTS))
+    else:
+        contrast = int(rng.choice(V1_BASE_CONTRASTS))
+    params["contrast"] = contrast
+    params["mapping"] = prior["mapping"]
+    resistance = field_to_resistance(fld, contrast, prior["mapping"])
+    resistance[nodata] = 1.0
+    return SyntheticLandscape(resistance, nodata, fld.astype(np.float32), name, params, int(seed))
+
+
+def regenerate_v1(params: dict, seed: int) -> SyntheticLandscape:
+    ls = sample_landscape_v1(seed, tuple(params["shape"]))
+    if ls.params != params:
+        raise RuntimeError("regenerated v1 params differ from stored params; prior or code changed")
+    return ls
 
 
 def regenerate(params: dict, seed: int) -> SyntheticLandscape:
