@@ -32,11 +32,88 @@ metadata) and `results.md`. Deterministic: sorted sample order, no randomness.
 
 ## 3. `test_ood_published`
 
-TODO_PUBLISHED
+Built from the three CC BY 4.0 / CC0 rasters registered in Phase 7–8 (`docs/survey_resistance_surfaces.md`,
+`docs/licenses.md`), resistance used **as given**, no re-mapping:
+
+| source | native | tier (rule: nearest tier with pixel ≥ native, geometric mean of R = area mean of log R) | tiles | R range | NoData |
+|---|---|---|---|---|---|
+| Eurac Alps landscape permeability (CC BY 4.0) | 20 m, EPSG:32631 | S (100 m) | 30 | 1–1000 | 0.2 % |
+| Hawaiian gallinule resistance (CC0) | 10 m, EPSG:32604 (CRS not embedded in the archive; UTM 4N assumed and recorded) | S (100 m) | 15 | 1–100 | 0 % |
+| Raccoon Europe (CC BY 4.0) | 1 km | XXL (1 km, native) | 1 (centre 55.0° N, 24.7° E) | 1.19–100 | 13.8 % |
+
+Tiles are `pub_<source>_<tier>_<hash>` (`data/tiles/published/published_tiles.parquet`, 2-band GeoTIFFs with a
+provenance JSON tag: source DOI, licence, native pixel size, resampling rule, CRS assumption). The planner
+family `published` gives them split `test_ood_published`, all applicable tasks (points K per tier, wall-to-wall
+NS/EW, advanced, Omniscape with the tier's radius/block) and `cg_baseline = true`. Build `data/builds/published`
+(Slurm array 5774245: three S shards 16–21 min each, the XXL shard 3 h 0 min of which Omniscape 2 h 54 min,
+peak RSS 9.6 GB — consistent with the XXL_test profile entry). Reference solver CHOLMOD throughout, no fallback;
+residuals ≤ 5.5e-10 (S) and ≤ 3.5e-9 (XXL), no refinement triggered.
+
+TODO_PUBLISHED_QC
+
 
 ## 4. Non-learned baseline: coarsen ×4 → CHOLMOD → upsample
 
-TODO_BASELINE
+Method (`ampscape/models/coarsen.py`, `scripts/baseline_coarsen.py`, brief §12.1): resistance → geometric
+mean over 4×4 blocks; NoData → majority; focal labels → any pixel of the block; T3 sources → block sum
+(Σ S = 1), T4 sources → block mean; ground → any; Omniscape radius and block ÷ 4. Reference CHOLMOD solve on
+the 32×32 grid (Slurm job 5774662, 4 CPUs, 9.9 min for 44 landscapes incl. Julia start-up), bilinear
+upsampling, Reff taken from the coarse solve. Three scale rules were needed to make the baseline
+physically comparable and are documented in `DECISIONS.md`:
+
+1. pairwise/advanced current maps are divided by f (a coarse node collects the flow crossing f fine
+   pixels); Omniscape maps are not (their sources were mean-pooled); the true focal pixels are reset to
+   the exact 1 A per pair, and coarse focal pixels are in-filled from the nearest non-focal coarse pixel
+   before upsampling (the naive version stamped 4-pixel-wide bands with the injected current: T1W rel-L2
+   1.91 → 0.24);
+2. for T3, a coarse block holding both a source and a ground pixel becomes ground only, the remaining
+   sources are renormalised — Circuitscape leaves a node that is both source and ground ungrounded (27 of
+   the 32 coarse ground nodes of one mini sample sat at up to 4.7 V; T3 rel-L2 0.90 → 0.26);
+3. for T3, the block-summed injection is removed before the 1/f scaling and the fine injection added
+   back (node current = through-flow + injection).
+
+Inference time = coarsening + coarse solve + upsampling, measured per landscape.
+
+### Results (mini, tier S, `evaluate.py`, mean over configurations; `data/predictions/coarsen4/eval_*/`)
+
+| task | split | n | mae_log10eps | rel_l2 | top5_iou | pinch_recall | corridor_dice_q10 | spearman | reff_rel_error | reff_spearman | ssim | speed-up (median) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| T1 | test_id | 15 | 0.075 | 0.381 | 0.617 | 0.390 | 0.835 | 0.970 | 0.167 | 0.934 | 0.863 | 2.59 |
+| T1W | test_id | 30 | 0.064 | 0.181 | 0.457 | 0.453 | 0.717 | 0.888 | 0.037 | – | 0.733 | 2.32 |
+| T3 | test_id | 15 | 0.077 | 0.195 | 0.692 | 0.387 | 0.860 | 0.963 | – | – | 0.867 | 2.85 |
+| T4 | test_id | 15 | 0.446 | 0.712 | 0.668 | 0.638 | 0.822 | 0.951 | – | – | 0.837 | 62.0 |
+| T1 | test_ood | 8 | 0.120 | 0.531 | 0.448 | 0.164 | 0.695 | 0.908 | 0.116 | 0.953 | 0.663 | 4.47 |
+| T1R | test_ood | 6 | 0.184 | 0.185 | 0.652 | 0.476 | 0.733 | 0.910 | 0.104 | 0.986 | 0.689 | 3.88 |
+| T1W | test_ood | 16 | 0.115 | 0.363 | 0.249 | 0.127 | 0.490 | 0.698 | 0.123 | – | 0.446 | 2.39 |
+| T3 | test_ood | 8 | 0.118 | 0.355 | 0.450 | 0.150 | 0.685 | 0.912 | – | – | 0.691 | 2.95 |
+| T4 | test_ood | 8 | 0.477 | 0.749 | 0.425 | 0.228 | 0.623 | 0.879 | – | – | 0.513 | 81.1 |
+| T1 | ood_region | 21 | 0.095 | 0.432 | 0.618 | 0.394 | 0.809 | 0.945 | 0.144 | 0.950 | 0.789 | 2.40 |
+| T1R | ood_region | 8 | 0.147 | 0.257 | 0.576 | 0.419 | 0.730 | 0.905 | 0.096 | 0.987 | 0.745 | 4.71 |
+| T1W | ood_region | 42 | 0.079 | 0.234 | 0.340 | 0.165 | 0.561 | 0.759 | 0.087 | – | 0.596 | 2.40 |
+| T3 | ood_region | 21 | 0.087 | 0.262 | 0.572 | 0.318 | 0.765 | 0.931 | – | – | 0.779 | 2.94 |
+| T4 | ood_region | 21 | 0.476 | 0.726 | 0.553 | 0.489 | 0.759 | 0.919 | – | – | 0.703 | 58.0 |
+| **T1** | all three | 44 | 0.093 | 0.433 | 0.587 | 0.351 | 0.797 | 0.947 | 0.147 | 0.945 | 0.791 | 2.44 |
+| **T1R** | all three | 14 | 0.163 | 0.227 | 0.608 | 0.444 | 0.731 | 0.907 | 0.100 | 0.986 | 0.721 | 4.30 |
+| **T1W** | all three | 88 | 0.080 | 0.239 | 0.363 | 0.256 | 0.601 | 0.792 | 0.076 | – | 0.616 | 2.39 |
+| **T3** | all three | 44 | 0.089 | 0.256 | 0.591 | 0.311 | 0.783 | 0.938 | – | – | 0.793 | 2.94 |
+| **T4** | all three | 44 | 0.466 | 0.725 | 0.569 | 0.493 | 0.756 | 0.922 | – | – | 0.714 | 61.0 |
+
+Physics and acceleration (all three splits): `phys_neg_fraction` = 0 everywhere; `phys_focal_current_err`
+= 0 (focal pixels reset by construction); `phys_throughput_err` 0.03 (T1), 0.19 (T1R), 0.015 (T1W),
+0.017 (T3); Kirchhoff residual of the upsampled voltage (median) 1.2 (T1), 0.77 (T1R), 0.33 (T1W), 10.5
+(T3) — an interpolated field is not a solution of the fine graph, as expected. Solver acceleration on the
+70 systems with a stored zero-start baseline (T3 and K ≤ 4 T1): AMG-PCG iterations 11 → 10 (median
+reduction 6.9 %), time 28 ms → 22 ms (7.5 %); warm-start residual median 2.7 (zero start = 1). At tier S
+the PCG converges in ≈ 11 iterations, so the acceleration track has little headroom there; it is meant
+for XL/XXL where the baseline needs hundreds of iterations.
+
+Reading: the baseline recovers the global pattern (Spearman 0.79–0.95, corridor Dice 0.6–0.8) but loses
+the fine structure (top-5 % IoU 0.36–0.61, pinch-point recall 0.26–0.49) and is worst on Omniscape (T4
+mae 0.47), whose radius/block ÷ 4 changes the moving-window integration itself. T1W and T4 degrade most
+on `test_ood` (contrast 10⁶, saturated tables). Speed-up is 2.4–4.7× for the Circuitscape tasks and
+≈ 60× for Omniscape (16× fewer windows, each 16× smaller). These numbers are the reference row for the
+Phase 10 learned baselines.
+
 
 ## 5. Tests, commits
 

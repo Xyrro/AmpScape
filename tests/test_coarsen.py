@@ -39,3 +39,12 @@ def test_coarsen_advanced_ground_wins_and_renormalises():
     sc, gr = coarsen_advanced(S, G, np.zeros((2, 2), bool), 2)
     assert gr[0, 0] and not gr[1, 1]
     assert sc[0, 0] == 0 and np.isclose(sc[1, 1], 1.0) and np.isclose(sc.sum(), 1.0)
+
+
+def test_coarsen_advanced_drops_ungrounded_island():
+    from ampscape.models.coarsen import coarsen_advanced
+    S = np.zeros((6, 6)); S[0, 0] = 0.5; S[5, 5] = 0.5
+    G = np.zeros((6, 6)); G[0, 2] = 1                                    # ground in block (0,1)
+    ndc = np.zeros((3, 3), bool); ndc[1, 1] = ndc[1, 2] = ndc[2, 1] = True   # block (2,2) is an 8-connected island
+    sc, gr = coarsen_advanced(S, G, ndc, 2)
+    assert sc[2, 2] == 0 and np.isclose(sc[0, 0], 1.0) and gr[0, 1]

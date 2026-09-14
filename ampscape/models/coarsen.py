@@ -4,7 +4,8 @@ coarse grid, upsample the outputs back.
 Coarsening rules (documented): resistance → geometric mean over f×f blocks; NoData → block is NoData if
 more than half of it is; focal labels → any pixel of the block carries the label (a region may grow);
 source strength → block sum (T3, keeps Σ S = 1) or block mean (T4); ground → any, and a block that holds both
-source and ground becomes ground only (Circuitscape leaves such nodes ungrounded), sources renormalised. Omniscape radius and
+source and ground becomes ground only (Circuitscape leaves such nodes ungrounded), sources on coarse components
+without a ground are dropped (majority NoData can isolate islands), sources renormalised. Omniscape radius and
 block size are divided by f (block rounded to the nearest odd ≥ 1). Outputs: current maps are
 upsampled bilinearly and, for pairwise/advanced maps, divided by f (a coarse node collects the flow crossing f fine
 pixels of width; Omniscape maps are left unscaled because their sources were mean-pooled); coarse focal pixels are
@@ -75,6 +76,11 @@ def coarsen_advanced(S: np.ndarray, G: np.ndarray, ndc: np.ndarray, f: int) -> t
     gr[ndc] = False
     total = sc.sum()
     sc[gr] = 0
+    # a coarse component (8-connected non-NoData pixels) without a ground node cannot carry current: drop its sources
+    lab, n = ndimage.label(~ndc, structure=np.ones((3, 3)))
+    if n > 1:
+        grounded = np.isin(lab, np.unique(lab[gr & (lab > 0)]))
+        sc[~grounded] = 0
     if sc.sum() > 0 and total > 0:
         sc *= total / sc.sum()
     return sc, gr

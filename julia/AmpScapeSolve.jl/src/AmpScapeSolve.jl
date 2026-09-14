@@ -330,7 +330,15 @@ function refine_voltage!(L::SparseMatrixCSC, idx::AbstractMatrix{<:Integer}, vol
     before = nb > 0 ? norm(r) / nb : NaN
     out = Dict{String,Any}("residual_before" => before, "refined" => false, "trigger" => rtol_trigger)
     if isfinite(before) && before > rtol_trigger
-        F = cholesky(Af)                                   # CHOLMOD (SuiteSparse)
+        F = try
+            cholesky(Af)                                   # CHOLMOD (SuiteSparse)
+        catch err
+            # not positive definite: a free component without a ground (Circuitscape solves such components
+            # separately); leave the Circuitscape solution untouched and record why
+            out["error"] = "cholesky failed: " * sprint(showerror, err)
+            nothing
+        end
+        F === nothing && return out
         d = F \ r
         xf .+= d
         r2 = bf .- Af * xf

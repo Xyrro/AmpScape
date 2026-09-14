@@ -5,8 +5,14 @@
 ### Phase 9 — 2026-09-13
 - `ampscape/metrics` (pixel, domain, reff, physics, efficiency, acceleration) with hand-computed tests; `ampscape/eval/harness.py`,
   `scripts/evaluate.py`, `docs/evaluation.md` (predictions format); oracle / zero-predictor anchors.
-- `test_ood_published`: `ampscape/landscapes/published.py`, `scripts/tile_published.py`, planner family `published` (46 tiles solved).
-- Non-learned coarsen×4 baseline (`ampscape/models/coarsen.py`, `scripts/baseline_coarsen.py`) evaluated on the mini test splits.
+- `test_ood_published`: `ampscape/landscapes/published.py` (geometric-mean resampling to the nearest tier, provenance tag),
+  `scripts/tile_published.py`, planner family `published`; build `data/builds/published` (45 S tiles from Eurac Alps and the
+  Hawaiian gallinule layers, 1 XXL tile from the raccoon Europe map; all five configurations, CHOLMOD, CG baselines).
+- Non-learned coarsen×4 baseline (`ampscape/models/coarsen.py`, `scripts/baseline_coarsen.py`, `tests/test_coarsen.py`)
+  with documented scale rules (1/f current scaling for pairwise/advanced, focal in-fill, ground-wins blocks and
+  injection-aware scaling for T3); evaluated on the mini test splits and on `test_ood_published` (`docs/phase_09_report.md`).
+- Harness fixes found by the baseline: per-pair focal-current check, zero-flow pixels excluded from top-q sets and pinch
+  points, published-tile root resolution in `prepare`.
 
 ### Phase 8 — 2026-09-07
 - Licences and provenance: `docs/licenses.md` reconciled with the full source manifest (21 files) incl. the published
