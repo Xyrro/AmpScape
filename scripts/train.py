@@ -28,7 +28,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from ampscape.data.dataset import AmpScapeDataset, compute_norm_stats, load_norm_stats  # noqa: E402
-from ampscape.models import MODEL_CONFIGS, MODEL_VARIANTS, build_model  # noqa: E402
+from ampscape.models import MODEL_CONFIGS, MODEL_VARIANTS, OFFICIAL, build_model  # noqa: E402
 from ampscape.models.common import TASK_CHANNELS, TASK_TARGET, coarse_graph, grid_graph, inverse_target, make_inputs, make_target, masked_mse, n_channels  # noqa: E402
 
 DEFAULT_LR = {"unet": 1e-3, "fno": 1e-3, "vit": 3e-4, "gnn": 1e-3}
@@ -175,8 +175,8 @@ def main():
     ap.add_argument("--published-tiers", default="S", help="comma list; XXL only for fully convolutional models")
     ap.add_argument("--no-amp", action="store_true")
     ap.add_argument("--eval-only", default=None, help="checkpoint path; skip training")
-    ap.add_argument("--variant", default="base", help="key of ampscape.models.MODEL_VARIANTS[model]")
-    ap.add_argument("--extra", default="", help="comma list of extra input channels (dist)")
+    ap.add_argument("--variant", default="official", help="key of ampscape.models.MODEL_VARIANTS[model] (default: the frozen official config)")
+    ap.add_argument("--extra", default="official", help="comma list of extra input channels (dist); 'official' = the frozen default, '' = none")
     a = ap.parse_args()
 
     out = pathlib.Path(a.out)
@@ -187,7 +187,9 @@ def main():
     amp = (not a.no_amp) and a.model != "fno"            # complex FFT weights are not autocast-safe
     lr = a.lr or DEFAULT_LR[a.model]
     graph = a.model == "gnn"
-    extra = tuple(e for e in a.extra.split(",") if e)
+    if a.variant == "official":
+        a.variant = OFFICIAL[a.model][0]
+    extra = OFFICIAL[a.model][1] if a.extra == "official" else tuple(e for e in a.extra.split(",") if e)
     mcfg = dict(MODEL_VARIANTS[a.model][a.variant])
     multiscale = bool(mcfg.get("multiscale", False))
     in_ch = n_channels(a.task, extra)
