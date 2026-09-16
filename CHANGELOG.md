@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### v1.0 generation + Phase 11 — 2026-09-15/16
+- v1.0 freeze (`v1.0-pipeline` = 8491bbe): frozen cell assignment, tile-level hold-out, `test_ood_scale_strict`, decimated
+  tile reader with resampling provenance, per-tier tile manifests, live streaming sync + scratch guard, runbook.
+- v1.0 tile set (13 958 tiles, 69 790 rasters); tier S generation (100 000 landscapes, 500 shards) streaming to the public
+  `Xirro/AmpScape`; autonomous tier driver for M → L → XL → XXL; two incidents (scratch quota; partial-finalize race)
+  recorded in `docs/status/generation_log.md` with the fixes (one-commit uploads, sample-count validation, finalize
+  guards, intermediates deleted on validated finalize).
+- Phase 11: README, `docs/generation_guide.md`, `docs/contributing.md`, notebooks 01–05, CI workflow, connectivity test,
+  ruff formatting of the whole tree; tuning pass and official baseline configs (`docs/tables/tuning_dev.md`).
+
 ### Dev subset + Phase 10 — 2026-09-14
 - v1.0 planner (`ampscape/solve/plan_v1.py`, `scripts/plan_v1.py`): per-tier prefix streams; v1.0 synthetic sampler with the
   hard-case stratum (`sample_landscape_v1`, `corridor_walls`); T1R on synthetic mosaics; v1.0 tile stream
