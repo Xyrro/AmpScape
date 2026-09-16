@@ -222,6 +222,14 @@ def cmd_finalize(a) -> None:
         p = shard_paths(build, sh)
         if p["final"].with_suffix(".uploaded").exists() and not a.force:
             continue                                   # streamed to the Hub; intermediates deleted (sync_live)
+        if p["outputs"].exists() and not a.force:               # never finalize a shard whose solver is still adding samples
+            import h5py
+
+            with h5py.File(p["outputs"], "r") as fo:
+                n_done = sum(1 for k in fo["samples"] if "complete" in fo["samples"][k].attrs)
+            if n_done < int((df.shard == sh).sum()):
+                print(f"shard {sh}: {n_done}/{int((df.shard == sh).sum())} samples solved — not finalizing yet")
+                continue
         if not p["outputs"].exists():
             print(f"shard {sh}: no outputs yet")
             continue
@@ -235,6 +243,16 @@ def cmd_finalize(a) -> None:
         from ampscape.io.sync import validate as validate_and_mark
 
         valid = validate_and_mark(p["final"])
+        if valid:                                                     # sample count must match the manifest (truncation guard)
+            import h5py
+
+            with h5py.File(p["final"], "r") as fh:
+                n_final = len(list(fh.keys()))
+            if n_final != int((df.shard == sh).sum()):
+                p["final"].with_suffix(".ok").unlink(missing_ok=True)
+                p["final"].with_suffix(".invalid").write_text(f"sample count {n_final} != manifest {int((df.shard == sh).sum())}")
+                print(f"shard {sh}: INVALID — {n_final} samples, manifest has {int((df.shard == sh).sum())}")
+                valid = False
         if valid:
             p["final"].with_suffix(".invalid").unlink(missing_ok=True)
         if valid and not getattr(a, "keep_raw", False):     # the validated final contains the inputs and the raw outputs

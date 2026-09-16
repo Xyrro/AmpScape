@@ -10,10 +10,11 @@ while true; do
   for s in $(seq $LO $HI); do
     f=$(printf "%s/shards/shard-%05d.h5" "$B" $s); o=$(printf "%s/outputs/shard-%05d.outputs.h5" "$B" $s); u=$(printf "%s/shards/shard-%05d.uploaded" "$B" $s)
     if [ -f "$u" ] || [ -f "$f" ]; then continue; fi
-    if [ -f "$o" ] && python - "$o" <<'PY' 2>/dev/null
-import sys, h5py
-with h5py.File(sys.argv[1], "r") as h: ok = all("complete" in h["samples"][k].attrs for k in h["samples"])
-sys.exit(0 if ok else 1)
+    if [ -f "$o" ] && python - "$o" "$B" $s <<'PY' 2>/dev/null
+import sys, h5py, pandas as pd
+n_exp = int((pd.read_parquet(sys.argv[2] + "/manifest.parquet", columns=["shard"]).shard == int(sys.argv[3])).sum())
+with h5py.File(sys.argv[1], "r") as h: n = sum(1 for k in h["samples"] if "complete" in h["samples"][k].attrs)
+sys.exit(0 if n == n_exp else 1)      # ALL manifest samples must be complete (2026-09-16: partial finalize race)
 PY
     then python scripts/generate.py finalize --build "$B" --shard $s --quicklooks 2>&1 | grep -v Warning | tail -1
     else left=$((left + 1)); fi
