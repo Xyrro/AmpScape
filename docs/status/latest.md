@@ -1,22 +1,20 @@
-# Status — 2026-09-14 (dev subset + Phase 10)
+# Status — 2026-09-15 (v1.0 freeze checklist)
 
-**Dev subset built, Phase 10 complete; waiting for owner decisions** (split rules, GPU sizing) before Phase 11.
+**Checklist a–f done except the reproducibility verdict (b, running); waiting for approval to launch tier S.**
 
-- **Dev subset** `data/dev`: 3 000 S + 500 M landscapes as a true prefix of v1.0 (tier-disjoint synthetic seeds with the
-  hard-case stratum, prefix-extracted stratified real tiles × 5 tables incl. per-tile random tables), all tasks, CHOLMOD,
-  100 % / 99.9 % QC, 66 CPU-h, 4.9 GB; splits by the v1.0 rule (`docs/dev_subset.md`).
-- **Two split findings need a decision** (labels only): cell-level biome hold-out made 52 % of real S tiles OOD (now
-  tile-level by default); the 32 v1.0 XXL parent footprints merge into 13 continental regions covering 72 % of S tiles
-  (parent regions disabled for dev). Both are config switches in `configs/datasets/v1_0.yaml`.
-- **Learned baselines** (U-Net, FNO, ViT-based, grid-GNN; shared inputs / log10-ε targets / masked MSE; `scripts/train.py`)
-  trained on T1 and T4 (all four) and T3 (U-Net, FNO), single seed, evaluated through `evaluate.py` on test_id,
-  test_ood, ood_region and test_ood_published alongside the coarsen baseline (`docs/tables/baselines_dev.md`).
-  test_id rel-L2: U-Net T1 0.25 / T3 0.30 / T4 0.09; U-Net is the only model beating the non-learned baseline on T1,
-  FNO and GNN fail on T1 (≥ 1.0), all models collapse on the XXL published tile (scale transfer is the hard axis).
-- **No task is too easy**: best test_id rel-L2 0.093 (T4), above the 0.05 flag.
-- **GPU**: 1.44 GPU-h for the ten dev runs (1.8 GPU-h for every GPU job of the phase); v1.0 extrapolation 365 GPU-h
-  (optimistic epoch rule) to 933 GPU-h (30 epochs per tier), three seeds, S–XL, L40S — GNN is half of it.
-- Environment: torch pinned to the cu126 wheels (ICE driver is CUDA 12.9); one faulty-GPU node killed eight jobs (resubmitted).
-- Tests: 129 passing.
+| item | result |
+|---|---|
+| a. pipeline freeze | no pending change affects stored outputs (the tuning pass touched models only); tag **`v1.0-pipeline` = `8491bbe`**, pushed; `pipeline_tag` + `pipeline_git_sha` recorded in every shard root, sample meta and index row |
+| b. reproducibility | four dev shards regenerated from the tagged tree (S shards 0 synthetic / 18 real, M shards 0 / 8; 2.3–3.7 h each): **M 0, M 8 and S 0 are bitwise identical in every dataset** (1 239 / 1 440 / 3 107 datasets; only timing, host and provenance attributes differ). **S 18 is not**: 392 of 3 354 datasets differ in the last bits (max relative difference 1.2e-9; Reff, voltages, pair maps) with matching residual-level stats — it is the one shard whose dev solve ran on a different CPU node (Gold 6226 vs the node used for the other three), i.e. CHOLMOD/BLAS results are bitwise reproducible on identical hardware and agree to ~1e-9 relative across ICE node types. Per the rule, and independently because the C2 land-cover rule changed the real S tiles, **the dev subset is regenerated as part of v1.0 rather than reused**; the datasheet states reproducibility as bitwise on identical hardware, ≤ 1e-9 relative across CPU types |
+| c. v1.0 real tiles | `data/tiles/v1.0`: **S 8 000 / M 4 000 / L 1 600 / XL 320 / XXL 32 + 6 strict** accepted (71 / 36 / 10 / 5 / 1 rejected, prefix mode, lists extended by 5 % with the prefix verified identical), 6.5 h of Slurm extraction with the new decimated reader (XXL 7.6 min per tile). Strata: 166 biome × realm × gHM-tercile strata at S (median 66 tiles); **short of the plan's floor of 150 S tiles per biome: Mangroves 128 (an OOD-only biome) and RESOLVE "N/A" polygons 28** (28 S / 14 M / 14 L / 1 XL tiles carry biome "N/A"; flagged, kept). Every other biome ≥ 244 at S; realms Palearctic 1 936 … Oceania 15. Resistance rasters (5 per tile) being built (job 5786761) |
+| d. Hub | `Xirro/AmpScape` is **public** with the in-progress notice at the top of the card; the 39 dev-era files (mini shards, index, splits, stats, croissant) were removed first — the repo holds only README and .gitattributes until the first S shards land |
+| e. streaming sync | `sync_shards.py --live`: validate → split by task group → upload → verify Hub sha256 → `.uploaded` → delete final + staged files, index rows/markers/quicklooks kept; `--publish-index` re-publishes `index/<tier>.parquet` + split lists; a shard failing verification twice gets `.upload_failed` and the loop stops; `generate.py submit` refuses above **200 GB** under `data/` (`limits.scratch_pause_gb`) |
+| f. runbook | `docs/generation_runbook.md`: order S → M → L → XL → XXL, shard sizes for ≈ 3.2 h shards (S 200, M 100, L 20, XL 6 @ 4 cpus, XXL 1 @ 8 cpus), arrays ≤ 400 tasks under the 512-core cap, ≈ 11 300 core-hours incl. overhead, ≈ 840 GB streamed; resume procedure; `scripts/generation_log.py` appends the daily summary to `docs/status/generation_log.md`; stop rule (QC fail > 1 % in a tier or a shard failing upload twice) |
 
-Full report: `docs/phase_10_report.md`.
+Also done from the same message:
+- Decisions 1, 2, 4 and the generation decision recorded (`DECISIONS.md`); XXL / `test_ood_scale` disclosure in the task spec and the card; `test_ood_scale_strict` = 6 XXL tiles sampled inside test_id cells only (3 cells qualify) with a geometric zero-overlap check at finalize.
+- **Tuning pass (2.69 GPU-h, 16 runs, `docs/tables/tuning_dev.md`)**: FNO recovers on T1 with 64 modes + the distance-to-source channel (rel-L2 1.14 → 0.34); the GNN improves with a 4×-coarsened graph level + distance (1.04 → 0.69) but stays behind the U-Net; the wide U-Net and patch-2 ViT are within single-seed noise; the distance channel does not help the convolutional models. **Frozen official configs** (`ampscape.models.OFFICIAL`): U-Net base, FNO m64+dist, ViT base, GNN multi-scale+dist. Cumulative GPU use this phase 4.5 h of the 20-h gate. GPU request noted at 1 000 GPU-h in `docs/tables/gpu_budget.md`.
+- Found and fixed on the way: the macro-cell split depended on which cells held tiles (now frozen for the whole grid, `configs/splits/cell_assignment_v1.json`, 70 land cells 56/7/7); the tile reader read full-resolution windows (XXL impossible) — now decimated from COG overviews with the C2 rules and per-channel provenance; DEM gaps counted over land only; per-tier tile manifests for concurrent extraction.
+- Consequence for the dev subset: S land cover now follows the C2 majority rule (was nearest), so the **real** half of dev is not bitwise reproducible and is regenerated as part of v1.0 (owner's fallback); the synthetic half is.
+
+Tests: 129 passing. Next on approval: `plan_v1.py --tier S --n 100000 --out data/v1/S --shard-size 200`, prepare, submit in two arrays (400 + 100), start `sync_loop.sh`; report when the first 10 % of S shards are validated and on the Hub; Phase 11 starts once S is running.

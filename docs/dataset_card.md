@@ -62,6 +62,13 @@ realm (Australasia) is held out. Other OOD sets: held-out resistance table (`for
 contrast (10⁶), held-out scale (XL/XXL for models trained ≤ L), and a synthetic→real flag. **Pilot caveat:** the mini's 50 real tiles over-represent the held-out regions
 (20 of 50) because the Phase 2 pilot sampled those strata for coverage; this is not a v1.0 property.
 
+## Reproducibility
+
+Every sample records the solver versions, parameters, residuals and the pipeline tag/commit. Regenerating a shard from
+`v1.0-pipeline` on the same CPU model reproduces every stored array bitwise; across CPU models (PACE-ICE node types)
+CHOLMOD/BLAS results differ in the last bits (≤ 1.2e-9 relative on the checked shards), so cross-hardware reproducibility
+is stated at that tolerance, not bitwise.
+
 ## Metrics caveat
 
 The domain-level metrics (top-q % high-flow IoU, pinch-point recall, corridor Dice) use thresholds
