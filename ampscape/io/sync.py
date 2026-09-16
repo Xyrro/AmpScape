@@ -134,6 +134,11 @@ def sync_live(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib.Pat
                 for part in parts.values():
                     for f in (part, part.with_suffix(".ok"), part.with_suffix(".uploaded")):
                         f.unlink(missing_ok=True)
+                # the verified final shard on the Hub contains the inputs and the raw solver outputs: drop both
+                # intermediates too (index rows, markers and quicklooks stay); ~2x the shard size per shard
+                stem = sh.stem
+                for f in (build / "inputs" / f"{stem}.inputs.h5", build / "outputs" / f"{stem}.outputs.h5"):
+                    f.unlink(missing_ok=True)
                 rec["status"] = "uploaded+deleted"
         elif not ok:
             sh.with_suffix(".upload_failed").write_text(json.dumps(recs))

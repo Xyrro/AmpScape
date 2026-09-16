@@ -181,6 +181,7 @@ def cmd_submit(a) -> None:
         shards = [s for s in shards if lo <= s <= hi]
     todo = [s for s in shards if not shard_paths(build, s)["final"].exists()] if not a.force else shards
     todo = [s for s in todo if not shard_paths(build, s)["outputs"].exists()] if not a.force else todo   # solved, awaiting finalize
+    todo = [s for s in todo if not shard_paths(build, s)["final"].with_suffix(".uploaded").exists()]     # streamed already
     if not todo:
         print("nothing to submit")
         return
@@ -219,6 +220,8 @@ def cmd_finalize(a) -> None:
     shards = [a.shard] if a.shard is not None else sorted(int(s) for s in df.shard.unique())
     for sh in shards:
         p = shard_paths(build, sh)
+        if p["final"].with_suffix(".uploaded").exists() and not a.force:
+            continue                                   # streamed to the Hub; intermediates deleted (sync_live)
         if not p["outputs"].exists():
             print(f"shard {sh}: no outputs yet")
             continue
@@ -262,8 +265,9 @@ def cmd_status(a) -> None:
 
             with h5py.File(p["outputs"], "r") as f:
                 done = sum(1 for s in f["samples"] if "complete" in f["samples"][s].attrs)
+        up = p["final"].with_suffix(".uploaded").exists()
         rows.append({"shard": sh, "samples": int((df.shard == sh).sum()), "inputs": p["inputs"].exists(),
-                     "solved": done, "final": p["final"].exists()})
+                     "solved": done if not up else int((df.shard == sh).sum()), "final": p["final"].exists(), "uploaded": up})
     print(pd.DataFrame(rows).to_string(index=False))
 
 

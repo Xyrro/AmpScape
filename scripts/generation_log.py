@@ -21,7 +21,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 def tier_summary(build: pathlib.Path) -> dict:
     man = pd.read_parquet(build / "manifest.parquet")
     n_shards = man.shard.nunique()
-    solved = len(list((build / "outputs").glob("shard-*.outputs.h5")))
+    up_names = {p.stem for p in (build / "shards").glob("shard-*.uploaded")}
+    solved = len({p.stem.replace(".outputs", "") for p in (build / "outputs").glob("shard-*.outputs.h5")} | up_names)
     finals = list((build / "shards").glob("shard-*.h5"))
     ok = list((build / "shards").glob("shard-*.ok"))
     up = list((build / "shards").glob("shard-*.uploaded"))
