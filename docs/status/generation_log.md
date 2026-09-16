@@ -28,3 +28,13 @@ truncated finals deleted and **re-finalized from their intact solver outputs (no
 re-validated, 0 QC failures)**, sync rewritten (per-shard temporary split always cleaned, one commit per shard,
 two-failure stop rule), finalize now deletes intermediates on success, scratch budget and wave sizes in the
 runbook §5. Upload rate after the fix ≈ 125 shards/h.
+
+## Incident 2026-09-16 (b) — partial finalize race on tier S
+
+The tier-S finalize array polled the solver outputs and finalized a shard as soon as *every sample present* was
+complete — but the solver adds samples one by one, so 73 shards (the first shards of each polling range) were
+finalized with 178–199 of 200 samples (shard 104 with 5), passed schema validation (which did not check the sample
+count) and were uploaded; their raw outputs were then deleted by the quota recovery. Fix: finalize now refuses a
+shard until all manifest samples are solved, validation and finalize compare the sample count with the manifest,
+and the 73 shards are re-prepared, re-solved (≈ 220 core-hours), re-finalized and re-uploaded (the Hub files are
+overwritten in place; the index is re-published).
