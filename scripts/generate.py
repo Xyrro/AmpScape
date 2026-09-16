@@ -235,6 +235,11 @@ def cmd_finalize(a) -> None:
         from ampscape.io.sync import validate as validate_and_mark
 
         valid = validate_and_mark(p["final"])
+        if valid:
+            p["final"].with_suffix(".invalid").unlink(missing_ok=True)
+        if valid and not getattr(a, "keep_raw", False):     # the validated final contains the inputs and the raw outputs
+            for f in (p["inputs"], p["outputs"]):
+                f.unlink(missing_ok=True)
         print(f"shard {sh}: {idx.sample_id.nunique()} samples, {len(idx)} configs, {n_fail} QC failures, "
               f"{p['final'].stat().st_size/1e6:.1f} MB, schema {'OK' if valid else 'INVALID (see .invalid)'}")
         if a.quicklooks:
@@ -298,6 +303,7 @@ def main() -> None:
         q.add_argument("--force", action="store_true")
         if name == "finalize":
             q.add_argument("--quicklooks", action="store_true")
+            q.add_argument("--keep-raw", action="store_true", help="keep the per-shard inputs/outputs after a validated finalize")
         q.set_defaults(func=fn)
     s = sub.add_parser("solve")
     s.add_argument("--build", required=True)

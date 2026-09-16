@@ -90,12 +90,39 @@ def delete_local(shard: pathlib.Path, push: bool) -> bool:
     return True
 
 
+def upload_parts_one_commit(parts: dict[str, pathlib.Path], staging: pathlib.Path, repo_id: str) -> dict[str, dict]:
+    """Upload the task-group files of ONE shard in ONE Hub commit, then verify every file's sha256 on the Hub.
+    Returns {group: record}; raises RuntimeError on any mismatch (the caller counts the attempt)."""
+    from huggingface_hub import CommitOperationAdd, HfApi
+
+    api = HfApi()
+    ops, rels, shas = [], {}, {}
+    for grp, part in sorted(parts.items()):
+        rel = str(part.relative_to(staging))
+        rels[grp], shas[grp] = rel, sha256(part)
+        ops.append(CommitOperationAdd(path_in_repo=rel, path_or_fileobj=str(part)))
+    res = api.create_commit(repo_id=repo_id, repo_type="dataset", operations=ops,
+                            commit_message=f"add {pathlib.Path(rels[next(iter(rels))]).name} ({len(ops)} task groups)")
+    out = {}
+    for grp, rel in rels.items():
+        remote = remote_sha256(api, repo_id, rel)
+        if remote != shas[grp]:
+            raise RuntimeError(f"checksum mismatch on the Hub for {rel}")
+        out[grp] = {"repo": repo_id, "path": rel, "sha256": shas[grp], "bytes": parts[grp].stat().st_size,
+                    "commit": getattr(res, "oid", None), "uploaded_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}
+    return out
+
+
 def sync_live(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib.Path, push: bool = True, delete: bool = True,
-              max_upload_attempts: int = 2) -> list[dict]:
-    """v1.0 streaming mode (owner checklist e): for every final shard without an `.uploaded` marker —
-    validate (schema) → split into the HF task-group files → upload each → verify the Hub sha256 → write the marker →
-    delete the final shard and the staged files locally (index rows, `.ok`, `.uploaded` and quicklooks stay).
-    A shard whose upload fails `max_upload_attempts` times gets a `.upload_failed` marker (stop rule: two failures)."""
+              max_failures: int = 2) -> list[dict]:
+    """v1.0 streaming mode (owner checklist e, revised 2026-09-16): one shard at a time —
+    validate (schema) → split into the task-group files in a per-shard temporary staging dir → upload all parts in
+    ONE commit → verify each part's sha256 on the Hub → `.uploaded` marker (with bytes) → delete the final shard, the
+    raw inputs/outputs and the temporary dir. The temporary dir is removed in every case (also on failure), so a full
+    disk cannot leave partial files behind. Every failed cycle on a shard is counted in `.upload_attempts`; after
+    `max_failures` consecutive failures the shard gets `.upload_failed` and is skipped (stop rule)."""
+    import shutil
+
     from ampscape.io.hf_layout import split_shard_by_task_group
 
     out = []
@@ -109,44 +136,63 @@ def sync_live(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib.Pat
             rec["status"] = "failed_twice"
             out.append(rec)
             continue
-        if not validate(sh):
+        try:
+            valid = validate(sh)
+        except Exception as e:                       # unreadable / truncated final
+            sh.with_suffix(".invalid").write_text(f"unreadable: {e}")
+            valid = False
+        if not valid:
             rec["status"] = "invalid"
             out.append(rec)
             continue
-        parts = split_shard_by_task_group(sh, staging, tier)
-        recs, ok = {}, True
-        for grp, part in sorted(parts.items()):
-            rel = str(part.relative_to(staging))
-            try:
-                part_ok = part.with_suffix(".ok")
-                if not part_ok.exists():
-                    part_ok.write_text(json.dumps({"sha256": sha256(part)}))
-                recs[grp] = upload_and_verify(part, repo_id, rel, push, max_retries=max_upload_attempts)
-            except RuntimeError as e:      # checksum mismatch after the allowed attempts
-                recs[grp] = {"error": str(e)}
-                ok = False
-        rec["parts"] = recs
-        if ok and push:
-            sh.with_suffix(".uploaded").write_text(json.dumps({"parts": recs, "uploaded_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}))
-            rec["status"] = "uploaded"
-            if delete:
-                sh.unlink()
-                for part in parts.values():
-                    for f in (part, part.with_suffix(".ok"), part.with_suffix(".uploaded")):
-                        f.unlink(missing_ok=True)
-                # the verified final shard on the Hub contains the inputs and the raw solver outputs: drop both
-                # intermediates too (index rows, markers and quicklooks stay); ~2x the shard size per shard
-                stem = sh.stem
-                for f in (build / "inputs" / f"{stem}.inputs.h5", build / "outputs" / f"{stem}.outputs.h5"):
-                    f.unlink(missing_ok=True)
-                rec["status"] = "uploaded+deleted"
-        elif not ok:
-            sh.with_suffix(".upload_failed").write_text(json.dumps(recs))
-            rec["status"] = "upload_failed"
-        else:
-            rec["status"] = "dry_run"
+        tmp = staging / "tmp" / sh.stem
+        attempts_f = sh.with_suffix(".upload_attempts")
+        attempts = json.loads(attempts_f.read_text()) if attempts_f.exists() else {"failures": 0, "log": []}
+        try:
+            shutil.rmtree(tmp, ignore_errors=True)
+            tmp.mkdir(parents=True, exist_ok=True)
+            parts = split_shard_by_task_group(sh, tmp, tier)
+            if not push:
+                rec["status"] = "dry_run"
+                rec["parts"] = {g: str(p.relative_to(tmp)) for g, p in parts.items()}
+                out.append(rec)
+                continue
+            recs = upload_parts_one_commit(parts, tmp, repo_id)
+        except Exception as e:                       # disk full, network, checksum mismatch, ...
+            attempts["failures"] += 1
+            attempts["log"].append({"at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "error": str(e)[:300]})
+            attempts_f.write_text(json.dumps(attempts))
+            rec["status"] = "upload_error"
+            rec["error"] = str(e)[:200]
+            if attempts["failures"] >= max_failures:
+                sh.with_suffix(".upload_failed").write_text(json.dumps(attempts))
+                rec["status"] = "upload_failed"
+            out.append(rec)
+            continue
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        sh.with_suffix(".uploaded").write_text(json.dumps({"parts": recs, "bytes_final": sh.stat().st_size,
+                                                           "uploaded_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}))
+        attempts_f.unlink(missing_ok=True)
+        rec["status"] = "uploaded"
+        if delete:
+            sh.unlink()
+            for f in (build / "inputs" / f"{sh.stem}.inputs.h5", build / "outputs" / f"{sh.stem}.outputs.h5"):
+                f.unlink(missing_ok=True)
+            rec["status"] = "uploaded+deleted"
         out.append(rec)
     return out
+
+
+def hub_gb(repo_id: str, prefix: str = "data/") -> float:
+    """GB of files under `prefix` in the dataset repo, from the Hub's own file listing."""
+    from huggingface_hub import HfApi
+
+    tot = 0
+    for it in HfApi().list_repo_tree(repo_id, repo_type="dataset", recursive=True):
+        if it.path.startswith(prefix) and getattr(it, "size", None):
+            tot += it.size
+    return tot / 1e9
 
 
 def publish_index(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib.Path, push: bool = True) -> dict:
@@ -232,6 +278,8 @@ def main(argv=None) -> int:
         for rec in recs:
             print(json.dumps(rec))
         n_fail = sum(1 for r in recs if r.get("status") in ("upload_failed", "failed_twice"))
+        n_new = sum(1 for r in recs if r.get("status", "").startswith("uploaded"))
+        print(json.dumps({"summary": True, "uploaded_this_cycle": n_new, "failed_twice": n_fail}))
         return 2 if n_fail else 0
     for rec in sync_build(build, a.repo, a.tier, push=a.push, delete=a.delete):
         print(json.dumps(rec))

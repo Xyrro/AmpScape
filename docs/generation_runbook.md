@@ -84,12 +84,43 @@ network except tile extraction and the uploads.
 verified on the Hub, local GB, core-hours used (sacct). **Stop rule:** pause submissions and report to the owner if
 the QC failure rate of any tier exceeds 1 % or any shard fails to upload twice (both are printed as TRIGGERED).
 
-## 5. Scratch guard
+## 5. Scratch budget and submission waves (revised 2026-09-16 after the tier-S quota incident)
+
+Measured on tier S: a finalized shard of 200 landscapes is ≈ 130 MB; its raw intermediates are ≈ 245 MB (inputs
+37 MB + outputs 208 MB) and exist from `prepare` until the finalize inside the array task deletes them; the
+validated final exists until the sync loop has verified it on the Hub (one commit per shard, five task-group files;
+measured throughput ≈ 25–30 shards/h ≈ 3.5 GB/h for S). Scratch is 300 GB; the fixed footprint (sources 19 GB,
+v1.0 tiles 36 GB, dev/mini/published builds 22 GB, environments, Julia depot) is ≈ 90 GB, so the generation may
+use **≤ 200 GB** in flight:
+
+    in_flight = (shards prepared but not yet finalized) × (inputs + outputs)
+              + (finalized, not yet uploaded) × final_size            must stay < 200 GB − fixed ≈ 110 GB
+
+| tier | landscapes / shard | final / shard | intermediates / shard | max shards in flight (110 GB) | wave size | shards per tier |
+|---|---|---|---|---|---|---|
+| S | 200 | 0.13 GB | 0.25 GB | ≈ 290 (all raw) → 400 if raw is deleted at finalize | **200** | 500 |
+| M | 100 | 0.36 GB | 0.7 GB | ≈ 100 | **80** | 500 |
+| L | 20 | 0.26 GB | 0.5 GB | ≈ 140 | **100** | 1 000 |
+| XL | 6 | 0.30 GB | 0.6 GB | ≈ 120 | **100** | 667 |
+| XXL | 1 | 0.17 GB | 0.35 GB | ≈ 200 | **64** | 400 |
+
+Rules: (1) `prepare` only the next wave (inputs are 15–20 % of the intermediates but add up: 100 000 S inputs were
+18 GB); (2) submit the next wave only when `uploaded ≥ submitted − wave_size` (i.e. the upload backlog is below one
+wave) and `du -sb data/` < 200 GB — `generate.py submit` enforces the second; (3) the finalize inside the array task
+deletes the raw inputs/outputs of every validated shard, so a wave's intermediates vanish as it completes; (4) the
+sync loop never writes more than one shard's temporary split at a time and removes it in every case.
+
+What went wrong on tier S: all 500 shards ran at once (the scheduler granted 500 cores), finalize ran in a separate
+array after the solves, and the sync only deleted the *final* after upload — so 500 × (245 + 130) MB ≈ 190 GB of
+S data plus the fixed footprint filled the 300 GB quota; the split of shard 12 was truncated by the full disk and the
+loop retried it every 15 min without counting the failure. Fixed as above (owner items 1–5).
+
+## 6. Scratch guard
 
 `generate.py submit` refuses while `data/` holds more than 200 GB (`limits.scratch_pause_gb` in
 `configs/cluster/ice.yaml`; override `--ignore-scratch-guard` only with the owner's approval). Scratch cap is 300 GB.
 
-## 6. On completion
+## 7. On completion
 
 Assemble the final per-tier indexes and split lists (`publish_index`), the Croissant file and the dataset card
 (remove the in-progress notice), push the tuned baseline results, mint the Zenodo DOI (Phase 12).

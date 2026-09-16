@@ -22,7 +22,8 @@ def tier_summary(build: pathlib.Path) -> dict:
     man = pd.read_parquet(build / "manifest.parquet")
     n_shards = man.shard.nunique()
     up_names = {p.stem for p in (build / "shards").glob("shard-*.uploaded")}
-    solved = len({p.stem.replace(".outputs", "") for p in (build / "outputs").glob("shard-*.outputs.h5")} | up_names)
+    solved = len({p.stem.replace(".outputs", "") for p in (build / "outputs").glob("shard-*.outputs.h5")} | up_names
+                 | {p.stem for p in (build / "shards").glob("shard-*.h5")} | {p.stem for p in (build / "shards").glob("shard-*.ok")})
     finals = list((build / "shards").glob("shard-*.h5"))
     ok = list((build / "shards").glob("shard-*.ok"))
     up = list((build / "shards").glob("shard-*.uploaded"))
@@ -35,6 +36,11 @@ def tier_summary(build: pathlib.Path) -> dict:
     for m in up:
         d = json.loads(m.read_text())
         gb_hub += sum(p.get("bytes", 0) for p in d.get("parts", {}).values()) / 1e9 if "parts" in d else 0.0
+    try:
+        from ampscape.io.sync import hub_gb
+        gb_hub = hub_gb(f"{__import__('os').environ.get('HF_ORG', 'Xirro')}/AmpScape", prefix=f"data/{man.tier.iloc[0]}/")
+    except Exception:  # noqa: BLE001 - offline: keep the marker-based estimate
+        pass
     gb_local = sum(p.stat().st_size for p in finals) / 1e9
     return {"tier": str(man.tier.iloc[0]), "shards": n_shards, "solved": solved, "finalized": len(ok), "uploaded": len(up),
             "upload_failed": len(failed), "invalid": len(invalid), "qc_fail_rate": qc_fail, "rows": len(idx),
