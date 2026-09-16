@@ -1,0 +1,31 @@
+name: ci
+on:
+  push: {branches: [main]}
+  pull_request:
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install 3.11 && uv sync --extra dev
+      - run: uv run ruff check ampscape scripts tests && uv run ruff format --check ampscape scripts tests
+      - run: uv run python -m pytest -q -m "not julia and not slow and not gpu" --ignore=tests/test_real_network.py
+  julia-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with: {version: '1.11'}
+      - uses: julia-actions/cache@v2
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install 3.11 && uv sync --extra dev
+      - run: julia --project=julia/AmpScapeSolve.jl -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+      - name: mini-pipeline smoke test (5 synthetic samples, all tasks)
+        run: |
+          uv run python scripts/generate.py plan --dataset ci_smoke --out data/builds/ci_smoke --n-synthetic 5 --n-real 0 --tier S --shard-size 5
+          uv run python scripts/generate.py prepare --build data/builds/ci_smoke
+          uv run python scripts/generate.py solve --build data/builds/ci_smoke --shard 0
+          uv run python scripts/generate.py finalize --build data/builds/ci_smoke
+          uv run python -c "from ampscape.io.schema import validate_shard; r = validate_shard('data/builds/ci_smoke/shards/shard-00000.h5'); assert r.ok, r.errors; print('smoke OK', r.n_samples, 'samples', r.n_configs, 'configs')"
