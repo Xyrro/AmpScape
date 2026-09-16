@@ -41,7 +41,12 @@ def tier_summary(build: pathlib.Path) -> dict:
         gb_hub = hub_gb(f"{__import__('os').environ.get('HF_ORG', 'Xirro')}/AmpScape", prefix=f"data/{man.tier.iloc[0]}/")
     except Exception:  # noqa: BLE001 - offline: keep the marker-based estimate
         pass
-    gb_local = sum(p.stat().st_size for p in finals) / 1e9
+    def _size(p):
+        try:
+            return p.stat().st_size
+        except FileNotFoundError:          # deleted by the sync loop between glob and stat
+            return 0
+    gb_local = sum(_size(p) for p in finals) / 1e9
     return {"tier": str(man.tier.iloc[0]), "shards": n_shards, "solved": solved, "finalized": len(ok), "uploaded": len(up),
             "upload_failed": len(failed), "invalid": len(invalid), "qc_fail_rate": qc_fail, "rows": len(idx),
             "gb_hub": gb_hub, "gb_local": gb_local}
