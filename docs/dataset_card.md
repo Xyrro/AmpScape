@@ -64,6 +64,9 @@ contrast (10⁶), held-out scale (XL/XXL for models trained ≤ L), and a synthe
 
 ## Reproducibility
 
+Generation note: during the tier-S run the scratch disk filled and 149 S shards had to be re-finalized from their
+intact solver outputs; no solve was lost and every shard was re-validated before upload.
+
 Every sample records the solver versions, parameters, residuals and the pipeline tag/commit. Regenerating a shard from
 `v1.0-pipeline` on the same CPU model reproduces every stored array bitwise; across CPU models (PACE-ICE node types)
 CHOLMOD/BLAS results differ in the last bits (≤ 1.2e-9 relative on the checked shards), so cross-hardware reproducibility
