@@ -21,8 +21,10 @@ Date: 2026-09-16 (written while the v1.0 generation runs; brief §13).
 ## Generation status at the time of writing
 
 Tier S: 500 shards solved; 72 shards are being re-solved after the partial-finalize incident (`docs/status/generation_log.md`),
-the rest is on the Hub; the autonomous driver waits for S to be complete before M. CI has not yet been observed on
-GitHub from this session (no `gh` on the cluster) — the first run triggers on the pushed commits.
+the rest is on the Hub; the autonomous driver waits for S to be complete before M. CI observed **green** on GitHub for `c131636` (both jobs: lint + offline tests; Julia tests + 5-sample smoke pipeline).
+Two CI-only findings fixed on the way: `ruff` classified `ampscape` as third-party on a clean checkout (`known-first-party`
+pinned), and the root `.gitignore` pattern `data` had silently kept `ampscape/data/` (the loader package) out of the
+repository since Phase 7 — it is now tracked and the pattern is `/data/`.
 
 ## Open items
 

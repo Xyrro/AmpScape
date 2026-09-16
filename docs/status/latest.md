@@ -9,5 +9,6 @@
   M → L → XL → XXL in waves per the runbook §5, reports at tier boundaries (`logs/tier_boundary_<tier>.txt`), and stops on
   the stop rule / scratch > 250 GB / a dead sync supervisor (`logs/ALERT.txt`).
 - **Phase 11** delivered (`docs/phase_11_report.md`): README, generation guide, contributing guide, notebooks 01–05, CI
-  workflow (lint, offline tests, Julia tests, 5-sample smoke), connectivity test; tree ruff-formatted; 130 tests passing.
+  workflow (lint, offline tests, Julia tests, 5-sample smoke), connectivity test; tree ruff-formatted; 130 tests passing; **CI green on GitHub** (the loader package `ampscape/data` had been
+  excluded by the root `data` ignore pattern since Phase 7 — now tracked).
 - Scratch 172 GB of 300; GB on Hub (data/S) ≈ 60; core-hours ≈ 1 700 + 220 for the repair.
