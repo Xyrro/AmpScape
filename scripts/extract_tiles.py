@@ -60,7 +60,7 @@ def quicklook(path: str, channels: dict, spec: real.TileSpec, qc: dict) -> None:
 
 
 def process(spec_d: dict, sources: real.SourcePaths, out: pathlib.Path, versions: dict) -> dict:
-    spec = real.TileSpec(**spec_d)
+    spec = real.TileSpec(**{k: v for k, v in spec_d.items() if k != "strict"})
     tif = out / "tiles" / spec.tier / f"{spec.tile_id}.tif"
     channels, grid, qc = real.extract_tile(spec, sources)
     row = {"tile_id": spec.tile_id, "lat": spec.lat, "lon": spec.lon, "tier": spec.tier, "size": spec.size,

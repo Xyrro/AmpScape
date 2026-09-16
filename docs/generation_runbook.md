@@ -39,9 +39,9 @@ that `finalized-but-not-uploaded` never exceeds ≈ 80 GB (the sync loop drains 
 source scripts/env.sh
 python scripts/plan_v1.py --tier S --n 100000 --out data/v1/S --shard-size 200 --dataset-version 1.0.0
 sbatch scripts/slurm/dev/prepare_dev.sh data/v1/S                 # inputs (no network needed after tile extraction)
-python scripts/generate.py submit --build data/v1/S --max-concurrent 400          # arrays of ≤ 400 shards; scratch guard
+python scripts/generate.py submit --build data/v1/S --shards 0-399 --max-concurrent 400   # then --shards 400-499; scratch guard
 # finalize + validate + stream, in the sync loop (login node, HF pushes only here):
-nohup scripts/slurm/v1/sync_loop.sh data/v1/S S > data/v1/S/logs/sync_loop.out 2>&1 &
+setsid nohup scripts/slurm/v1/sync_loop.sh data/v1/S S >/dev/null 2>&1 < /dev/null &   # see §2.1
 ```
 
 `sync_loop.sh` every 15 min: `generate.py finalize --build … --quicklooks` (new shards only), then
@@ -50,12 +50,31 @@ upload → verify sha256 on the Hub → `.uploaded` marker → delete the final 
 index rows, `.ok`/`.uploaded` markers and quicklooks stay on scratch. A shard that fails verification twice gets
 `.upload_failed` and the loop exits non-zero (stop rule).
 
+### 2.1 Sync supervisor (login node, detached from any session)
+
+```bash
+setsid nohup /storage/ice1/1/8/yxiao413/EcoFlowBench/scripts/slurm/v1/sync_loop.sh data/v1/S S >/dev/null 2>&1 < /dev/null &
+```
+
+That is the exact restart command (owner requirement): safe to run at any time — a pid lock
+(`$AMPSCAPE_SCRATCH/logs/sync_S.pid`) refuses a second copy, every step is idempotent (finalize skips existing
+finals, sync skips `.uploaded` shards, uploads are verified by checksum before anything is deleted). Log:
+`$AMPSCAPE_SCRATCH/logs/sync.log` (one block per 15-min cycle: finalize, sync records, counts). Stop with
+`kill $(cat $AMPSCAPE_SCRATCH/logs/sync_S.pid)`. Replace `S` by the tier for later tiers (one loop per tier).
+
 ## 3. Resume procedure
 
 Everything is idempotent at the shard level: `prepare` skips shards with inputs, the array skips shards with a
-final file, `finalize` skips existing finals, `sync` skips `.uploaded`. After a node failure or a cancelled array:
-`python scripts/generate.py status --build data/v1/T` → `submit` again (only missing shards are queued). After a
-login-node restart: relaunch `sync_loop.sh`. Nothing needs the network except tile extraction and the uploads.
+final or an outputs file, `finalize` skips existing finals, `sync` skips `.uploaded`.
+
+**Login-node reboot mid-run** (owner requirement 2): running and pending Slurm array tasks are unaffected — they are
+owned by the scheduler, not by the login session. Only two things live on the login node and must be re-launched:
+1. the sync supervisor — the one-line command in §2.1 (safe to repeat; the lock prevents duplicates);
+2. any array **not yet submitted** (later waves / tiers): `python scripts/generate.py status --build data/v1/T`
+   shows the state; `python scripts/generate.py submit --build data/v1/T --shards a-b --max-concurrent 400` queues
+   only the shards that have neither a final nor an outputs file (already-solved shards are picked up by finalize).
+After a compute-node failure or a cancelled array the same `submit` re-queues the missing shards. Nothing needs the
+network except tile extraction and the uploads.
 
 ## 4. Daily summary and stop rule
 

@@ -176,7 +176,11 @@ def cmd_submit(a) -> None:
                              "let the sync loop drain uploaded shards before submitting (or --ignore-scratch-guard)")
         print(f"scratch guard: {used:.0f} GB under data/ (pause at {pause_gb:.0f} GB)")
     shards = sorted(int(s) for s in df.shard.unique())
+    if getattr(a, "shards", None):                      # "a-b" inclusive range: arrays of <= 400 tasks under the 500-job submit limit
+        lo, hi = (int(x) for x in a.shards.split("-"))
+        shards = [s for s in shards if lo <= s <= hi]
     todo = [s for s in shards if not shard_paths(build, s)["final"].exists()] if not a.force else shards
+    todo = [s for s in todo if not shard_paths(build, s)["outputs"].exists()] if not a.force else todo   # solved, awaiting finalize
     if not todo:
         print("nothing to submit")
         return
@@ -318,6 +322,7 @@ def main() -> None:
     b.add_argument("--dry-run", action="store_true")
     b.add_argument("--skip-precompile", action="store_true")
     b.add_argument("--ignore-scratch-guard", action="store_true")
+    b.add_argument("--shards", default=None, help="inclusive shard range a-b to submit (arrays of <= 400 tasks)")
     b.set_defaults(func=cmd_submit)
     t = sub.add_parser("status")
     t.add_argument("--build", required=True)
