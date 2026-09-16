@@ -25,4 +25,6 @@ EXTRA=()
 [ "${AMPSCAPE_FORCE:-0}" = "1" ] && EXTRA+=(--force)
 python scripts/generate.py solve --build "$AMPSCAPE_BUILD" --shard "$SHARD" \
     --solver "${AMPSCAPE_SOLVER:-cholmod}" --fallback "${AMPSCAPE_FALLBACK:-cg+amg}" --omniscape-solver "${AMPSCAPE_OSOLVER:-cholmod}" "${EXTRA[@]}"
+# v1.0: finalize + validate + quicklooks on the compute node right after the solve (idempotent; skips if final exists)
+python scripts/generate.py finalize --build "$AMPSCAPE_BUILD" --shard "$SHARD" --quicklooks 2>&1 | grep -v Warning | tail -2
 echo "end=$(date -u +%FT%TZ)"

@@ -44,8 +44,9 @@ python scripts/generate.py submit --build data/v1/S --shards 0-399 --max-concurr
 setsid nohup scripts/slurm/v1/sync_loop.sh data/v1/S S >/dev/null 2>&1 < /dev/null &   # see §2.1
 ```
 
-`sync_loop.sh` every 15 min: `generate.py finalize --build … --quicklooks` (new shards only), then
-`python scripts/sync_shards.py --build … --tier … --live --publish-index` — validate → split by task group →
+Finalize (merge, QC, schema validation, quicklooks) runs on the compute node at the end of every array task
+(`solve_shard.sbatch`), or through `scripts/slurm/v1/finalize_range.sh` for shards solved before that change (tier S).
+`sync_loop.sh` every 15 min runs only `python scripts/sync_shards.py --build … --tier … --live --publish-index` — validate → split by task group →
 upload → verify sha256 on the Hub → `.uploaded` marker → delete the final shard and staged files locally; the
 index rows, `.ok`/`.uploaded` markers and quicklooks stay on scratch. A shard that fails verification twice gets
 `.upload_failed` and the loop exits non-zero (stop rule).

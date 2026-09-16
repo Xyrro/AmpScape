@@ -19,8 +19,8 @@ trap 'rm -f "$PIDF"' EXIT
 echo "$(date -u +%FT%TZ) sync_loop $TIER started pid $$ build=$BUILD interval=${INT}s" >> "$LOG"
 while true; do
   {
-    echo "== $(date -u +%FT%TZ) $TIER finalize"
-    python scripts/generate.py finalize --build "$BUILD" --quicklooks 2>&1 | grep -v Warning | grep -v "^shard .*inputs already\|^ *[0-9]* *[0-9]* *True" | tail -4
+    # finalize runs inside the Slurm array tasks (solve_shard.sbatch) or a finalize array — never here: 500 shards of
+    # QC would be hours of CPU on the shared login node. This loop only validates, uploads, verifies and deletes.
     echo "== $(date -u +%FT%TZ) $TIER sync"
     python scripts/sync_shards.py --build "$BUILD" --tier "$TIER" --live --publish-index 2>&1 | grep -v Warning | grep -v '"already"' | tail -8
     rc=${PIPESTATUS[0]}
