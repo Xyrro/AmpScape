@@ -173,15 +173,14 @@ def publish_index(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib
 
 
 def scratch_used_gb(root: pathlib.Path) -> float:
-    """Bytes under root (du -s equivalent, follows no symlinks)."""
-    total = 0
-    for p in root.rglob("*"):
-        try:
-            if p.is_file() and not p.is_symlink():
-                total += p.stat().st_size
-        except OSError:
-            pass
-    return total / 1e9
+    """Bytes under root via `du -sb` (a Python walk over the ~100k tile files takes minutes on Lustre)."""
+    import subprocess
+
+    try:
+        out = subprocess.run(["du", "-sb", str(root)], capture_output=True, text=True, timeout=600).stdout
+        return int(out.split()[0]) / 1e9
+    except Exception:  # noqa: BLE001
+        return 0.0
 
 
 def sync_build(build: pathlib.Path, repo_id: str, tier: str, push: bool = False, delete: bool = False,
