@@ -9,14 +9,17 @@ import rasterio
 from ampscape.landscapes import real, sampling
 
 
-@pytest.mark.parametrize("lat,lon,epsg", [
-    (33.77, -84.39, 32616),   # Atlanta, zone 16N
-    (-33.87, 151.21, 32756),  # Sydney, zone 56S
-    (0.0, 0.0, 32631),        # zone 31N (lon 0 belongs to zone 31)
-    (51.5, -0.1, 32630),      # London, zone 30N
-    (64.1, -21.9, 32627),     # Reykjavik, 27N
-    (-1.3, 36.8, 32737),      # Nairobi, 37S
-])
+@pytest.mark.parametrize(
+    "lat,lon,epsg",
+    [
+        (33.77, -84.39, 32616),  # Atlanta, zone 16N
+        (-33.87, 151.21, 32756),  # Sydney, zone 56S
+        (0.0, 0.0, 32631),  # zone 31N (lon 0 belongs to zone 31)
+        (51.5, -0.1, 32630),  # London, zone 30N
+        (64.1, -21.9, 32627),  # Reykjavik, 27N
+        (-1.3, 36.8, 32737),  # Nairobi, 37S
+    ],
+)
 def test_utm_epsg(lat, lon, epsg):
     assert real.utm_epsg(lat, lon) == epsg
 
@@ -40,17 +43,23 @@ def test_make_grid_geometry_and_reproducibility():
 
 def test_worldcover_tile_naming():
     urls = real.worldcover_tile_urls((-84.5, 33.7, -84.3, 33.9))
-    assert urls == [f"{real.WORLDCOVER_BUCKET}/v200/2021/map/ESA_WorldCover_10m_2021_v200_N33W087_Map.tif"]
-    urls = real.worldcover_tile_urls((2.9, -0.1, 3.1, 0.1))   # crosses lat 0 and lon 3
+    assert urls == [
+        f"{real.WORLDCOVER_BUCKET}/v200/2021/map/ESA_WorldCover_10m_2021_v200_N33W087_Map.tif"
+    ]
+    urls = real.worldcover_tile_urls((2.9, -0.1, 3.1, 0.1))  # crosses lat 0 and lon 3
     names = sorted(u.rsplit("_", 2)[-2] for u in urls)
     assert names == ["N00E000", "N00E003", "S03E000", "S03E003"]
 
 
 def test_copdem_tile_naming():
     urls = real.copdem_tile_urls((-84.5, 33.7, -84.3, 33.9))
-    assert urls == [f"{real.COPDEM30_BUCKET}/Copernicus_DSM_COG_10_N33_00_W085_00_DEM/"
-                    "Copernicus_DSM_COG_10_N33_00_W085_00_DEM.tif"]
-    assert real.copdem_tile_urls((-84.5, -33.9, -84.3, -33.7), 90)[0].startswith(real.COPDEM90_BUCKET)
+    assert urls == [
+        f"{real.COPDEM30_BUCKET}/Copernicus_DSM_COG_10_N33_00_W085_00_DEM/"
+        "Copernicus_DSM_COG_10_N33_00_W085_00_DEM.tif"
+    ]
+    assert real.copdem_tile_urls((-84.5, -33.9, -84.3, -33.7), 90)[0].startswith(
+        real.COPDEM90_BUCKET
+    )
     assert "S34_00_W085_00" in real.copdem_tile_urls((-84.5, -33.9, -84.3, -33.7))[0]
 
 
@@ -70,7 +79,9 @@ def test_distance_and_attribute_line():
     g = real.make_grid(33.77, -84.39, 64, 100.0)
     xmin, ymin, xmax, ymax = g.bounds
     ymid = (ymin + ymax) / 2
-    line = gpd.GeoDataFrame({"GP_RTP": [3]}, geometry=[LineString([(xmin - 10, ymid), (xmax + 10, ymid)])], crs=g.crs)
+    line = gpd.GeoDataFrame(
+        {"GP_RTP": [3]}, geometry=[LineString([(xmin - 10, ymid), (xmax + 10, ymid)])], crs=g.crs
+    )
     dist, cls = real.distance_and_attribute(line, g, "GP_RTP")
     assert dist.shape == (64, 64) and cls.dtype == np.int16
     row = int((ymax - ymid) / 100.0)
@@ -119,10 +130,16 @@ def test_sampling_helpers():
     assert sampling.grip_region("Palearctic", 35.0, 120.0) == 6
     assert sampling.grip_region("Nearctic", 40.0, -100.0) == 1
     rng = np.random.default_rng(0)
-    cands = [sampling.Candidate(0, 0, b, "b", "R", 1, "e", 0.1, t) for b in range(1, 8) for t in range(3) for _ in range(4)]
+    cands = [
+        sampling.Candidate(0, 0, b, "b", "R", 1, "e", 0.1, t)
+        for b in range(1, 8)
+        for t in range(3)
+        for _ in range(4)
+    ]
     chosen = sampling.balance_strata(cands, 50, rng, min_biomes=5)
     assert len(chosen) == 50
     from collections import Counter
+
     counts = Counter(c.stratum for c in chosen)
     assert max(counts.values()) - min(counts.values()) <= 1
 
@@ -140,8 +157,17 @@ def test_read_into_grid_merges_partial_sources(tmp_path):
         h = int(round((ymax - ymin + 1000) / 50.0))
         data = np.full((h, w), 100.0 * (i + 1), dtype=np.float32)
         p = tmp_path / f"src{i}.tif"
-        with rasterio.open(p, "w", driver="GTiff", height=h, width=w, count=1, dtype="float32", crs=g.crs,
-                           transform=from_origin(x0, ymax + 500, 50.0, 50.0)) as dst:
+        with rasterio.open(
+            p,
+            "w",
+            driver="GTiff",
+            height=h,
+            width=w,
+            count=1,
+            dtype="float32",
+            crs=g.crs,
+            transform=from_origin(x0, ymax + 500, 50.0, 50.0),
+        ) as dst:
             dst.write(data, 1)
         paths.append(str(p))
     out = np.full(g.shape, np.nan, dtype=np.float32)
@@ -155,7 +181,9 @@ def test_fill_nearest():
     a = np.arange(16, dtype=np.float32).reshape(4, 4)
     a[1, 1] = np.nan
     b, frac = real.fill_nearest(a)
-    assert np.isfinite(b).all() and frac == 1 / 16 and b[1, 1] in {a[0, 1], a[1, 0], a[1, 2], a[2, 1]}
+    assert (
+        np.isfinite(b).all() and frac == 1 / 16 and b[1, 1] in {a[0, 1], a[1, 0], a[1, 2], a[2, 1]}
+    )
     a[:, :] = np.nan
     c, frac = real.fill_nearest(a)
     assert frac == 0.0 and np.isnan(c).all()

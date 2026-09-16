@@ -19,7 +19,9 @@ def _json_safe(v):
     return v
 
 
-def export_zarr(shard_h5: str | pathlib.Path, out: str | pathlib.Path, max_samples: int | None = None) -> int:
+def export_zarr(
+    shard_h5: str | pathlib.Path, out: str | pathlib.Path, max_samples: int | None = None
+) -> int:
     """Copy every sample group (datasets + attributes) of ``shard_h5`` into a Zarr store at ``out``."""
     root = zarr.open_group(str(out), mode="w")
     n = 0
@@ -35,7 +37,16 @@ def export_zarr(shard_h5: str | pathlib.Path, out: str | pathlib.Path, max_sampl
                     copy_group(item, dst.create_group(name))
                 else:
                     arr = item[...]
-                    z = dst.create_array(name, shape=arr.shape, dtype=arr.dtype, chunks=arr.shape if arr.ndim <= 1 else arr.shape[-2:] if arr.ndim == 2 else (1, *arr.shape[-2:]))
+                    z = dst.create_array(
+                        name,
+                        shape=arr.shape,
+                        dtype=arr.dtype,
+                        chunks=arr.shape
+                        if arr.ndim <= 1
+                        else arr.shape[-2:]
+                        if arr.ndim == 2
+                        else (1, *arr.shape[-2:]),
+                    )
                     z[...] = arr
                     for k, v in item.attrs.items():
                         z.attrs[k] = _json_safe(v)

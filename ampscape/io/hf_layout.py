@@ -19,7 +19,13 @@ import pathlib
 import h5py
 import pandas as pd
 
-TASK_GROUPS = {"T1": ["points"], "T1W": ["wall_to_wall_NS", "wall_to_wall_EW"], "T1R": ["regions"], "T3": ["advanced"], "T4": ["omniscape"]}
+TASK_GROUPS = {
+    "T1": ["points"],
+    "T1W": ["wall_to_wall_NS", "wall_to_wall_EW"],
+    "T1R": ["regions"],
+    "T3": ["advanced"],
+    "T4": ["omniscape"],
+}
 CONFIG_TO_GROUP = {c: g for g, cs in TASK_GROUPS.items() for c in cs}
 GZIP = {"compression": "gzip", "compression_opts": 4, "shuffle": True}
 
@@ -31,12 +37,19 @@ def _copy_group(src: h5py.Group, dst: h5py.Group) -> None:
         if isinstance(item, h5py.Group):
             _copy_group(item, dst.create_group(name))
         else:
-            d = dst.create_dataset(name, data=item[...], chunks=True if item.ndim >= 2 else None, **(GZIP if item.ndim >= 2 else {}))
+            d = dst.create_dataset(
+                name,
+                data=item[...],
+                chunks=True if item.ndim >= 2 else None,
+                **(GZIP if item.ndim >= 2 else {}),
+            )
             for k, v in item.attrs.items():
                 d.attrs[k] = v
 
 
-def split_shard_by_task_group(final_h5: str | pathlib.Path, out_root: str | pathlib.Path, tier: str) -> dict[str, pathlib.Path]:
+def split_shard_by_task_group(
+    final_h5: str | pathlib.Path, out_root: str | pathlib.Path, tier: str
+) -> dict[str, pathlib.Path]:
     """Write one shard per task group under out_root/data/<tier>/<group>/<same shard name>."""
     final_h5 = pathlib.Path(final_h5)
     outs: dict[str, h5py.File] = {}
@@ -70,7 +83,12 @@ def split_shard_by_task_group(final_h5: str | pathlib.Path, out_root: str | path
     return paths
 
 
-def export_build(build: str | pathlib.Path, out_root: str | pathlib.Path, tier: str, subsets: dict[str, set[str]] | None = None) -> pd.DataFrame:
+def export_build(
+    build: str | pathlib.Path,
+    out_root: str | pathlib.Path,
+    tier: str,
+    subsets: dict[str, set[str]] | None = None,
+) -> pd.DataFrame:
     """Export a finalized build into the HF layout; returns the per-tier index with `shard` re-pointed."""
     build = pathlib.Path(build)
     out_root = pathlib.Path(out_root)
@@ -80,12 +98,14 @@ def export_build(build: str | pathlib.Path, out_root: str | pathlib.Path, tier: 
             raise RuntimeError(f"{sh} has no .ok marker (run the validator first)")
         split_shard_by_task_group(sh, out_root, tier)
     idx["task_group"] = idx.config.map(CONFIG_TO_GROUP)
-    idx["hf_path"] = [f"data/{tier}/{g}/{s}" for g, s in zip(idx.task_group, idx.shard, strict=True)]
+    idx["hf_path"] = [
+        f"data/{tier}/{g}/{s}" for g, s in zip(idx.task_group, idx.shard, strict=True)
+    ]
     for name, ids in (subsets or {}).items():
         idx[f"subset_{name}"] = idx.sample_id.isin(ids)
     (out_root / "index").mkdir(parents=True, exist_ok=True)
     idx.to_parquet(out_root / "index" / f"{tier}.parquet", index=False)
-    for sub in (subsets or {"full": set(idx.sample_id)}):
+    for sub in subsets or {"full": set(idx.sample_id)}:
         d = out_root / "splits" / sub
         d.mkdir(parents=True, exist_ok=True)
         part = idx[idx[f"subset_{sub}"]] if f"subset_{sub}" in idx else idx

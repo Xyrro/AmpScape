@@ -7,6 +7,7 @@ Steps: (1) create the repo if missing (private), (2) upload README (dataset card
 stats/, (3) upload every shard with the sync path (sha256 verified against the Hub's LFS object, .uploaded marker),
 (4) print a manifest. Requires `hf auth login` on the login node.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -30,8 +31,16 @@ def main() -> int:
     layout = pathlib.Path(a.layout)
     shutil.copy(a.card, layout / "README.md")
     shards = sorted(layout.glob("data/*/*/*.h5"))
-    small = [p for p in layout.rglob("*") if p.is_file() and p.suffix != ".h5" and not p.name.endswith((".ok", ".uploaded", ".invalid"))]
-    print(f"repo {a.repo}: {len(shards)} shards ({sum(p.stat().st_size for p in shards)/1e6:.0f} MB), {len(small)} metadata files")
+    small = [
+        p
+        for p in layout.rglob("*")
+        if p.is_file()
+        and p.suffix != ".h5"
+        and not p.name.endswith((".ok", ".uploaded", ".invalid"))
+    ]
+    print(
+        f"repo {a.repo}: {len(shards)} shards ({sum(p.stat().st_size for p in shards) / 1e6:.0f} MB), {len(small)} metadata files"
+    )
     if not a.push:
         for p in shards[:5] + small[:8]:
             print("  would upload", p.relative_to(layout))
@@ -43,8 +52,13 @@ def main() -> int:
 
     api = HfApi()
     api.create_repo(a.repo, repo_type="dataset", private=a.private, exist_ok=True)
-    api.upload_folder(repo_id=a.repo, repo_type="dataset", folder_path=str(layout), allow_patterns=["README.md", "croissant.json", "index/*", "splits/**", "stats/*"],
-                      commit_message="metadata: card, croissant, index, splits, stats")
+    api.upload_folder(
+        repo_id=a.repo,
+        repo_type="dataset",
+        folder_path=str(layout),
+        allow_patterns=["README.md", "croissant.json", "index/*", "splits/**", "stats/*"],
+        commit_message="metadata: card, croissant, index, splits, stats",
+    )
     manifest = []
     for sh in shards:
         rel = str(sh.relative_to(layout))
@@ -55,10 +69,26 @@ def main() -> int:
             continue
         ok = False
         for attempt in range(1, 4):
-            res = api.upload_file(path_or_fileobj=str(sh), path_in_repo=rel, repo_id=a.repo, repo_type="dataset", commit_message=f"add {rel}")
+            res = api.upload_file(
+                path_or_fileobj=str(sh),
+                path_in_repo=rel,
+                repo_id=a.repo,
+                repo_type="dataset",
+                commit_message=f"add {rel}",
+            )
             remote = remote_sha256(api, a.repo, rel)
             if remote == local:
-                marker.write_text(json.dumps({"repo": a.repo, "path": rel, "sha256": local, "commit": getattr(res, "oid", None), "attempt": attempt}))
+                marker.write_text(
+                    json.dumps(
+                        {
+                            "repo": a.repo,
+                            "path": rel,
+                            "sha256": local,
+                            "commit": getattr(res, "oid", None),
+                            "attempt": attempt,
+                        }
+                    )
+                )
                 ok = True
                 break
         manifest.append({"path": rel, "status": "verified" if ok else "MISMATCH", "sha256": local})

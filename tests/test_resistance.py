@@ -77,7 +77,7 @@ def test_term_behaviour_large_mammal(tables):
     t = tables["large_mammal"]
     n = 8
     cov = {k: np.zeros((n, n), np.float32) for k in CHANNELS}
-    cov["landcover"] = np.full((n, n), 10, np.int16)          # forest
+    cov["landcover"] = np.full((n, n), 10, np.int16)  # forest
     cov["road_class"] = np.zeros((n, n), np.int16)
     cov["road_distance"] = np.full((n, n), 5000, np.float32)
     base, _, _ = apply_table(t, cov)
@@ -119,11 +119,16 @@ def test_forest_bird_elevation_bands(tables):
     t = tables["forest_bird"]
     n = 4
     cov = {k: np.zeros((n, n), np.float32) for k in CHANNELS}
-    cov["landcover"] = np.full((n, n), 30, np.int16)   # grass = 15
+    cov["landcover"] = np.full((n, n), 30, np.int16)  # grass = 15
     cov["elevation"] = np.array([[500, 2000, 4000, 9000]] * n, np.float32)
     cov["road_distance"][:] = 9999
     r, _, _ = apply_table(t, cov)
-    assert np.allclose(r[:, 0], 15) and np.allclose(r[:, 1], 30) and np.allclose(r[:, 2], 60) and np.allclose(r[:, 3], 60)
+    assert (
+        np.allclose(r[:, 0], 15)
+        and np.allclose(r[:, 1], 30)
+        and np.allclose(r[:, 2], 60)
+        and np.allclose(r[:, 3], 60)
+    )
 
 
 def test_schema_rejects_bad_tables(tables):
@@ -155,7 +160,9 @@ def test_random_table_reproducible(tables):
     assert r[~nd].min() >= 1 and r[~nd].max() <= a.r_max
 
 
-@pytest.mark.skipif(not (PILOT / "tiles.parquet").exists(), reason="pilot tiles not on this machine")
+@pytest.mark.skipif(
+    not (PILOT / "tiles.parquet").exists(), reason="pilot tiles not on this machine"
+)
 def test_all_tables_on_all_pilot_tiles(tables):
     import pandas as pd
 

@@ -22,7 +22,9 @@ from ampscape.sources import SourceConfig, generate_all
 OMNI_TIERS = {"S": (16, 3), "M": (32, 5), "L": (64, 9), "XL": (128, 17), "XXL": (256, 33)}
 
 
-def omni_params(tier: str, solver_yaml: str = "configs/solver/omniscape_reference.yaml") -> tuple[int, int]:
+def omni_params(
+    tier: str, solver_yaml: str = "configs/solver/omniscape_reference.yaml"
+) -> tuple[int, int]:
     try:
         d = yaml.safe_load(open(solver_yaml))["tiers"][tier]
         return int(d["radius"]), int(d["block_size"])
@@ -43,15 +45,19 @@ def load_landscape(spec: SampleSpec, pilot_root: str | None):
         else:
             ls = sample_landscape(spec.seed, (spec.size, spec.size))
         R, contrast, params = ls.resistance, ls.contrast, ls.params
-        if "contrast_override" in extra:           # probes: re-map the same cost field to a fixed contrast
+        if "contrast_override" in extra:  # probes: re-map the same cost field to a fixed contrast
             from ampscape.landscapes.synthetic import field_to_resistance
 
             contrast = float(extra["contrast_override"])
             R = field_to_resistance(ls.cost_field, contrast, ls.params["mapping"])
             R[ls.nodata_mask] = 1.0
             params = dict(ls.params, contrast=contrast, contrast_override=True)
-        meta = {"generator": ls.generator, "generator_params": params, "contrast": contrast,
-                "resistance_table_id": None}
+        meta = {
+            "generator": ls.generator,
+            "generator_params": params,
+            "contrast": contrast,
+            "resistance_table_id": None,
+        }
         lc = None
         if "patch_mosaic" in params and "regions" in spec.config_list():
             # C5: focal regions on synthetic patch mosaics = the lowest-cost class (cost 0 -> R = 1), as habitat class 10
@@ -70,9 +76,18 @@ def load_landscape(spec: SampleSpec, pilot_root: str | None):
             R = src.read(1).astype(np.float32)
             nd = src.read(2) > 0.5
             prov = json.loads(src.tags()["provenance"])
-        meta = {"generator": "published", "resistance_table_id": spec.table_id, "tile_id": spec.tile_id, "lat": float(t["lat"]),
-                "lon": float(t["lon"]), "crs": f"EPSG:{int(t['epsg'])}", "transform": prov["transform"], "r_max": prov["r_max"],
-                "contrast": float(prov["r_max"] / prov["r_min"]), "published_source": prov}
+        meta = {
+            "generator": "published",
+            "resistance_table_id": spec.table_id,
+            "tile_id": spec.tile_id,
+            "lat": float(t["lat"]),
+            "lon": float(t["lon"]),
+            "crs": f"EPSG:{int(t['epsg'])}",
+            "transform": prov["transform"],
+            "r_max": prov["r_max"],
+            "contrast": float(prov["r_max"] / prov["r_min"]),
+            "published_source": prov,
+        }
         return R, nd, None, None, meta
 
     root = pathlib.Path(pilot_root)
@@ -85,18 +100,36 @@ def load_landscape(spec: SampleSpec, pilot_root: str | None):
     tiles = pd.read_parquet(root / "tiles.parquet").set_index("tile_id")
     t = tiles.loc[spec.tile_id]
     cov, tags = read_tile(str(root / t["path"]))
-    meta = {"generator": "real", "resampling": json.loads(tags["resampling"]) if tags.get("resampling") else None,
-            "resistance_table_id": spec.table_id, "table_version": int(row.table_version),
-            "table_sha256": row.table_sha256, "r_max": r_max, "tile_id": spec.tile_id, "lat": float(t["lat"]),
-            "lon": float(t["lon"]), "crs": f"EPSG:{int(t['epsg'])}", "transform": json.loads(t["transform"]),
-            "biome_num": int(t["biome_num"]), "biome_name": t["biome_name"], "realm": t["realm"],
-            "ghm_tercile": int(t["ghm_tercile"]), "stratum": t["stratum"],
-            "frac_at_rmax": float(row.frac_at_rmax), "contrast": float(10 ** row.log10_contrast)}
+    meta = {
+        "generator": "real",
+        "resampling": json.loads(tags["resampling"]) if tags.get("resampling") else None,
+        "resistance_table_id": spec.table_id,
+        "table_version": int(row.table_version),
+        "table_sha256": row.table_sha256,
+        "r_max": r_max,
+        "tile_id": spec.tile_id,
+        "lat": float(t["lat"]),
+        "lon": float(t["lon"]),
+        "crs": f"EPSG:{int(t['epsg'])}",
+        "transform": json.loads(t["transform"]),
+        "biome_num": int(t["biome_num"]),
+        "biome_name": t["biome_name"],
+        "realm": t["realm"],
+        "ghm_tercile": int(t["ghm_tercile"]),
+        "stratum": t["stratum"],
+        "frac_at_rmax": float(row.frac_at_rmax),
+        "contrast": float(10**row.log10_contrast),
+    }
     return R, nd, cov["landcover"], cov, meta
 
 
-def prepare_shard(specs: list[SampleSpec], out_h5: str, source_cfg: SourceConfig, pilot_root: str | None = None,
-                  overwrite: bool = False) -> int:
+def prepare_shard(
+    specs: list[SampleSpec],
+    out_h5: str,
+    source_cfg: SourceConfig,
+    pilot_root: str | None = None,
+    overwrite: bool = False,
+) -> int:
     """Write inputs for all specs into out_h5; returns number of samples written."""
     p = pathlib.Path(out_h5)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -116,19 +149,31 @@ def prepare_shard(specs: list[SampleSpec], out_h5: str, source_cfg: SourceConfig
             if "k_override" in extra:
                 from ampscape.sources import sample_points
 
-                samples["points"] = sample_points(R, nd, cfg, np.random.default_rng(spec.seed), k=int(extra["k_override"]))
+                samples["points"] = sample_points(
+                    R, nd, cfg, np.random.default_rng(spec.seed), k=int(extra["k_override"])
+                )
             g = g_all.create_group(spec.sample_id)
             radius, bs = omni_params(spec.tier)
             g.attrs["tier"] = spec.tier
             g.attrs["omni_radius"] = radius
             g.attrs["omni_block_size"] = bs
-            g.attrs["cg_baseline"] = int(bool(getattr(spec, "cg_baseline", True)))   # test/OOD samples only (owner decision)
+            g.attrs["cg_baseline"] = int(
+                bool(getattr(spec, "cg_baseline", True))
+            )  # test/OOD samples only (owner decision)
             gi = g.create_group("inputs")
-            gi.create_dataset("resistance", data=R.astype(np.float32), compression="gzip", compression_opts=4)
-            gi.create_dataset("nodata_mask", data=nd.astype(np.uint8), compression="gzip", compression_opts=4)
+            gi.create_dataset(
+                "resistance", data=R.astype(np.float32), compression="gzip", compression_opts=4
+            )
+            gi.create_dataset(
+                "nodata_mask", data=nd.astype(np.uint8), compression="gzip", compression_opts=4
+            )
             if cov is not None:
-                stack = np.stack([np.nan_to_num(cov[c].astype(np.float32), nan=-9999.0) for c in CHANNELS])
-                d = gi.create_dataset("covariates", data=stack, compression="gzip", compression_opts=4)
+                stack = np.stack(
+                    [np.nan_to_num(cov[c].astype(np.float32), nan=-9999.0) for c in CHANNELS]
+                )
+                d = gi.create_dataset(
+                    "covariates", data=stack, compression="gzip", compression_opts=4
+                )
                 d.attrs["channels"] = ",".join(CHANNELS)
             gc_all = g.create_group("configs")
             src_meta = {}
@@ -139,18 +184,45 @@ def prepare_shard(specs: list[SampleSpec], out_h5: str, source_cfg: SourceConfig
                 gc = gc_all.create_group(cname)
                 gc.attrs["kind"] = s.kind
                 if s.focal_mask is not None:
-                    gc.create_dataset("focal_mask", data=s.focal_mask.astype(np.int32), compression="gzip", compression_opts=4)
+                    gc.create_dataset(
+                        "focal_mask",
+                        data=s.focal_mask.astype(np.int32),
+                        compression="gzip",
+                        compression_opts=4,
+                    )
                 if s.source_strength is not None:
-                    gc.create_dataset("source_strength", data=s.source_strength.astype(np.float32), compression="gzip", compression_opts=4)
+                    gc.create_dataset(
+                        "source_strength",
+                        data=s.source_strength.astype(np.float32),
+                        compression="gzip",
+                        compression_opts=4,
+                    )
                 if s.ground is not None:
-                    gc.create_dataset("ground", data=s.ground.astype(np.int8), compression="gzip", compression_opts=4)
+                    gc.create_dataset(
+                        "ground",
+                        data=s.ground.astype(np.int8),
+                        compression="gzip",
+                        compression_opts=4,
+                    )
                 if s.kind == "omniscape":
                     gc.attrs["source_threshold"] = float(s.meta.get("source_threshold", 0.0))
                 src_meta[cname] = {"focal_table": s.focal_table, "meta": s.meta}
-            meta.update({"sample_id": spec.sample_id, "dataset_id": spec.dataset_id, "family": spec.family,
-                         "tier": spec.tier, "H": spec.size, "W": spec.size, "pixel_size_m": spec.pixel_m,
-                         "seed": spec.seed, "source_config": cfg.provenance(), "omniscape": {"radius": radius, "block_size": bs},
-                         "configs": src_meta, "graph_connectivity": 8})
+            meta.update(
+                {
+                    "sample_id": spec.sample_id,
+                    "dataset_id": spec.dataset_id,
+                    "family": spec.family,
+                    "tier": spec.tier,
+                    "H": spec.size,
+                    "W": spec.size,
+                    "pixel_size_m": spec.pixel_m,
+                    "seed": spec.seed,
+                    "source_config": cfg.provenance(),
+                    "omniscape": {"radius": radius, "block_size": bs},
+                    "configs": src_meta,
+                    "graph_connectivity": 8,
+                }
+            )
             g.attrs["meta"] = json.dumps(meta, default=float)
             n += 1
     return n

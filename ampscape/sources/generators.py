@@ -26,11 +26,11 @@ from ampscape.sources.graph import all_in_one_component, component_labels
 
 @dataclass
 class SourceSample:
-    kind: str                                  # points | wall_to_wall | regions | advanced | omniscape
-    focal_mask: np.ndarray | None = None       # int32 (H, W)
+    kind: str  # points | wall_to_wall | regions | advanced | omniscape
+    focal_mask: np.ndarray | None = None  # int32 (H, W)
     focal_table: list[dict] = field(default_factory=list)
     source_strength: np.ndarray | None = None  # float32 (H, W)  (advanced / omniscape)
-    ground: np.ndarray | None = None           # int8 (H, W)     (advanced)
+    ground: np.ndarray | None = None  # int8 (H, W)     (advanced)
     meta: dict = field(default_factory=dict)
 
     @property
@@ -55,7 +55,11 @@ def _cheb(a: tuple[int, int], b: tuple[int, int]) -> int:
 
 def _connectivity_meta(labels: np.ndarray, focal_mask: np.ndarray) -> dict:
     ok, n_comp = all_in_one_component(labels, focal_mask > 0)
-    return {"connected": ok, "n_components_touched": n_comp, "n_graph_components": int(labels.max() + 1)}
+    return {
+        "connected": ok,
+        "n_components_touched": n_comp,
+        "n_graph_components": int(labels.max() + 1),
+    }
 
 
 def _region_wkt(mask: np.ndarray) -> str:
@@ -71,8 +75,13 @@ def _region_wkt(mask: np.ndarray) -> str:
 # ---------------------------------------------------------------------------
 # T1 / T2: point focal nodes
 # ---------------------------------------------------------------------------
-def sample_points(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, rng: np.random.Generator,
-                  k: int | None = None) -> SourceSample:
+def sample_points(
+    R: np.ndarray,
+    nodata: np.ndarray,
+    cfg: SourceConfig,
+    rng: np.random.Generator,
+    k: int | None = None,
+) -> SourceSample:
     """K point focal nodes with minimum Chebyshev separation, mixed placement.
 
     Each node is independently placed "anywhere" (any pixel of the largest component) with
@@ -112,14 +121,30 @@ def sample_points(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, rng: np.
     table = []
     for i, ((r, c), p) in enumerate(zip(chosen, placements, strict=True), start=1):
         mask[r, c] = i
-        table.append({"label": i, "row": r, "col": c, "kind": "point", "placement": p, "n_pixels": 1,
-                      "resistance": float(R[r, c])})
+        table.append(
+            {
+                "label": i,
+                "row": r,
+                "col": c,
+                "kind": "point",
+                "placement": p,
+                "n_pixels": 1,
+                "resistance": float(R[r, c]),
+            }
+        )
     meta = {
-        "k": k, "min_separation_px_requested": pc.min_separation_px, "min_separation_px_used": sep,
-        "separation_relaxations": relaxations, "low_resistance_threshold": thr,
-        "n_anywhere": placements.count("anywhere"), "n_low_resistance": placements.count("low_resistance"),
-        "placement": "anywhere" if placements.count("anywhere") == k else
-                     "low_resistance" if placements.count("low_resistance") == k else "mixed",
+        "k": k,
+        "min_separation_px_requested": pc.min_separation_px,
+        "min_separation_px_used": sep,
+        "separation_relaxations": relaxations,
+        "low_resistance_threshold": thr,
+        "n_anywhere": placements.count("anywhere"),
+        "n_low_resistance": placements.count("low_resistance"),
+        "placement": "anywhere"
+        if placements.count("anywhere") == k
+        else "low_resistance"
+        if placements.count("low_resistance") == k
+        else "mixed",
         **_connectivity_meta(labels, mask),
     }
     return SourceSample("points", mask, table, meta=meta)
@@ -128,7 +153,9 @@ def sample_points(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, rng: np.
 # ---------------------------------------------------------------------------
 # T1W: wall-to-wall strips
 # ---------------------------------------------------------------------------
-def sample_wall_to_wall(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, orientation: str) -> SourceSample | None:
+def sample_wall_to_wall(
+    R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, orientation: str
+) -> SourceSample | None:
     """Two edge strips (label 1 = north or west, 2 = south or east) restricted to the largest component."""
     if orientation not in ("NS", "EW"):
         raise ValueError("orientation must be NS or EW")
@@ -138,29 +165,50 @@ def sample_wall_to_wall(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, or
     mask = np.zeros((H, W), dtype=np.int32)
     if orientation == "NS":
         mask[:w, :] = 1
-        mask[H - w:, :] = 2
+        mask[H - w :, :] = 2
     else:
         mask[:, :w] = 1
-        mask[:, W - w:] = 2
+        mask[:, W - w :] = 2
     mask[~comp] = 0
     table = []
     for lab in (1, 2):
         rc = np.argwhere(mask == lab)
         if len(rc) == 0:
-            return None          # strip entirely NoData / outside the largest component (large-NoData or coastal
-                                 # landscapes): the wall-to-wall configuration is not defined for this landscape
-        table.append({"label": lab, "row": int(round(rc[:, 0].mean())), "col": int(round(rc[:, 1].mean())),
-                      "kind": "strip", "placement": "strip", "n_pixels": int(len(rc)), "wkt": _region_wkt(mask == lab)})
-    meta = {"orientation": orientation, "strip_width_px": w, "k": 2, "placement": "strip",
-            "strip_pixels": [t["n_pixels"] for t in table], **_connectivity_meta(labels, mask)}
+            return None  # strip entirely NoData / outside the largest component (large-NoData or coastal
+            # landscapes): the wall-to-wall configuration is not defined for this landscape
+        table.append(
+            {
+                "label": lab,
+                "row": int(round(rc[:, 0].mean())),
+                "col": int(round(rc[:, 1].mean())),
+                "kind": "strip",
+                "placement": "strip",
+                "n_pixels": int(len(rc)),
+                "wkt": _region_wkt(mask == lab),
+            }
+        )
+    meta = {
+        "orientation": orientation,
+        "strip_width_px": w,
+        "k": 2,
+        "placement": "strip",
+        "strip_pixels": [t["n_pixels"] for t in table],
+        **_connectivity_meta(labels, mask),
+    }
     return SourceSample("wall_to_wall", mask, table, meta=meta)
 
 
 # ---------------------------------------------------------------------------
 # T1 regions from habitat patches
 # ---------------------------------------------------------------------------
-def sample_regions(R: np.ndarray, nodata: np.ndarray, landcover: np.ndarray, cfg: SourceConfig,
-                   rng: np.random.Generator, k: int | None = None) -> SourceSample | None:
+def sample_regions(
+    R: np.ndarray,
+    nodata: np.ndarray,
+    landcover: np.ndarray,
+    cfg: SourceConfig,
+    rng: np.random.Generator,
+    k: int | None = None,
+) -> SourceSample | None:
     """Focal regions = habitat patches (WorldCover classes in ``habitat_classes``), >= min size.
 
     Returns None when fewer than ``k_range[0]`` eligible, well-separated patches exist.
@@ -176,7 +224,9 @@ def sample_regions(R: np.ndarray, nodata: np.ndarray, landcover: np.ndarray, cfg
     eligible = [i + 1 for i, s in enumerate(sizes) if s >= rc_cfg.min_patch_px]
     if len(eligible) < rc_cfg.k_range[0]:
         return None
-    centroids = {i: tuple(int(round(v)) for v in ndimage.center_of_mass(habitat, lab, i)) for i in eligible}
+    centroids = {
+        i: tuple(int(round(v)) for v in ndimage.center_of_mass(habitat, lab, i)) for i in eligible
+    }
     k = int(rng.integers(rc_cfg.k_range[0], rc_cfg.k_range[1] + 1)) if k is None else int(k)
     order = list(rng.permutation(eligible))
     chosen: list[int] = []
@@ -200,18 +250,38 @@ def sample_regions(R: np.ndarray, nodata: np.ndarray, landcover: np.ndarray, cfg
             m = np.zeros_like(m)
             m[keep[:, 0], keep[:, 1]] = True
         mask[m] = new_lab
-        table.append({"label": new_lab, "row": centroids[i][0], "col": centroids[i][1], "kind": "region",
-                      "placement": "habitat_patch", "n_pixels": int(m.sum()), "wkt": _region_wkt(m)})
-    meta = {"k": len(chosen), "habitat_classes": rc_cfg.habitat_classes, "min_patch_px": rc_cfg.min_patch_px,
-            "n_eligible_patches": len(eligible), "placement": "habitat_patch", **_connectivity_meta(labels, mask)}
+        table.append(
+            {
+                "label": new_lab,
+                "row": centroids[i][0],
+                "col": centroids[i][1],
+                "kind": "region",
+                "placement": "habitat_patch",
+                "n_pixels": int(m.sum()),
+                "wkt": _region_wkt(m),
+            }
+        )
+    meta = {
+        "k": len(chosen),
+        "habitat_classes": rc_cfg.habitat_classes,
+        "min_patch_px": rc_cfg.min_patch_px,
+        "n_eligible_patches": len(eligible),
+        "placement": "habitat_patch",
+        **_connectivity_meta(labels, mask),
+    }
     return SourceSample("regions", mask, table, meta=meta)
 
 
 # ---------------------------------------------------------------------------
 # T3 / T4: source strength and grounds
 # ---------------------------------------------------------------------------
-def suitability_field(R: np.ndarray, nodata: np.ndarray, comp: np.ndarray, sc: SourceFieldCfg,
-                      rng: np.random.Generator) -> tuple[np.ndarray, dict]:
+def suitability_field(
+    R: np.ndarray,
+    nodata: np.ndarray,
+    comp: np.ndarray,
+    sc: SourceFieldCfg,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, dict]:
     """Suitability proxy in [0, 1] on the largest component (0 elsewhere)."""
     if sc.mode == "inverse_resistance":
         s = np.power(1.0 / np.asarray(R, dtype=np.float64), sc.power)
@@ -231,7 +301,9 @@ def suitability_field(R: np.ndarray, nodata: np.ndarray, comp: np.ndarray, sc: S
     return src, meta
 
 
-def sample_advanced(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, rng: np.random.Generator) -> SourceSample | None:
+def sample_advanced(
+    R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, rng: np.random.Generator
+) -> SourceSample | None:
     """T3: source-strength raster (sum = normalize_total) and ground raster; grounds never overlap sources."""
     H, W = R.shape
     comp, labels = _largest_component_mask(R, nodata)
@@ -245,15 +317,19 @@ def sample_advanced(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, rng: n
         ground = np.zeros((H, W), dtype=np.int8)
         if m == "edge":
             side = str(rng.choice(["N", "S", "E", "W"]))
-            sl = {"N": (slice(0, ew), slice(None)), "S": (slice(H - ew, H), slice(None)),
-                  "W": (slice(None), slice(0, ew)), "E": (slice(None), slice(W - ew, W))}[side]
+            sl = {
+                "N": (slice(0, ew), slice(None)),
+                "S": (slice(H - ew, H), slice(None)),
+                "W": (slice(None), slice(0, ew)),
+                "E": (slice(None), slice(W - ew, W)),
+            }[side]
             ground[sl] = 1
             gmeta = {"mode": m, "side": side}
         elif m == "all_edges":
             ground[:ew, :] = 1
-            ground[H - ew:, :] = 1
+            ground[H - ew :, :] = 1
             ground[:, :ew] = 1
-            ground[:, W - ew:] = 1
+            ground[:, W - ew :] = 1
             gmeta = {"mode": m}
         else:
             n_p = int(rng.integers(gc.n_patches_range[0], gc.n_patches_range[1] + 1))
@@ -264,7 +340,12 @@ def sample_advanced(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, rng: n
                 cy, cx = (int(v) for v in rc[rng.integers(len(rc))])
                 ground[(yy - cy) ** 2 + (xx - cx) ** 2 <= gc.patch_radius_px**2] = 1
                 centres.append((cy, cx))
-            gmeta = {"mode": m, "n_patches": n_p, "centres": centres, "radius_px": gc.patch_radius_px}
+            gmeta = {
+                "mode": m,
+                "n_patches": n_p,
+                "centres": centres,
+                "radius_px": gc.patch_radius_px,
+            }
         ground[~comp] = 0
         s_try = src.copy()
         s_try[ground > 0] = 0.0
@@ -278,26 +359,42 @@ def sample_advanced(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, rng: n
     nt = cfg.advanced.source.normalize_total
     if nt:
         src = src * (nt / src.sum())
-    meta = {"source": smeta, "ground": gmeta, "n_source_pixels": int((src > 0).sum()),
-            "n_ground_pixels": int(ground.sum()), "source_total": float(src.sum()),
-            **_connectivity_meta(labels, (src > 0) | (ground > 0))}
+    meta = {
+        "source": smeta,
+        "ground": gmeta,
+        "n_source_pixels": int((src > 0).sum()),
+        "n_ground_pixels": int(ground.sum()),
+        "source_total": float(src.sum()),
+        **_connectivity_meta(labels, (src > 0) | (ground > 0)),
+    }
     return SourceSample("advanced", None, [], src.astype(np.float32), ground, meta)
 
 
-def sample_omniscape(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, rng: np.random.Generator) -> SourceSample:
+def sample_omniscape(
+    R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, rng: np.random.Generator
+) -> SourceSample:
     """T4: Omniscape source-strength raster scaled to max = scale_max; threshold recorded."""
     comp, labels = _largest_component_mask(R, nodata)
     src, smeta = suitability_field(R, nodata, comp, cfg.omniscape.source, rng)
     sm = cfg.omniscape.source.scale_max or 1.0
     src = src * (sm / src.max())
-    meta = {"source": smeta, "scale_max": sm, "source_threshold": cfg.omniscape.source_threshold,
-            "n_source_pixels": int((src > cfg.omniscape.source_threshold).sum()),
-            **_connectivity_meta(labels, src > 0)}
+    meta = {
+        "source": smeta,
+        "scale_max": sm,
+        "source_threshold": cfg.omniscape.source_threshold,
+        "n_source_pixels": int((src > cfg.omniscape.source_threshold).sum()),
+        **_connectivity_meta(labels, src > 0),
+    }
     return SourceSample("omniscape", None, [], src.astype(np.float32), None, meta)
 
 
-def generate_all(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, seed: int,
-                 landcover: np.ndarray | None = None) -> dict[str, SourceSample]:
+def generate_all(
+    R: np.ndarray,
+    nodata: np.ndarray,
+    cfg: SourceConfig,
+    seed: int,
+    landcover: np.ndarray | None = None,
+) -> dict[str, SourceSample]:
     """Every configuration for one landscape from one seed (sub-seeded per kind, so kinds are independent)."""
     ss = np.random.SeedSequence(int(seed))
     kids = ss.spawn(5)
@@ -308,7 +405,9 @@ def generate_all(R: np.ndarray, nodata: np.ndarray, cfg: SourceConfig, seed: int
         "advanced": sample_advanced(R, nodata, cfg, np.random.default_rng(kids[1])),
         "omniscape": sample_omniscape(R, nodata, cfg, np.random.default_rng(kids[2])),
     }
-    out = {k: v for k, v in out.items() if v is not None}     # wall_to_wall may be undefined (empty strip)
+    out = {
+        k: v for k, v in out.items() if v is not None
+    }  # wall_to_wall may be undefined (empty strip)
     if landcover is not None:
         reg = sample_regions(R, nodata, landcover, cfg, np.random.default_rng(kids[3]))
         if reg is not None:

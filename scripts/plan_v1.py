@@ -4,6 +4,7 @@
   python scripts/plan_v1.py --tier S --n 3000 --out data/dev/S --tiles data/tiles/v1 --shard-size 100 --dataset-version 1.0.0-dev
 Then: generate.py prepare / submit / finalize --build data/dev/S (same driver as the mini).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -23,7 +24,12 @@ def main():
     ap.add_argument("--dataset-version", default="1.0.0-dev")
     ap.add_argument("--source-config", default="configs/tasks/sources_default.yaml")
     ap.add_argument("--solver-preset", default="configs/solver/circuitscape_reference.yaml")
-    ap.add_argument("--n-tiles", type=int, default=None, help="override the number of real tiles (XXL: all 38 incl. the 6 strict)")
+    ap.add_argument(
+        "--n-tiles",
+        type=int,
+        default=None,
+        help="override the number of real tiles (XXL: all 38 incl. the 6 strict)",
+    )
     a = ap.parse_args()
     from ampscape.solve.plan_v1 import V1_DATASET_ID, plan_v1, split_counts
 
@@ -32,12 +38,29 @@ def main():
     df = plan_v1(a.tier, a.n, str(ROOT / a.tiles), a.shard_size, n_tiles=a.n_tiles)
     df.to_parquet(build / "manifest.parquet", index=False)
     n_syn, n_tiles = split_counts(a.n) if a.n_tiles is None else (a.n - a.n_tiles * 5, a.n_tiles)
-    cfg = {"dataset_id": V1_DATASET_ID, "design": "v1.0-prefix", "tier": a.tier, "n": a.n, "n_synthetic": n_syn, "n_real": n_tiles * 5,
-           "n_tiles": n_tiles, "shard_size": a.shard_size, "pilot": a.tiles, "published": None, "source_config": a.source_config,
-           "solver_preset": a.solver_preset, "dataset_version": a.dataset_version, "seed0": None}
+    cfg = {
+        "dataset_id": V1_DATASET_ID,
+        "design": "v1.0-prefix",
+        "tier": a.tier,
+        "n": a.n,
+        "n_synthetic": n_syn,
+        "n_real": n_tiles * 5,
+        "n_tiles": n_tiles,
+        "shard_size": a.shard_size,
+        "pilot": a.tiles,
+        "published": None,
+        "source_config": a.source_config,
+        "solver_preset": a.solver_preset,
+        "dataset_version": a.dataset_version,
+        "seed0": None,
+    }
     (build / "build.json").write_text(json.dumps(cfg, indent=1))
-    print(f"planned {len(df)} samples ({n_syn} synthetic + {n_tiles} tiles × 5) in {df.shard.nunique()} shards -> {build}")
-    print("splits:", df.split.value_counts().to_dict(), "| cg_baseline on", int(df.cg_baseline.sum()))
+    print(
+        f"planned {len(df)} samples ({n_syn} synthetic + {n_tiles} tiles × 5) in {df.shard.nunique()} shards -> {build}"
+    )
+    print(
+        "splits:", df.split.value_counts().to_dict(), "| cg_baseline on", int(df.cg_baseline.sum())
+    )
     ex = df[df.family == "synthetic"].extra.apply(lambda x: json.loads(x).get("hard_case"))
     print("generators:", df[df.family == "synthetic"].generator.value_counts().to_dict())
     print("hard cases:", ex.value_counts(dropna=False).to_dict())

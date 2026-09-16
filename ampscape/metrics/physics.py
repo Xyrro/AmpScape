@@ -23,8 +23,10 @@ def nonnegativity(pred, mask=None) -> dict[str, float]:
     m = np.ones(p.shape, bool) if mask is None else np.asarray(mask, bool).squeeze()
     v = p[m]
     mx = float(np.max(np.abs(v))) if v.size else 0.0
-    return {"neg_fraction": float(np.mean(v < 0)) if v.size else 0.0,
-            "neg_min_over_max": float(min(v.min(), 0.0) / mx) if mx > 0 else 0.0}
+    return {
+        "neg_fraction": float(np.mean(v < 0)) if v.size else 0.0,
+        "neg_min_over_max": float(min(v.min(), 0.0) / mx) if mx > 0 else 0.0,
+    }
 
 
 def focal_current_error(pred, focal_mask, pair_index=None) -> float:
@@ -37,7 +39,11 @@ def focal_current_error(pred, focal_mask, pair_index=None) -> float:
         return float("nan")
     errs = []
     for lab in labels:
-        expected = 1.0 if pair_index is None or len(pair_index) == 1 else float(sum(1 for a, b in pair_index if lab in (a, b)))
+        expected = (
+            1.0
+            if pair_index is None or len(pair_index) == 1
+            else float(sum(1 for a, b in pair_index if lab in (a, b)))
+        )
         at = p[f == lab]
         errs.append(np.abs(at.max() - expected) / expected)
     return float(np.mean(errs))

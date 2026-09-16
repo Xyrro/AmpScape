@@ -1,4 +1,5 @@
 """Source generation: every configuration is connected on the largest component (brief §6 / Phase 11 test list)."""
+
 import numpy as np
 
 from ampscape.landscapes.synthetic import sample_landscape_v1

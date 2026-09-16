@@ -3,6 +3,7 @@
 compared after dropping run-specific provenance (created_at, pipeline_git_sha/tag, hostname, timings, memory).
   python scripts/compare_shards.py --a data/dev/S/shards --b data/repro/S/shards --out data/repro/S_compare.json
 """
+
 from __future__ import annotations
 
 import argparse
@@ -12,8 +13,19 @@ import pathlib
 import h5py
 import numpy as np
 
-VOLATILE = {"created_at", "pipeline_git_sha", "pipeline_tag", "hostname", "wall_s", "maxrss_mb", "started_utc", "time_to_1e-06",
-            "time_to_2e-12", "n_threads", "blas_threads"}
+VOLATILE = {
+    "created_at",
+    "pipeline_git_sha",
+    "pipeline_tag",
+    "hostname",
+    "wall_s",
+    "maxrss_mb",
+    "started_utc",
+    "time_to_1e-06",
+    "time_to_2e-12",
+    "n_threads",
+    "blas_threads",
+}
 
 
 def strip(obj):
@@ -53,11 +65,18 @@ def compare(fa: h5py.File, fb: h5py.File, rep: dict, path: str = "/") -> None:
         pa, pb = ga[k], gb[k]
         if isinstance(pa, h5py.Dataset):
             rep["n_datasets"] += 1
-            if pa.shape != pb.shape or pa.dtype != pb.dtype or not np.array_equal(pa[...], pb[...], equal_nan=True):
+            if (
+                pa.shape != pb.shape
+                or pa.dtype != pb.dtype
+                or not np.array_equal(pa[...], pb[...], equal_nan=True)
+            ):
                 rep["dataset_diffs"].append(f"{path}{k}")
                 if pa.shape == pb.shape and pa.dtype.kind == "f":
                     a, b = pa[...].astype(np.float64), pb[...].astype(np.float64)
-                    rep["max_rel_diff"] = max(rep["max_rel_diff"], float(np.nanmax(np.abs(a - b)) / (np.nanmax(np.abs(a)) + 1e-30)))
+                    rep["max_rel_diff"] = max(
+                        rep["max_rel_diff"],
+                        float(np.nanmax(np.abs(a - b)) / (np.nanmax(np.abs(a)) + 1e-30)),
+                    )
         else:
             compare(fa, fb, rep, f"{path}{k}/")
 
@@ -71,14 +90,31 @@ def main():
     out = {}
     for pb in sorted(pathlib.Path(a.b).glob("shard-*.h5")):
         pa = pathlib.Path(a.a) / pb.name
-        rep = {"n_datasets": 0, "dataset_diffs": [], "attr_diffs": [], "missing": [], "max_rel_diff": 0.0}
+        rep = {
+            "n_datasets": 0,
+            "dataset_diffs": [],
+            "attr_diffs": [],
+            "missing": [],
+            "max_rel_diff": 0.0,
+        }
         with h5py.File(pa, "r") as fa, h5py.File(pb, "r") as fb:
             compare(fa, fb, rep)
         rep["bitwise_identical"] = not (rep["dataset_diffs"] or rep["missing"])
         rep["identical_incl_attrs"] = rep["bitwise_identical"] and not rep["attr_diffs"]
         out[pb.name] = rep
-        print(pb.name, "datasets", rep["n_datasets"], "| bitwise identical:", rep["bitwise_identical"], "| attr diffs:", len(rep["attr_diffs"]),
-              "| dataset diffs:", len(rep["dataset_diffs"]), "| max rel diff:", rep["max_rel_diff"])
+        print(
+            pb.name,
+            "datasets",
+            rep["n_datasets"],
+            "| bitwise identical:",
+            rep["bitwise_identical"],
+            "| attr diffs:",
+            len(rep["attr_diffs"]),
+            "| dataset diffs:",
+            len(rep["dataset_diffs"]),
+            "| max rel diff:",
+            rep["max_rel_diff"],
+        )
     pathlib.Path(a.out).write_text(json.dumps(out, indent=1))
 
 

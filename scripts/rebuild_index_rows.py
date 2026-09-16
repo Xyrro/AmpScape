@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Rebuild a shard's index rows from its task-group files on the Hub (for shards uploaded before their index row
 parquet could be written).  python scripts/rebuild_index_rows.py --build data/v1/S --tier S --shard 104"""
+
 from __future__ import annotations
 
 import argparse

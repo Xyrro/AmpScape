@@ -11,6 +11,7 @@
 Resumable at every stage: existing inputs / complete outputs / final shards are skipped unless --force.
 Solving never needs the network (inputs are materialised in `prepare`, on the login node).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -44,9 +45,13 @@ def load_manifest(build: pathlib.Path) -> pd.DataFrame:
 
 def shard_paths(build: pathlib.Path, shard: int) -> dict[str, pathlib.Path]:
     s = f"shard-{shard:05d}"
-    return {"inputs": build / "inputs" / f"{s}.inputs.h5", "outputs": build / "outputs" / f"{s}.outputs.h5",
-            "final": build / "shards" / f"{s}.h5", "index": build / "index" / f"{s}.parquet",
-            "quicklooks": build / "quicklooks" / s}
+    return {
+        "inputs": build / "inputs" / f"{s}.inputs.h5",
+        "outputs": build / "outputs" / f"{s}.outputs.h5",
+        "final": build / "shards" / f"{s}.h5",
+        "index": build / "index" / f"{s}.parquet",
+        "quicklooks": build / "quicklooks" / s,
+    }
 
 
 def cmd_plan(a) -> None:
@@ -57,7 +62,14 @@ def cmd_plan(a) -> None:
     configs = a.configs.split(",") if a.configs else None
     from ampscape.solve.manifest import DEFAULT_CONFIGS
 
-    specs = plan_synthetic(a.dataset, a.n_synthetic, a.tier, a.seed0, configs=configs or DEFAULT_CONFIGS, shard_size=a.shard_size)
+    specs = plan_synthetic(
+        a.dataset,
+        a.n_synthetic,
+        a.tier,
+        a.seed0,
+        configs=configs or DEFAULT_CONFIGS,
+        shard_size=a.shard_size,
+    )
     if a.k_override or a.contrast_override:
         for sp in specs:
             e = {}
@@ -68,21 +80,51 @@ def cmd_plan(a) -> None:
             sp.extra = json.dumps(e)
     n_shards = (len(specs) + a.shard_size - 1) // a.shard_size if specs else 0
     if a.n_real:
-        specs += plan_real(a.dataset, str(ROOT / a.pilot / "resistance.parquet"), str(ROOT / a.pilot / "sources.parquet"),
-                           a.n_real, a.tier, a.seed0, configs=configs or DEFAULT_CONFIGS, shard_size=a.shard_size, shard0=n_shards)
+        specs += plan_real(
+            a.dataset,
+            str(ROOT / a.pilot / "resistance.parquet"),
+            str(ROOT / a.pilot / "sources.parquet"),
+            a.n_real,
+            a.tier,
+            a.seed0,
+            configs=configs or DEFAULT_CONFIGS,
+            shard_size=a.shard_size,
+            shard0=n_shards,
+        )
     from ampscape.solve.manifest import assign_plan_splits
 
     if a.published:
         from ampscape.solve.manifest import plan_published
 
-        specs += plan_published(a.dataset, str(ROOT / a.published), configs=configs or DEFAULT_CONFIGS, shard_size=a.shard_size,
-                                shard0=(max(sp.shard for sp in specs) + 1) if specs else 0)
+        specs += plan_published(
+            a.dataset,
+            str(ROOT / a.published),
+            configs=configs or DEFAULT_CONFIGS,
+            shard_size=a.shard_size,
+            shard0=(max(sp.shard for sp in specs) + 1) if specs else 0,
+        )
     df = assign_plan_splits(to_frame(specs), str(ROOT / a.pilot) if a.n_real else None)
     df.to_parquet(build / "manifest.parquet", index=False)
-    print("provisional splits:", df.split.value_counts().to_dict(), "| cg_baseline on", int(df.cg_baseline.sum()), "samples")
-    cfg = {"dataset_id": a.dataset, "tier": a.tier, "seed0": a.seed0, "shard_size": a.shard_size, "pilot": a.pilot,
-           "n_synthetic": a.n_synthetic, "n_real": a.n_real, "published": a.published, "source_config": a.source_config,
-           "solver_preset": a.solver_preset, "dataset_version": a.dataset_version}
+    print(
+        "provisional splits:",
+        df.split.value_counts().to_dict(),
+        "| cg_baseline on",
+        int(df.cg_baseline.sum()),
+        "samples",
+    )
+    cfg = {
+        "dataset_id": a.dataset,
+        "tier": a.tier,
+        "seed0": a.seed0,
+        "shard_size": a.shard_size,
+        "pilot": a.pilot,
+        "n_synthetic": a.n_synthetic,
+        "n_real": a.n_real,
+        "published": a.published,
+        "source_config": a.source_config,
+        "solver_preset": a.solver_preset,
+        "dataset_version": a.dataset_version,
+    }
     (build / "build.json").write_text(json.dumps(cfg, indent=1))
     print(f"planned {len(df)} samples in {df.shard.nunique()} shards -> {build}")
     print(df.groupby(["family", "shard"]).size().to_string())
@@ -107,14 +149,37 @@ def cmd_prepare(a) -> None:
         fam = {sp.family for sp in specs}
         root_dir = cfg.get("published") if fam == {"published"} else cfg["pilot"]
         if root_dir and root_dir.endswith(".parquet"):
-            root_dir = str(pathlib.Path(root_dir).parent)          # published_tiles.parquet -> its directory
-        n = prepare_shard(specs, str(p["inputs"]), scfg, pilot_root=str(ROOT / root_dir), overwrite=a.force)
-        print(f"shard {sh}: prepared {n} samples -> {p['inputs'].name}" if n else f"shard {sh}: inputs already present")
+            root_dir = str(
+                pathlib.Path(root_dir).parent
+            )  # published_tiles.parquet -> its directory
+        n = prepare_shard(
+            specs, str(p["inputs"]), scfg, pilot_root=str(ROOT / root_dir), overwrite=a.force
+        )
+        print(
+            f"shard {sh}: prepared {n} samples -> {p['inputs'].name}"
+            if n
+            else f"shard {sh}: inputs already present"
+        )
 
 
-def julia_cmd(inputs, outputs, tmp, solver, fallback, osolver, max_n=None, configs=None, force=False) -> list[str]:
-    cmd = ["julia", f"--project={JULIA_PKG}", str(JULIA_PKG / "scripts" / "solve_shard.jl"), str(inputs), str(outputs),
-           "--tmp", tmp, "--solver", solver, "--fallback", fallback, "--omniscape-solver", osolver]
+def julia_cmd(
+    inputs, outputs, tmp, solver, fallback, osolver, max_n=None, configs=None, force=False
+) -> list[str]:
+    cmd = [
+        "julia",
+        f"--project={JULIA_PKG}",
+        str(JULIA_PKG / "scripts" / "solve_shard.jl"),
+        str(inputs),
+        str(outputs),
+        "--tmp",
+        tmp,
+        "--solver",
+        solver,
+        "--fallback",
+        fallback,
+        "--omniscape-solver",
+        osolver,
+    ]
     if max_n:
         cmd += ["--max", str(max_n)]
     if configs:
@@ -130,10 +195,21 @@ def cmd_solve(a) -> None:
     p["outputs"].parent.mkdir(parents=True, exist_ok=True)
     # per-job working directory: node-local $TMPDIR when the job sets it, else $AMPSCAPE_SCRATCH/cache/<job>
     job = os.environ.get("SLURM_JOB_ID", f"local-{os.getpid()}")
-    tmp = os.environ.get("TMPDIR") or str(pathlib.Path(os.environ.get("AMPSCAPE_SCRATCH", ROOT)) / "cache" / job)
+    tmp = os.environ.get("TMPDIR") or str(
+        pathlib.Path(os.environ.get("AMPSCAPE_SCRATCH", ROOT)) / "cache" / job
+    )
     pathlib.Path(tmp).mkdir(parents=True, exist_ok=True)
-    cmd = julia_cmd(p["inputs"], p["outputs"], tmp, a.solver, a.fallback, a.omniscape_solver, a.max,
-                    configs=a.configs, force=a.force)
+    cmd = julia_cmd(
+        p["inputs"],
+        p["outputs"],
+        tmp,
+        a.solver,
+        a.fallback,
+        a.omniscape_solver,
+        a.max,
+        configs=a.configs,
+        force=a.force,
+    )
     print(" ".join(cmd))
     sys.exit(subprocess.run(cmd, check=False).returncode)
 
@@ -142,8 +218,16 @@ def precompile_julia() -> None:
     """Precompile AmpScapeSolve on the login node so array tasks never race on the shared depot's
     precompile pidfiles (observed hang when several nodes started with a stale cache)."""
     print("precompiling Julia package (login node) ...", end=" ", flush=True)
-    r = subprocess.run(["julia", f"--project={JULIA_PKG}", "-e", "using Pkg; Pkg.precompile(); using AmpScapeSolve"],
-                       capture_output=True, text=True)
+    r = subprocess.run(
+        [
+            "julia",
+            f"--project={JULIA_PKG}",
+            "-e",
+            "using Pkg; Pkg.precompile(); using AmpScapeSolve",
+        ],
+        capture_output=True,
+        text=True,
+    )
     if r.returncode != 0:
         print(r.stderr[-2000:])
         raise SystemExit("Julia precompilation failed; not submitting")
@@ -156,7 +240,11 @@ def cmd_submit(a) -> None:
     df = load_manifest(build)
     tier = str(df.tier.iloc[0])
     key = tier
-    if "cg_baseline" in df and bool(df.cg_baseline.any()) and f"{tier}_test" in prof.get("defaults", {}):
+    if (
+        "cg_baseline" in df
+        and bool(df.cg_baseline.any())
+        and f"{tier}_test" in prof.get("defaults", {})
+    ):
         key = f"{tier}_test"
     d = prof.get("defaults", {}).get(key, {})
     a.partition = a.partition or prof["partitions"]["cpu"]
@@ -172,33 +260,54 @@ def cmd_submit(a) -> None:
 
         used = scratch_used_gb(pathlib.Path(prof["scratch_root"]) / "data")
         if used > pause_gb:
-            raise SystemExit(f"scratch guard: {used:.0f} GB under data/ exceeds the {pause_gb:.0f} GB pause threshold — "
-                             "let the sync loop drain uploaded shards before submitting (or --ignore-scratch-guard)")
+            raise SystemExit(
+                f"scratch guard: {used:.0f} GB under data/ exceeds the {pause_gb:.0f} GB pause threshold — "
+                "let the sync loop drain uploaded shards before submitting (or --ignore-scratch-guard)"
+            )
         print(f"scratch guard: {used:.0f} GB under data/ (pause at {pause_gb:.0f} GB)")
     shards = sorted(int(s) for s in df.shard.unique())
-    if getattr(a, "shards", None):                      # "a-b" inclusive range: arrays of <= 400 tasks under the 500-job submit limit
+    if getattr(
+        a, "shards", None
+    ):  # "a-b" inclusive range: arrays of <= 400 tasks under the 500-job submit limit
         lo, hi = (int(x) for x in a.shards.split("-"))
         shards = [s for s in shards if lo <= s <= hi]
-    todo = [s for s in shards if not shard_paths(build, s)["final"].exists()] if not a.force else shards
-    todo = [s for s in todo if not shard_paths(build, s)["outputs"].exists()] if not a.force else todo   # solved, awaiting finalize
-    todo = [s for s in todo if not shard_paths(build, s)["final"].with_suffix(".uploaded").exists()]     # streamed already
+    todo = (
+        [s for s in shards if not shard_paths(build, s)["final"].exists()]
+        if not a.force
+        else shards
+    )
+    todo = (
+        [s for s in todo if not shard_paths(build, s)["outputs"].exists()] if not a.force else todo
+    )  # solved, awaiting finalize
+    todo = [
+        s for s in todo if not shard_paths(build, s)["final"].with_suffix(".uploaded").exists()
+    ]  # streamed already
     if not todo:
         print("nothing to submit")
         return
     arr = ",".join(str(s) for s in todo)
     (build / "logs").mkdir(exist_ok=True)
-    cmd = ["sbatch", f"--array={arr}%{a.max_concurrent}", f"--time={a.time}", f"--cpus-per-task={a.cpus}", f"--mem={a.mem}",
-           f"--partition={a.partition}", f"--job-name=ampscape-{build.name}", f"--output={build}/logs/%A_%a.out"]
+    cmd = [
+        "sbatch",
+        f"--array={arr}%{a.max_concurrent}",
+        f"--time={a.time}",
+        f"--cpus-per-task={a.cpus}",
+        f"--mem={a.mem}",
+        f"--partition={a.partition}",
+        f"--job-name=ampscape-{build.name}",
+        f"--output={build}/logs/%A_%a.out",
+    ]
     if prof.get("account"):
         cmd.append(f"--account={prof['account']}")
     if prof.get("qos"):
         cmd.append(f"--qos={prof['qos']}")
     cmd += [
-           f"--export=ALL,AMPSCAPE_BUILD={build},AMPSCAPE_SOLVER={a.solver},AMPSCAPE_FALLBACK={a.fallback},AMPSCAPE_OSOLVER={a.omniscape_solver},"
-           f"AMPSCAPE_CONFIGS={(a.configs or '').replace(',', '+')},AMPSCAPE_FORCE={'1' if a.force_solve else '0'},"
-           f"AMPSCAPE_SCRATCH={prof['scratch_root']},AMPSCAPE_NODE_TMP={prof.get('node_tmp', '/tmp')},"
-           f"AMPSCAPE_MODULES={':'.join(prof.get('modules', []))}",
-           str(SBATCH_TEMPLATE)]
+        f"--export=ALL,AMPSCAPE_BUILD={build},AMPSCAPE_SOLVER={a.solver},AMPSCAPE_FALLBACK={a.fallback},AMPSCAPE_OSOLVER={a.omniscape_solver},"
+        f"AMPSCAPE_CONFIGS={(a.configs or '').replace(',', '+')},AMPSCAPE_FORCE={'1' if a.force_solve else '0'},"
+        f"AMPSCAPE_SCRATCH={prof['scratch_root']},AMPSCAPE_NODE_TMP={prof.get('node_tmp', '/tmp')},"
+        f"AMPSCAPE_MODULES={':'.join(prof.get('modules', []))}",
+        str(SBATCH_TEMPLATE),
+    ]
     print(" ".join(cmd))
     if not a.dry_run:
         out = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout.strip()
@@ -221,14 +330,18 @@ def cmd_finalize(a) -> None:
     for sh in shards:
         p = shard_paths(build, sh)
         if p["final"].with_suffix(".uploaded").exists() and not a.force:
-            continue                                   # streamed to the Hub; intermediates deleted (sync_live)
-        if p["outputs"].exists() and not a.force:               # never finalize a shard whose solver is still adding samples
+            continue  # streamed to the Hub; intermediates deleted (sync_live)
+        if (
+            p["outputs"].exists() and not a.force
+        ):  # never finalize a shard whose solver is still adding samples
             import h5py
 
             with h5py.File(p["outputs"], "r") as fo:
                 n_done = sum(1 for k in fo["samples"] if "complete" in fo["samples"][k].attrs)
             if n_done < int((df.shard == sh).sum()):
-                print(f"shard {sh}: {n_done}/{int((df.shard == sh).sum())} samples solved — not finalizing yet")
+                print(
+                    f"shard {sh}: {n_done}/{int((df.shard == sh).sum())} samples solved — not finalizing yet"
+                )
                 continue
         if not p["outputs"].exists():
             print(f"shard {sh}: no outputs yet")
@@ -236,30 +349,40 @@ def cmd_finalize(a) -> None:
         if p["final"].exists() and not a.force:
             print(f"shard {sh}: final exists")
             continue
-        idx = finalize_shard(str(p["inputs"]), str(p["outputs"]), str(p["final"]), cfg["dataset_version"], preset)
+        idx = finalize_shard(
+            str(p["inputs"]), str(p["outputs"]), str(p["final"]), cfg["dataset_version"], preset
+        )
         p["index"].parent.mkdir(parents=True, exist_ok=True)
         idx.to_parquet(p["index"], index=False)
         n_fail = int((~idx.qc_pass).sum())
         from ampscape.io.sync import validate as validate_and_mark
 
         valid = validate_and_mark(p["final"])
-        if valid:                                                     # sample count must match the manifest (truncation guard)
+        if valid:  # sample count must match the manifest (truncation guard)
             import h5py
 
             with h5py.File(p["final"], "r") as fh:
                 n_final = len(list(fh.keys()))
             if n_final != int((df.shard == sh).sum()):
                 p["final"].with_suffix(".ok").unlink(missing_ok=True)
-                p["final"].with_suffix(".invalid").write_text(f"sample count {n_final} != manifest {int((df.shard == sh).sum())}")
-                print(f"shard {sh}: INVALID — {n_final} samples, manifest has {int((df.shard == sh).sum())}")
+                p["final"].with_suffix(".invalid").write_text(
+                    f"sample count {n_final} != manifest {int((df.shard == sh).sum())}"
+                )
+                print(
+                    f"shard {sh}: INVALID — {n_final} samples, manifest has {int((df.shard == sh).sum())}"
+                )
                 valid = False
         if valid:
             p["final"].with_suffix(".invalid").unlink(missing_ok=True)
-        if valid and not getattr(a, "keep_raw", False):     # the validated final contains the inputs and the raw outputs
+        if valid and not getattr(
+            a, "keep_raw", False
+        ):  # the validated final contains the inputs and the raw outputs
             for f in (p["inputs"], p["outputs"]):
                 f.unlink(missing_ok=True)
-        print(f"shard {sh}: {idx.sample_id.nunique()} samples, {len(idx)} configs, {n_fail} QC failures, "
-              f"{p['final'].stat().st_size/1e6:.1f} MB, schema {'OK' if valid else 'INVALID (see .invalid)'}")
+        print(
+            f"shard {sh}: {idx.sample_id.nunique()} samples, {len(idx)} configs, {n_fail} QC failures, "
+            f"{p['final'].stat().st_size / 1e6:.1f} MB, schema {'OK' if valid else 'INVALID (see .invalid)'}"
+        )
         if a.quicklooks:
             shard_quicklooks(str(p["final"]), str(p["quicklooks"]))
     parts = sorted((build / "index").glob("shard-*.parquet"))
@@ -271,9 +394,24 @@ def cmd_finalize(a) -> None:
         full.to_parquet(build / "index.parquet", index=False)
         print("splits:", full.groupby("split").sample_id.nunique().to_dict())
         (build / "stats").mkdir(exist_ok=True)
-        full[["sample_id", "config", "kind", "family", "tier", "H", "W", "K", "solver", "solve_time_s", "maxrss_mb"]].to_parquet(
-            build / "stats" / "solve_times.parquet", index=False)
-        print(f"index: {len(full)} rows, {full.sample_id.nunique()} samples, qc_pass={full.qc_pass.mean():.3f}")
+        full[
+            [
+                "sample_id",
+                "config",
+                "kind",
+                "family",
+                "tier",
+                "H",
+                "W",
+                "K",
+                "solver",
+                "solve_time_s",
+                "maxrss_mb",
+            ]
+        ].to_parquet(build / "stats" / "solve_times.parquet", index=False)
+        print(
+            f"index: {len(full)} rows, {full.sample_id.nunique()} samples, qc_pass={full.qc_pass.mean():.3f}"
+        )
 
 
 def cmd_status(a) -> None:
@@ -289,8 +427,16 @@ def cmd_status(a) -> None:
             with h5py.File(p["outputs"], "r") as f:
                 done = sum(1 for s in f["samples"] if "complete" in f["samples"][s].attrs)
         up = p["final"].with_suffix(".uploaded").exists()
-        rows.append({"shard": sh, "samples": int((df.shard == sh).sum()), "inputs": p["inputs"].exists(),
-                     "solved": done if not up else int((df.shard == sh).sum()), "final": p["final"].exists(), "uploaded": up})
+        rows.append(
+            {
+                "shard": sh,
+                "samples": int((df.shard == sh).sum()),
+                "inputs": p["inputs"].exists(),
+                "solved": done if not up else int((df.shard == sh).sum()),
+                "final": p["final"].exists(),
+                "uploaded": up,
+            }
+        )
     print(pd.DataFrame(rows).to_string(index=False))
 
 
@@ -309,10 +455,23 @@ def main() -> None:
     p.add_argument("--source-config", default="configs/tasks/sources_default.yaml")
     p.add_argument("--solver-preset", default="configs/solver/circuitscape_reference.yaml")
     p.add_argument("--dataset-version", default="0.1.0-mini")
-    p.add_argument("--configs", default=None, help="comma-separated subset of configs (default: all)")
-    p.add_argument("--k-override", type=int, default=None, help="fix K for the points config (scaling probe)")
-    p.add_argument("--contrast-override", type=float, default=None, help="re-map synthetic landscapes to this contrast (probe)")
-    p.add_argument("--published", default=None, help="published_tiles.parquet to add published-resistance samples (test_ood_published)")
+    p.add_argument(
+        "--configs", default=None, help="comma-separated subset of configs (default: all)"
+    )
+    p.add_argument(
+        "--k-override", type=int, default=None, help="fix K for the points config (scaling probe)"
+    )
+    p.add_argument(
+        "--contrast-override",
+        type=float,
+        default=None,
+        help="re-map synthetic landscapes to this contrast (probe)",
+    )
+    p.add_argument(
+        "--published",
+        default=None,
+        help="published_tiles.parquet to add published-resistance samples (test_ood_published)",
+    )
     p.set_defaults(func=cmd_plan)
     for name, fn in [("prepare", cmd_prepare), ("finalize", cmd_finalize)]:
         q = sub.add_parser(name)
@@ -321,7 +480,11 @@ def main() -> None:
         q.add_argument("--force", action="store_true")
         if name == "finalize":
             q.add_argument("--quicklooks", action="store_true")
-            q.add_argument("--keep-raw", action="store_true", help="keep the per-shard inputs/outputs after a validated finalize")
+            q.add_argument(
+                "--keep-raw",
+                action="store_true",
+                help="keep the per-shard inputs/outputs after a validated finalize",
+            )
         q.set_defaults(func=fn)
     s = sub.add_parser("solve")
     s.add_argument("--build", required=True)
@@ -331,11 +494,19 @@ def main() -> None:
     s.add_argument("--omniscape-solver", default="cholmod")
     s.add_argument("--max", type=int, default=None)
     s.add_argument("--configs", default=None, help="comma-separated configs to (re-)solve")
-    s.add_argument("--force", action="store_true", help="re-solve listed configs even if the sample is complete")
+    s.add_argument(
+        "--force",
+        action="store_true",
+        help="re-solve listed configs even if the sample is complete",
+    )
     s.set_defaults(func=cmd_solve)
     b = sub.add_parser("submit")
     b.add_argument("--build", required=True)
-    b.add_argument("--profile", default=None, help="configs/cluster/<name>.yaml (default: $AMPSCAPE_CLUSTER_PROFILE or ice)")
+    b.add_argument(
+        "--profile",
+        default=None,
+        help="configs/cluster/<name>.yaml (default: $AMPSCAPE_CLUSTER_PROFILE or ice)",
+    )
     b.add_argument("--time", default=None, help="override the profile's per-tier default")
     b.add_argument("--cpus", type=int, default=None)
     b.add_argument("--mem", default=None)
@@ -344,13 +515,23 @@ def main() -> None:
     b.add_argument("--solver", default="cholmod")
     b.add_argument("--fallback", default="cg+amg")
     b.add_argument("--omniscape-solver", default="cholmod")
-    b.add_argument("--force", action="store_true", help="resubmit shards that already have final files")
+    b.add_argument(
+        "--force", action="store_true", help="resubmit shards that already have final files"
+    )
     b.add_argument("--configs", default=None, help="only (re-)solve these configs inside the job")
-    b.add_argument("--force-solve", action="store_true", help="re-solve listed configs even for complete samples")
+    b.add_argument(
+        "--force-solve",
+        action="store_true",
+        help="re-solve listed configs even for complete samples",
+    )
     b.add_argument("--dry-run", action="store_true")
     b.add_argument("--skip-precompile", action="store_true")
     b.add_argument("--ignore-scratch-guard", action="store_true")
-    b.add_argument("--shards", default=None, help="inclusive shard range a-b to submit (arrays of <= 400 tasks)")
+    b.add_argument(
+        "--shards",
+        default=None,
+        help="inclusive shard range a-b to submit (arrays of <= 400 tasks)",
+    )
     b.set_defaults(func=cmd_submit)
     t = sub.add_parser("status")
     t.add_argument("--build", required=True)

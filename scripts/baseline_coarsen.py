@@ -5,6 +5,7 @@ python scripts/baseline_coarsen.py --root data/builds/mini --splits test_id,test
 Then: python scripts/evaluate.py --predictions data/predictions/coarsen4 --split test_id,test_ood,ood_region
 The coarse solve runs through the Julia batch solver (run this on a compute node or via srun).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -47,8 +48,21 @@ def main() -> None:
         times = write_coarse_inputs(str(final), str(cin), sids, a.factor)
         if cout.exists():
             cout.unlink()
-        cmd = ["julia", f"--project={JULIA_PKG}", str(JULIA_PKG / "scripts" / "solve_shard.jl"), str(cin), str(cout), "--tmp", tmp,
-               "--solver", "cholmod", "--fallback", "cg+amg", "--omniscape-solver", a.omniscape_solver]
+        cmd = [
+            "julia",
+            f"--project={JULIA_PKG}",
+            str(JULIA_PKG / "scripts" / "solve_shard.jl"),
+            str(cin),
+            str(cout),
+            "--tmp",
+            tmp,
+            "--solver",
+            "cholmod",
+            "--fallback",
+            "cg+amg",
+            "--omniscape-solver",
+            a.omniscape_solver,
+        ]
         r = subprocess.run(cmd, capture_output=True, text=True)
         if r.returncode != 0:
             print(r.stderr[-1500:])
@@ -56,9 +70,20 @@ def main() -> None:
         n = write_predictions(str(final), str(cout), str(pred), a.factor, times, append=True)
         total += n
         print(f"{shard}: {len(sids)} samples coarsened and solved, {n} written")
-    (out / "meta.json").write_text(json.dumps({"model": f"coarsen{a.factor}_solve_upsample", "task": "all", "tier": str(idx.tier.iloc[0]),
-                                               "split": a.splits, "factor": a.factor, "notes": "non-learned baseline: geometric-mean coarsening, "
-                                               "reference CHOLMOD solve on the coarse grid, bilinear upsampling; Reff taken from the coarse solve"}, indent=1))
+    (out / "meta.json").write_text(
+        json.dumps(
+            {
+                "model": f"coarsen{a.factor}_solve_upsample",
+                "task": "all",
+                "tier": str(idx.tier.iloc[0]),
+                "split": a.splits,
+                "factor": a.factor,
+                "notes": "non-learned baseline: geometric-mean coarsening, "
+                "reference CHOLMOD solve on the coarse grid, bilinear upsampling; Reff taken from the coarse solve",
+            },
+            indent=1,
+        )
+    )
     print(f"wrote {pred} ({total} samples), meta.json")
 
 

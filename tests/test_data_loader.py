@@ -10,15 +10,21 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MINI = ROOT / "data" / "builds" / "mini"
-pytestmark = pytest.mark.skipif(not (MINI / "index.parquet").exists(), reason="mini build not present")
+pytestmark = pytest.mark.skipif(
+    not (MINI / "index.parquet").exists(), reason="mini build not present"
+)
 
 
 def test_dataset_contracts():
     from ampscape.data import AmpScapeDataset, log1p_targets
 
-    for task, keys in {"T1": ["cum_current", "reff", "focal_onehot"], "T2": ["reff", "reff_mask", "focal_table"],
-                       "T1W": ["pairwise_current", "voltage", "pair_index"], "T3": ["current", "voltage", "ground"],
-                       "T4": ["cum_current", "flow_potential", "normalized"]}.items():
+    for task, keys in {
+        "T1": ["cum_current", "reff", "focal_onehot"],
+        "T2": ["reff", "reff_mask", "focal_table"],
+        "T1W": ["pairwise_current", "voltage", "pair_index"],
+        "T3": ["current", "voltage", "ground"],
+        "T4": ["cum_current", "flow_potential", "normalized"],
+    }.items():
         ds = AmpScapeDataset(task, split="train", tier="S", root=MINI)
         assert len(ds) > 0
         d = ds[0]
@@ -48,7 +54,10 @@ def test_split_and_qc_filters_and_torch():
     assert (oodc.index.contrast >= 1_000_000).all()
     torch_ds = tr.torch()
     b = torch_ds[0]
-    assert tuple(b["cum_current"].shape) == (1, 128, 128) and str(b["cum_current"].dtype) == "torch.float32"
+    assert (
+        tuple(b["cum_current"].shape) == (1, 128, 128)
+        and str(b["cum_current"].dtype) == "torch.float32"
+    )
 
 
 def test_normalization_train_only(tmp_path):
@@ -66,7 +75,10 @@ def test_hf_layout_export_and_subsets(tmp_path):
 
     idx = pd.read_parquet(MINI / "index.parquet")
     subs = assign_subsets(idx, {"mini": 60, "core": 120, "full": None})
-    assert subs["mini"] <= subs["core"] <= subs["full"] and len(subs["full"]) == idx.sample_id.nunique()
+    assert (
+        subs["mini"] <= subs["core"] <= subs["full"]
+        and len(subs["full"]) == idx.sample_id.nunique()
+    )
     assert 50 <= len(subs["mini"]) <= 80
     for split in idx.split.unique():
         assert idx[idx.sample_id.isin(subs["mini"]) & (idx.split == split)].shape[0] > 0
@@ -74,7 +86,9 @@ def test_hf_layout_export_and_subsets(tmp_path):
     paths = split_shard_by_task_group(sh, tmp_path, "S")
     assert set(paths) <= set(TASK_GROUPS) and "T1" in paths and "T4" in paths
     out = export_build(MINI, tmp_path / "hf", "S", subsets=subs)
-    assert (tmp_path / "hf" / "index" / "S.parquet").exists() and (tmp_path / "hf" / "splits" / "mini" / "train.parquet").exists()
+    assert (tmp_path / "hf" / "index" / "S.parquet").exists() and (
+        tmp_path / "hf" / "splits" / "mini" / "train.parquet"
+    ).exists()
     ds = AmpScapeDataset("T4", split="train", tier="S", root=tmp_path / "hf", subset="mini")
     d = ds[0]
     assert len(ds) > 0 and d["cum_current"].shape == (1, 128, 128) and out.task_group.notna().all()

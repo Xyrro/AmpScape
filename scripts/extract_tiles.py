@@ -8,6 +8,7 @@ from the reserve list (same stratum preferred), writes GeoTIFFs + quicklooks, an
 
 Usage (login node): python scripts/extract_tiles.py --specs data/tiles/pilot --out data/tiles/pilot --workers 4
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,14 +27,21 @@ for k, v in real.env_gdal().items():
 
 
 def source_versions(sources_dir: pathlib.Path) -> dict:
-    manifest = json.loads((sources_dir / "manifest.json").read_text()) if (sources_dir / "manifest.json").exists() else {}
+    manifest = (
+        json.loads((sources_dir / "manifest.json").read_text())
+        if (sources_dir / "manifest.json").exists()
+        else {}
+    )
     return {
         "worldcover": "ESA WorldCover 10m 2021 v200 (s3://esa-worldcover)",
         "copdem": "Copernicus DEM GLO-30 (s3://copernicus-dem-30m), GLO-90 fallback",
         "ghm": "gHM v1 1km (figshare 7283087 v1)",
         "grip4": "GRIP4 regional shapefiles (PBL, 2018)",
         "hydrorivers": "HydroRIVERS v1.0",
-        "downloads": {k: {"sha256": v["sha256"], "downloaded_utc": v["downloaded_utc"]} for k, v in manifest.items()},
+        "downloads": {
+            k: {"sha256": v["sha256"], "downloaded_utc": v["downloaded_utc"]}
+            for k, v in manifest.items()
+        },
     }
 
 
@@ -52,8 +60,11 @@ def quicklook(path: str, channels: dict, spec: real.TileSpec, qc: dict) -> None:
         ax.imshow(a, cmap=cmap, interpolation="nearest")
         ax.set_title(name, fontsize=8)
         ax.axis("off")
-    fig.suptitle(f"{spec.tile_id}  ({spec.lat:.2f}, {spec.lon:.2f})  {spec.stratum.get('biome_name','')}  "
-                 f"unusable={qc['frac_unusable']:.2f}", fontsize=9)
+    fig.suptitle(
+        f"{spec.tile_id}  ({spec.lat:.2f}, {spec.lon:.2f})  {spec.stratum.get('biome_name', '')}  "
+        f"unusable={qc['frac_unusable']:.2f}",
+        fontsize=9,
+    )
     fig.tight_layout()
     fig.savefig(path, dpi=80)
     plt.close(fig)
@@ -63,13 +74,38 @@ def process(spec_d: dict, sources: real.SourcePaths, out: pathlib.Path, versions
     spec = real.TileSpec(**{k: v for k, v in spec_d.items() if k != "strict"})
     tif = out / "tiles" / spec.tier / f"{spec.tile_id}.tif"
     channels, grid, qc = real.extract_tile(spec, sources)
-    row = {"tile_id": spec.tile_id, "lat": spec.lat, "lon": spec.lon, "tier": spec.tier, "size": spec.size,
-           "pixel_m": spec.pixel_m, "epsg": grid.epsg, "transform": json.dumps(list(grid.transform)[:6]),
-           **{f"qc_{k}": v for k, v in qc.items() if k != "resampling"}, "resampling": json.dumps(qc.get("resampling", {})),
-           "strict": bool(spec_d.get("strict", False)),
-           **{k: v for k, v in spec.stratum.items() if k in ("biome_num", "biome_name", "realm", "ecoregion_id",
-                                                              "ecoregion_name", "ghm", "ghm_tercile", "stratum", "grip_region")},
-           "created_utc": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "path": None, "sha256": None}
+    row = {
+        "tile_id": spec.tile_id,
+        "lat": spec.lat,
+        "lon": spec.lon,
+        "tier": spec.tier,
+        "size": spec.size,
+        "pixel_m": spec.pixel_m,
+        "epsg": grid.epsg,
+        "transform": json.dumps(list(grid.transform)[:6]),
+        **{f"qc_{k}": v for k, v in qc.items() if k != "resampling"},
+        "resampling": json.dumps(qc.get("resampling", {})),
+        "strict": bool(spec_d.get("strict", False)),
+        **{
+            k: v
+            for k, v in spec.stratum.items()
+            if k
+            in (
+                "biome_num",
+                "biome_name",
+                "realm",
+                "ecoregion_id",
+                "ecoregion_name",
+                "ghm",
+                "ghm_tercile",
+                "stratum",
+                "grip_region",
+            )
+        },
+        "created_utc": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+        "path": None,
+        "sha256": None,
+    }
     if qc["accept"]:
         row["sha256"] = real.write_tile(str(tif), channels, grid, spec, qc, versions)
         row["path"] = str(tif.relative_to(out))
@@ -86,28 +122,52 @@ def main() -> None:
     ap.add_argument("--sources", default="data/sources")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--limit", type=int, default=None)
-    ap.add_argument("--refresh", action="store_true",
-                    help="re-extract every tile already in the manifest (same tile set, new code)")
-    ap.add_argument("--first-accepted", type=int, default=None,
-                    help="prefix mode (v1.0): walk `selected` in order until this many tiles are accepted; rejected "
-                         "tiles are skipped, never replaced from the reserve, so the result is a true prefix")
-    ap.add_argument("--per-specs-manifest", action="store_true", help="write <out>/tiles_<specs-dir-name>.parquet instead of tiles.parquet")
-    ap.add_argument("--retry-rejected", action="store_true",
-                    help="drop previously rejected rows from the manifest and extract them again")
+    ap.add_argument(
+        "--refresh",
+        action="store_true",
+        help="re-extract every tile already in the manifest (same tile set, new code)",
+    )
+    ap.add_argument(
+        "--first-accepted",
+        type=int,
+        default=None,
+        help="prefix mode (v1.0): walk `selected` in order until this many tiles are accepted; rejected "
+        "tiles are skipped, never replaced from the reserve, so the result is a true prefix",
+    )
+    ap.add_argument(
+        "--per-specs-manifest",
+        action="store_true",
+        help="write <out>/tiles_<specs-dir-name>.parquet instead of tiles.parquet",
+    )
+    ap.add_argument(
+        "--retry-rejected",
+        action="store_true",
+        help="drop previously rejected rows from the manifest and extract them again",
+    )
     args = ap.parse_args()
     import pandas as pd
     from joblib import Parallel, delayed
 
     out = pathlib.Path(args.out)
     specs = json.loads((pathlib.Path(args.specs) / "tile_specs.json").read_text())
-    if specs.get("strict_cells"):                       # test_ood_scale_strict tiles carry a marker into the manifest
+    if specs.get("strict_cells"):  # test_ood_scale_strict tiles carry a marker into the manifest
         for s_ in specs["selected"] + specs["reserve"]:
             s_["strict"] = True
     sources = real.local_sources_from_dir(args.sources)
     versions = source_versions(pathlib.Path(args.sources))
-    versions["pipeline_git_sha"] = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-    ap_tier = (specs["selected"] or specs["reserve"])[0]["tier"] if (specs["selected"] or specs["reserve"]) else "all"
-    tag = pathlib.Path(args.specs).name if pathlib.Path(args.specs).name != pathlib.Path(args.out).name else ap_tier
+    versions["pipeline_git_sha"] = subprocess.run(
+        ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    ap_tier = (
+        (specs["selected"] or specs["reserve"])[0]["tier"]
+        if (specs["selected"] or specs["reserve"])
+        else "all"
+    )
+    tag = (
+        pathlib.Path(args.specs).name
+        if pathlib.Path(args.specs).name != pathlib.Path(args.out).name
+        else ap_tier
+    )
     # one manifest per specs directory so that tiers can be extracted concurrently; merge with `build_v1_tiles.py merge`
     manifest_path = out / (f"tiles_{tag}.parquet" if args.per_specs_manifest else "tiles.parquet")
     done = pd.read_parquet(manifest_path) if manifest_path.exists() else pd.DataFrame()
@@ -132,31 +192,43 @@ def main() -> None:
         ordered = [s for s in specs["selected"] if s["tile_id"] not in done_ids]
         pos = 0
         while n_ok < args.first_accepted and pos < len(ordered):
-            batch = ordered[pos: pos + max(args.workers * 4, args.first_accepted - n_ok)]
+            batch = ordered[pos : pos + max(args.workers * 4, args.first_accepted - n_ok)]
             pos += len(batch)
-            print(f"prefix mode: {n_ok}/{args.first_accepted} accepted, extracting {len(batch)} more")
-            new = Parallel(n_jobs=args.workers, prefer="threads")(delayed(process)(s, sources, out, versions) for s in batch)
+            print(
+                f"prefix mode: {n_ok}/{args.first_accepted} accepted, extracting {len(batch)} more"
+            )
+            new = Parallel(n_jobs=args.workers, prefer="threads")(
+                delayed(process)(s, sources, out, versions) for s in batch
+            )
             for r in new:
                 if n_ok < args.first_accepted:
                     rows.append(r)
                     n_ok += int(bool(r["qc_accept"]))
                 if not r["qc_accept"]:
-                    print(f"  rejected {r['tile_id']}: unusable={r['qc_frac_unusable']:.2f} dem_nan={r['qc_frac_dem_nan']:.2f}")
+                    print(
+                        f"  rejected {r['tile_id']}: unusable={r['qc_frac_unusable']:.2f} dem_nan={r['qc_frac_dem_nan']:.2f}"
+                    )
             pd.DataFrame(rows).to_parquet(manifest_path, index=False)
-        print(f"prefix mode done: {n_ok} accepted, {sum(1 for r in rows if not r['qc_accept'])} rejected, "
-              f"{pos} of {len(ordered)} selected tiles visited")
+        print(
+            f"prefix mode done: {n_ok} accepted, {sum(1 for r in rows if not r['qc_accept'])} rejected, "
+            f"{pos} of {len(ordered)} selected tiles visited"
+        )
         return
     n_target = max(len(specs["selected"]), len(todo))
     round_ = 0
     while todo:
         round_ += 1
         print(f"round {round_}: extracting {len(todo)} tiles with {args.workers} workers")
-        new = Parallel(n_jobs=args.workers, prefer="threads")(delayed(process)(s, sources, out, versions) for s in todo)
+        new = Parallel(n_jobs=args.workers, prefer="threads")(
+            delayed(process)(s, sources, out, versions) for s in todo
+        )
         rows.extend(new)
         pd.DataFrame(rows).to_parquet(manifest_path, index=False)
         rejected = [r for r in new if not r["qc_accept"]]
         for r in rejected:
-            print(f"  rejected {r['tile_id']}: unusable={r['qc_frac_unusable']:.2f} dem_nan={r['qc_frac_dem_nan']:.2f}")
+            print(
+                f"  rejected {r['tile_id']}: unusable={r['qc_frac_unusable']:.2f} dem_nan={r['qc_frac_dem_nan']:.2f}"
+            )
         n_ok = sum(1 for r in rows if r["qc_accept"])
         need = n_target - n_ok
         todo = []
@@ -171,8 +243,10 @@ def main() -> None:
             break
     df = pd.DataFrame(rows)
     ok = df[df["qc_accept"]]
-    print(f"accepted {len(ok)} / {len(df)} tiles; biomes={ok['biome_num'].nunique()} realms={ok['realm'].nunique()} "
-          f"strata={ok['stratum'].nunique()}")
+    print(
+        f"accepted {len(ok)} / {len(df)} tiles; biomes={ok['biome_num'].nunique()} realms={ok['realm'].nunique()} "
+        f"strata={ok['stratum'].nunique()}"
+    )
     print(ok.groupby(["biome_name"]).size().to_string())
 
 

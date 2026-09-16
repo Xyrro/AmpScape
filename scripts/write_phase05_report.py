@@ -5,6 +5,7 @@ Runs analyze_build.py and budget_extrapolation.py logic inline (imports their ou
 numbers are always regenerated from data. Usage:
     python scripts/write_phase05_report.py --builds data/builds/mini data/builds/probe_M ... --out docs/phase_05_report.md
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,14 +27,55 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--builds", nargs="+", required=True)
     ap.add_argument("--out", default="docs/phase_05_report.md")
-    ap.add_argument("--status", action="store_true", help="also write docs/status/latest.md and append history")
+    ap.add_argument(
+        "--status", action="store_true", help="also write docs/status/latest.md and append history"
+    )
     args = ap.parse_args()
     py = sys.executable
-    analysis = run([py, "scripts/analyze_build.py", "--builds", *args.builds, "--out", "docs/figures", "--prefix", "phase05"])
-    scale = ["--omniscape-scale", "XL=0.265,XXL=0.258"]   # adopted blocks 33 / 65 vs measured 17 / 33: (17/33)^2, (33/65)^2
-    budget4 = run([py, "scripts/budget_extrapolation.py", "--builds", *args.builds, "--target-cpu-hours", "500", "--cpus-per-job", "4", *scale])
-    budget1 = run([py, "scripts/budget_extrapolation.py", "--builds", *args.builds, "--target-cpu-hours", "500", "--cpus-per-job", "1",
-                   "--out", "docs/figures/phase05_budget_1core.json", *scale])
+    analysis = run(
+        [
+            py,
+            "scripts/analyze_build.py",
+            "--builds",
+            *args.builds,
+            "--out",
+            "docs/figures",
+            "--prefix",
+            "phase05",
+        ]
+    )
+    scale = [
+        "--omniscape-scale",
+        "XL=0.265,XXL=0.258",
+    ]  # adopted blocks 33 / 65 vs measured 17 / 33: (17/33)^2, (33/65)^2
+    budget4 = run(
+        [
+            py,
+            "scripts/budget_extrapolation.py",
+            "--builds",
+            *args.builds,
+            "--target-cpu-hours",
+            "500",
+            "--cpus-per-job",
+            "4",
+            *scale,
+        ]
+    )
+    budget1 = run(
+        [
+            py,
+            "scripts/budget_extrapolation.py",
+            "--builds",
+            *args.builds,
+            "--target-cpu-hours",
+            "500",
+            "--cpus-per-job",
+            "1",
+            "--out",
+            "docs/figures/phase05_budget_1core.json",
+            *scale,
+        ]
+    )
     cmp_path = ROOT / "data/builds/mini/stats/solver_comparison.json"
     cmp = json.load(open(cmp_path))
     c = pd.DataFrame(cmp["compare"])
@@ -51,16 +93,27 @@ def main() -> None:
     def sect(text: str, title: str) -> str:
         i = text.find(title)
         j = text.find("\n### ", i + 1)
-        body = text[i:j if j > 0 else None].strip().splitlines()
-        body = [ln for ln in body[1:] if not ln.startswith("wrote ")]   # drop the inner header and log lines
+        body = text[i : j if j > 0 else None].strip().splitlines()
+        body = [
+            ln for ln in body[1:] if not ln.startswith("wrote ")
+        ]  # drop the inner header and log lines
         return "\n".join(body).strip()
 
     gens = man[man.family == "synthetic"].generator.value_counts().to_dict()
     tables = man[man.family == "real"].table_id.value_counts().to_dict()
-    conv = {k: all(all(x) for x in c[k]) for k in ("pairwise_converged", "advanced_converged", "omniscape_converged")}
+    conv = {
+        k: all(all(x) for x in c[k])
+        for k in ("pairwise_converged", "advanced_converged", "omniscape_converged")
+    }
     tq = mini.groupby("kind").solve_time_s.describe()[["count", "50%", "mean", "max"]].round(3)
-    flags = mini[mini.qc_flags != ""][["sample_id", "config", "generator", "resistance_table_id", "contrast", "qc_flags"]]
-    xxl_note = "" if any("XXL" in b for b in args.builds) else "\n> XXL probe not yet included in the tables; see the status note.\n"
+    flags = mini[mini.qc_flags != ""][
+        ["sample_id", "config", "generator", "resistance_table_id", "contrast", "qc_flags"]
+    ]
+    xxl_note = (
+        ""
+        if any("XXL" in b for b in args.builds)
+        else "\n> XXL probe not yet included in the tables; see the status note.\n"
+    )
     report = f"""# Phase 5 report — solver pipeline and mini run (mandatory gate)
 
 > **Superseded items (2026-09-06):** the cost-driven Omniscape blocks proposed below (XL 33, XXL 65) were
@@ -101,17 +154,17 @@ hard-coded CG settings `cg_rtol_hardcoded = 1e-6`, `cg_itmax_hardcoded = 100000`
 Omniscape: `radius`, `block_size`, `source_threshold`, `solver` (cholmod), `precision`, `correct_artifacts`,
 `calc_flow_potential`, `calc_normalized_current`.
 
-### 2.1 CHOLMOD vs CG+AMG on {cmp['n_compare']} mini samples (all configs, single thread)
+### 2.1 CHOLMOD vs CG+AMG on {cmp["n_compare"]} mini samples (all configs, single thread)
 
 | Quantity | max (median) relative difference |
 |---|---|
-| T1 cumulative current | {num('cum_current_reldiff')} |
-| T2 effective resistance | {num('reff_reldiff')} |
-| T3 current / voltage | {num('advanced_current_reldiff')} / {num('advanced_voltage_reldiff')} |
-| T4 Omniscape cumulative current | {num('omniscape_cum_reldiff')} |
+| T1 cumulative current | {num("cum_current_reldiff")} |
+| T2 effective resistance | {num("reff_reldiff")} |
+| T3 current / voltage | {num("advanced_current_reldiff")} / {num("advanced_voltage_reldiff")} |
+| T4 Omniscape cumulative current | {num("omniscape_cum_reldiff")} |
 
-Converged with both solvers: pairwise {conv['pairwise_converged']}, advanced {conv['advanced_converged']},
-omniscape {conv['omniscape_converged']}. Kirchhoff residual (full precision, exact graph): CHOLMOD
+Converged with both solvers: pairwise {conv["pairwise_converged"]}, advanced {conv["advanced_converged"]},
+omniscape {conv["omniscape_converged"]}. Kirchhoff residual (full precision, exact graph): CHOLMOD
 {min(x[0] for x in c.residual_cholmod if x[0] is not None):.0e}–{max(max(x) for x in c.residual_cholmod if x[0] is not None):.0e},
 CG+AMG {min(x[0] for x in c.residual_cgamg if x[0] is not None):.0e}–{max(max(x) for x in c.residual_cgamg if x[0] is not None):.0e}.
 Median wall time (s): pairwise {pd.Series([x[0] for x in c.t_pairwise]).median():.2f} (CHOLMOD) vs {pd.Series([x[1] for x in c.t_pairwise]).median():.2f} (CG+AMG);
@@ -123,12 +176,12 @@ Omniscape solve (in the dev shard CG+AMG failed a whole T4 solve on a contrast-1
 window's residual exceeded Circuitscape's hard-coded 1e-4). CHOLMOD is the reference for all tasks;
 CG+AMG remains the documented memory fallback (`fallback_solver` flag).
 
-### 2.2 Determinism ({cmp['n_repeat']} samples solved twice per solver, `JULIA_NUM_THREADS=1`, BLAS threads 1)
+### 2.2 Determinism ({cmp["n_repeat"]} samples solved twice per solver, `JULIA_NUM_THREADS=1`, BLAS threads 1)
 
 | Solver | pairwise bitwise identical | Omniscape bitwise identical |
 |---|---|---|
-| CHOLMOD | {bool(det['pairwise_bitwise_cholmod'].all())} | {bool(det['omniscape_bitwise_cholmod'].all())} |
-| CG+AMG | {bool(det['pairwise_bitwise_cg+amg'].all())} | {bool(det['omniscape_bitwise_cg+amg'].all())} |
+| CHOLMOD | {bool(det["pairwise_bitwise_cholmod"].all())} | {bool(det["omniscape_bitwise_cholmod"].all())} |
+| CG+AMG | {bool(det["pairwise_bitwise_cg+amg"].all())} | {bool(det["omniscape_bitwise_cg+amg"].all())} |
 
 Both are bitwise reproducible single-threaded. Production jobs use one Julia thread; CHOLMOD/BLAS get the
 allocated cores (`OPENBLAS_NUM_THREADS = SLURM_CPUS_PER_TASK`), which we have not yet verified to be
@@ -152,7 +205,7 @@ wall each (~7.5–9 min solving + ~3.5 min Julia load/JIT). Resumable: `solve_sh
 
 **QC.** qc_pass = {mini.qc_pass.mean():.4f}, qc_trainval = {mini.qc_trainval.mean():.4f}. Flags:
 
-{flags.to_markdown(index=False) if len(flags) else 'none'}
+{flags.to_markdown(index=False) if len(flags) else "none"}
 
 All three `rmax_saturated` flags are the same contrast-10⁴ GRF landscape (> 50 % of pixels at r_max): kept
 in the index, excluded from train/val per the owner rule. No sample failed convergence, finiteness,
@@ -163,24 +216,24 @@ contact sheet `docs/figures/mini_contact_sheet.png` (log R over cumulative curre
 
 ## 4. Scaling probe (synthetic, `points` with K = 4 and `omniscape`, one sample per Julia process)
 
-{sect(analysis, '### Solve time (s) and peak RSS')}
+{sect(analysis, "### Solve time (s) and peak RSS")}
 
-{sect(analysis, '### Wall time per sample')}
+{sect(analysis, "### Wall time per sample")}
 
 Peak RSS is the process high-water mark (`Sys.maxrss`), which includes ~1 GB of Julia/package baseline.
 Figure: `docs/figures/phase05_solve_times.png`.
 {xxl_note}
 ## 5. Storage per sample (compressed HDF5, gzip-4 + shuffle)
 
-{sect(analysis, '### Storage')}
+{sect(analysis, "### Storage")}
 
 Pairwise maps for K ≤ 4 dominate (`voltage` + `pairwise_current` = 12 maps at K = 4).
 
 ## 6. Full-budget extrapolation
 
-{sect(budget4, '### Measured median')}
+{sect(budget4, "### Measured median")}
 
-{sect(budget4, '### Power-law')}
+{sect(budget4, "### Power-law")}
 
 Omniscape scales super-linearly in pixels because the window size grows with the tier (radius ∝ size).
 The XL and XXL Omniscape times in the budget tables are the measured values scaled to the **adopted**
@@ -193,7 +246,7 @@ block sizes (XL block 33 instead of the probed 17, XXL block 65 instead of 33; c
 
 ### 6.2 Proposed ladder fitting ≈ 500 CPU-hours, 4 cores per job
 
-{sect(budget4, '### Proposed ladder')}
+{sect(budget4, "### Proposed ladder")}
 
 ### 6.3 The same 500 CPU-hours at 1 core per job ({one_core_total})
 
@@ -201,9 +254,9 @@ Tier-S/M solves are single-threaded in practice (33²–65² Omniscape windows, 
 allocating 1 core per job should give the same wall time and 4× the samples per CPU-hour (to be
 verified with one shard before adoption):
 
-{sect(budget1, '### Proposed ladder')}
+{sect(budget1, "### Proposed ladder")}
 
-**Bottom line:** the brief's ladder costs ≈ {b4['brief']['cpu_h']:,.0f} CPU-hours (4 cores) and ≈ {b4['brief']['gb']:,.0f} GB;
+**Bottom line:** the brief's ladder costs ≈ {b4["brief"]["cpu_h"]:,.0f} CPU-hours (4 cores) and ≈ {b4["brief"]["gb"]:,.0f} GB;
 T4 (Omniscape) is > 90 % of the compute at every tier. Levers, in order of impact: (a) solve T4 on a
 subset of landscapes (e.g. 25 %), (b) 1-core jobs for S/M, (c) the larger XL/XXL block sizes already
 adopted in `configs/solver/omniscape_reference.yaml`, (d) fewer XL/XXL samples.

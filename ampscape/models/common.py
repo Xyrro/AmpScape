@@ -5,6 +5,7 @@ channel 1 = NoData mask, then the task's source channels — T1: focal mask (any
 scaled by the number of valid pixels and the ground mask; T4: Omniscape source strength (max 1).
 Targets: log10(C + ε·max C) per map (ampscape.metrics.transforms), predicted directly; loss = masked MSE.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -13,8 +14,20 @@ import torch
 from ampscape.metrics.transforms import EPS
 
 TASK_CHANNELS = {"T1": 3, "T1W": 3, "T1R": 3, "T3": 4, "T4": 3}
-TASK_TARGET = {"T1": "cum_current", "T1W": "cum_current", "T1R": "cum_current", "T3": "current", "T4": "cum_current"}
-TASK_CONFIG = {"T1": "points", "T1W": "wall_to_wall", "T1R": "regions", "T3": "advanced", "T4": "omniscape"}
+TASK_TARGET = {
+    "T1": "cum_current",
+    "T1W": "cum_current",
+    "T1R": "cum_current",
+    "T3": "current",
+    "T4": "cum_current",
+}
+TASK_CONFIG = {
+    "T1": "points",
+    "T1W": "wall_to_wall",
+    "T1R": "regions",
+    "T3": "advanced",
+    "T4": "omniscape",
+}
 
 
 def source_pixels(d: dict, task: str) -> np.ndarray:
@@ -111,7 +124,9 @@ def masked_mse(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> 
     return diff.sum() / mask.sum().clamp_min(1.0)
 
 
-def grid_graph(resistance: np.ndarray, nodata: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def grid_graph(
+    resistance: np.ndarray, nodata: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """8-neighbour grid graph with Circuitscape's average-conductance edge weights.
 
     Returns (node_index (H, W) int64 with -1 at NoData, edge_index (2, E) int64 both directions, edge_weight (E,) float32
@@ -124,10 +139,10 @@ def grid_graph(resistance: np.ndarray, nodata: np.ndarray) -> tuple[np.ndarray, 
     g = 1.0 / np.maximum(resistance.astype(np.float64), 1e-12)
     src, dst, wt = [], [], []
     for dy, dx, diag in ((0, 1, False), (1, 0, False), (1, 1, True), (1, -1, True)):
-        a = idx[max(0, -dy):H - max(0, dy), max(0, -dx):W - max(0, dx)]
-        b = idx[max(0, dy):H - max(0, -dy), max(0, dx):W - max(0, -dx)]
-        ga = g[max(0, -dy):H - max(0, dy), max(0, -dx):W - max(0, dx)]
-        gb = g[max(0, dy):H - max(0, -dy), max(0, dx):W - max(0, -dx)]
+        a = idx[max(0, -dy) : H - max(0, dy), max(0, -dx) : W - max(0, dx)]
+        b = idx[max(0, dy) : H - max(0, -dy), max(0, dx) : W - max(0, -dx)]
+        ga = g[max(0, -dy) : H - max(0, dy), max(0, -dx) : W - max(0, dx)]
+        gb = g[max(0, dy) : H - max(0, -dy), max(0, dx) : W - max(0, -dx)]
         ok = (a >= 0) & (b >= 0)
         w = 0.5 * (ga[ok] + gb[ok]) / (np.sqrt(2.0) if diag else 1.0)
         src += [a[ok], b[ok]]

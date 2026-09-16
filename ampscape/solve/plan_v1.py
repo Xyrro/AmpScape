@@ -21,9 +21,21 @@ import pathlib
 
 import pandas as pd
 
-from ampscape.solve.manifest import DEFAULT_CONFIGS, TIER_PIXEL_M, TIER_SIZES, SampleSpec, sample_uuid
+from ampscape.solve.manifest import (
+    DEFAULT_CONFIGS,
+    TIER_PIXEL_M,
+    TIER_SIZES,
+    SampleSpec,
+    sample_uuid,
+)
 
-TIER_SEED_BASE = {"S": 100_000_000, "M": 200_000_000, "L": 300_000_000, "XL": 400_000_000, "XXL": 500_000_000}
+TIER_SEED_BASE = {
+    "S": 100_000_000,
+    "M": 200_000_000,
+    "L": 300_000_000,
+    "XL": 400_000_000,
+    "XXL": 500_000_000,
+}
 V1_TABLES = ["generic_hm", "large_mammal", "amphibian", "forest_bird", "random_lm"]
 V1_DATASET_ID = "ampscape-v1.0"
 SYNTHETIC_SHARE = 0.6
@@ -33,14 +45,22 @@ def stable_seed(key: str) -> int:
     return int(hashlib.sha1(key.encode()).hexdigest()[:8], 16) % (2**31 - 1)
 
 
-def split_counts(n: int, synthetic_share: float = SYNTHETIC_SHARE, n_tables: int = len(V1_TABLES)) -> tuple[int, int]:
+def split_counts(
+    n: int, synthetic_share: float = SYNTHETIC_SHARE, n_tables: int = len(V1_TABLES)
+) -> tuple[int, int]:
     """(n_synthetic, n_tiles) with n_synthetic + n_tiles * n_tables == n when n * (1 - share) is a multiple of n_tables."""
     n_tiles = int(math.ceil(n * (1.0 - synthetic_share) / n_tables))
     return n - n_tiles * n_tables, n_tiles
 
 
-def plan_v1_synthetic(tier: str, n: int, shard_size: int, shard0: int = 0, dataset_id: str = V1_DATASET_ID,
-                      configs=DEFAULT_CONFIGS) -> list[SampleSpec]:
+def plan_v1_synthetic(
+    tier: str,
+    n: int,
+    shard_size: int,
+    shard0: int = 0,
+    dataset_id: str = V1_DATASET_ID,
+    configs=DEFAULT_CONFIGS,
+) -> list[SampleSpec]:
     from ampscape.landscapes.synthetic import sample_landscape_v1
 
     size = TIER_SIZES[tier]
@@ -48,19 +68,41 @@ def plan_v1_synthetic(tier: str, n: int, shard_size: int, shard0: int = 0, datas
     for i in range(n):
         seed = TIER_SEED_BASE[tier] + i
         ls = sample_landscape_v1(seed, (size, size))
-        cfgs = list(configs) + (["regions"] if "patch_mosaic" in ls.params and "regions" not in configs else [])
-        out.append(SampleSpec(sample_uuid(dataset_id, "synthetic", f"{tier}:{seed}"), dataset_id, "synthetic", tier, size,
-                              TIER_PIXEL_M[tier], seed, json.dumps(cfgs), generator=ls.generator, contrast=ls.contrast,
-                              shard=shard0 + i // shard_size,
-                              extra=json.dumps({"design": "v1", "hard_case": ls.params.get("hard_case")})))
+        cfgs = list(configs) + (
+            ["regions"] if "patch_mosaic" in ls.params and "regions" not in configs else []
+        )
+        out.append(
+            SampleSpec(
+                sample_uuid(dataset_id, "synthetic", f"{tier}:{seed}"),
+                dataset_id,
+                "synthetic",
+                tier,
+                size,
+                TIER_PIXEL_M[tier],
+                seed,
+                json.dumps(cfgs),
+                generator=ls.generator,
+                contrast=ls.contrast,
+                shard=shard0 + i // shard_size,
+                extra=json.dumps({"design": "v1", "hard_case": ls.params.get("hard_case")}),
+            )
+        )
     return out
 
 
-def plan_v1_real(tier: str, n_tiles: int, tiles_root: str | pathlib.Path, shard_size: int, shard0: int = 0,
-                 dataset_id: str = V1_DATASET_ID, configs=DEFAULT_CONFIGS, tables=V1_TABLES) -> list[SampleSpec]:
+def plan_v1_real(
+    tier: str,
+    n_tiles: int,
+    tiles_root: str | pathlib.Path,
+    shard_size: int,
+    shard0: int = 0,
+    dataset_id: str = V1_DATASET_ID,
+    configs=DEFAULT_CONFIGS,
+    tables=V1_TABLES,
+) -> list[SampleSpec]:
     root = pathlib.Path(tiles_root)
     tiles = pd.read_parquet(root / "tiles.parquet")
-    tiles = tiles[(tiles.tier == tier) & tiles.qc_accept]                      # extraction (= stream) order
+    tiles = tiles[(tiles.tier == tier) & tiles.qc_accept]  # extraction (= stream) order
     res = pd.read_parquet(root / "resistance.parquet")
     have = set(zip(res.tile_id, res.table_id, strict=True))
     if len(tiles) < n_tiles:
@@ -71,16 +113,37 @@ def plan_v1_real(tier: str, n_tiles: int, tiles_root: str | pathlib.Path, shard_
         for table in tables:
             if (tile, table) not in have:
                 raise SystemExit(f"resistance raster missing for {tile} × {table}")
-            cfgs = list(configs) + (["regions"] if "regions" not in configs else [])   # prepare skips tiles without patches
-            out.append(SampleSpec(sample_uuid(dataset_id, "real", f"{tier}:{tile}:{table}"), dataset_id, "real", tier,
-                                  TIER_SIZES[tier], TIER_PIXEL_M[tier], stable_seed(f"{tile}|{table}"), json.dumps(cfgs),
-                                  tile_id=tile, table_id=table, shard=shard0 + j // shard_size, extra=json.dumps({"design": "v1"})))
+            cfgs = list(configs) + (
+                ["regions"] if "regions" not in configs else []
+            )  # prepare skips tiles without patches
+            out.append(
+                SampleSpec(
+                    sample_uuid(dataset_id, "real", f"{tier}:{tile}:{table}"),
+                    dataset_id,
+                    "real",
+                    tier,
+                    TIER_SIZES[tier],
+                    TIER_PIXEL_M[tier],
+                    stable_seed(f"{tile}|{table}"),
+                    json.dumps(cfgs),
+                    tile_id=tile,
+                    table_id=table,
+                    shard=shard0 + j // shard_size,
+                    extra=json.dumps({"design": "v1"}),
+                )
+            )
             j += 1
     return out
 
 
-def plan_v1(tier: str, n: int, tiles_root: str | pathlib.Path, shard_size: int, dataset_id: str = V1_DATASET_ID,
-            n_tiles: int | None = None) -> pd.DataFrame:
+def plan_v1(
+    tier: str,
+    n: int,
+    tiles_root: str | pathlib.Path,
+    shard_size: int,
+    dataset_id: str = V1_DATASET_ID,
+    n_tiles: int | None = None,
+) -> pd.DataFrame:
     from ampscape.solve.manifest import assign_plan_splits, to_frame
 
     n_syn, n_tiles = split_counts(n) if n_tiles is None else (n - n_tiles * len(V1_TABLES), n_tiles)

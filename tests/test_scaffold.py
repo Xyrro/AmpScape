@@ -9,8 +9,17 @@ import tomllib
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 SUBPACKAGES = [
-    "landscapes", "resistance", "sources", "solve", "io", "splits",
-    "data", "models", "metrics", "eval", "viz",
+    "landscapes",
+    "resistance",
+    "sources",
+    "solve",
+    "io",
+    "splits",
+    "data",
+    "models",
+    "metrics",
+    "eval",
+    "viz",
 ]
 
 
@@ -24,9 +33,19 @@ def test_package_imports():
 
 
 def test_layout_matches_brief():
-    for d in ["configs/tasks", "configs/landscapes", "configs/resistance_tables",
-              "configs/solver", "configs/datasets", "julia/AmpScapeSolve.jl/src",
-              "scripts", "tests", "docs", "notebooks", "paper"]:
+    for d in [
+        "configs/tasks",
+        "configs/landscapes",
+        "configs/resistance_tables",
+        "configs/solver",
+        "configs/datasets",
+        "julia/AmpScapeSolve.jl/src",
+        "scripts",
+        "tests",
+        "docs",
+        "notebooks",
+        "paper",
+    ]:
         assert (ROOT / d).is_dir(), d
 
 

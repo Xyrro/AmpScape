@@ -59,7 +59,9 @@ def test_grf_correlation_length_increases_smoothness():
 
 def test_grf_anisotropy_direction():
     # principal axis along x (columns): variation along rows must exceed variation along columns
-    f = syn.gaussian_random_field((128, 128), 16, np.random.default_rng(3), anisotropy=4.0, angle_deg=0.0)
+    f = syn.gaussian_random_field(
+        (128, 128), 16, np.random.default_rng(3), anisotropy=4.0, angle_deg=0.0
+    )
     var_along_x = np.abs(np.diff(f, axis=1)).mean()
     var_along_y = np.abs(np.diff(f, axis=0)).mean()
     assert var_along_y > 1.5 * var_along_x
@@ -77,14 +79,28 @@ def test_field_to_resistance_ranges():
 
 
 def test_linear_barriers_geometry():
-    m = syn.linear_barriers((128, 128), 1, 3.0, np.random.default_rng(0), orientation_deg=0.0,
-                            orientation_jitter_deg=0.0)
+    m = syn.linear_barriers(
+        (128, 128),
+        1,
+        3.0,
+        np.random.default_rng(0),
+        orientation_deg=0.0,
+        orientation_jitter_deg=0.0,
+    )
     assert m.any()
     rows = np.where(m.any(axis=1))[0]
     assert len(rows) <= 4  # a horizontal line of width 3 touches at most 4 rows
     # gaps reduce coverage
-    m_gap = syn.linear_barriers((128, 128), 1, 3.0, np.random.default_rng(0), orientation_deg=0.0,
-                                orientation_jitter_deg=0.0, gap_fraction=0.3, gap_length_px=4.0)
+    m_gap = syn.linear_barriers(
+        (128, 128),
+        1,
+        3.0,
+        np.random.default_rng(0),
+        orientation_deg=0.0,
+        orientation_jitter_deg=0.0,
+        gap_fraction=0.3,
+        gap_length_px=4.0,
+    )
     assert 0.55 < m_gap.sum() / m.sum() < 0.85
 
 
@@ -140,7 +156,11 @@ def test_v1_sampler_strata_and_contracts():
         ls = syn.sample_landscape_v1(s, (64, 64))
         hc[ls.params["hard_case"]] += 1
         contrasts[ls.contrast] += 1
-        assert ls.resistance.shape == (64, 64) and 1.0 <= ls.resistance.min() and ls.resistance.max() <= ls.contrast
+        assert (
+            ls.resistance.shape == (64, 64)
+            and 1.0 <= ls.resistance.min()
+            and ls.resistance.max() <= ls.contrast
+        )
         assert ls.resistance[ls.nodata_mask].max(initial=1.0) == 1.0
         if ls.params["hard_case"] == "rmax_saturated":
             v = ~ls.nodata_mask
@@ -149,7 +169,7 @@ def test_v1_sampler_strata_and_contracts():
             assert 0.2 <= ls.nodata_mask.mean() <= 0.5
         if ls.params["hard_case"] is None:
             assert ls.contrast <= 10_000
-    assert 0.1 < (300 - hc[None]) / 300 < 0.3           # ≈ 20 % hard
+    assert 0.1 < (300 - hc[None]) / 300 < 0.3  # ≈ 20 % hard
     assert contrasts[1_000_000] > 0 and contrasts[100_000] > 0
 
 

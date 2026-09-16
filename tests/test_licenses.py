@@ -19,7 +19,15 @@ def test_manifest_licences_and_docs():
     doc = (ROOT / "docs" / "licenses.md").read_text()
     for k, v in m.items():
         assert v.get("license"), f"{k}: no licence recorded"
-        assert any(a in v["license"] for a in ALLOWED), f"{k}: licence not in the allowed set: {v['license']}"
+        assert any(a in v["license"] for a in ALLOWED), (
+            f"{k}: licence not in the allowed set: {v['license']}"
+        )
         assert len(v.get("sha256", "")) == 64, f"{k}: no sha256"
-        key = k.split("_v10_")[0] if k.startswith("hydrorivers") else k.split("_region")[0] if k.startswith("grip4") else k
+        key = (
+            k.split("_v10_")[0]
+            if k.startswith("hydrorivers")
+            else k.split("_region")[0]
+            if k.startswith("grip4")
+            else k
+        )
         assert key in doc or k in doc, f"{k}: not documented in docs/licenses.md"

@@ -4,6 +4,7 @@
 Usage: python scripts/analyze_build.py --builds data/builds/mini data/builds/probe_M ... --out docs/figures --prefix phase05
 Prints Markdown tables and writes <prefix>_solve_times.png.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -27,9 +28,15 @@ def storage_per_sample(build: pathlib.Path) -> dict:
                 for c in f[sid]["configs"]:
                     kind = f[sid]["configs"][c].attrs["kind"]
                     g = f[sid]["configs"][c]["outputs"]
-                    per_kind[kind] = per_kind.get(kind, 0) + sum(g[d].id.get_storage_size() for d in g)
-    return {"samples": n, "bytes_total": tot, "bytes_per_sample": tot / max(n, 1),
-            "output_bytes_per_kind": {k: v / max(n, 1) for k, v in per_kind.items()}}
+                    per_kind[kind] = per_kind.get(kind, 0) + sum(
+                        g[d].id.get_storage_size() for d in g
+                    )
+    return {
+        "samples": n,
+        "bytes_total": tot,
+        "bytes_per_sample": tot / max(n, 1),
+        "output_bytes_per_kind": {k: v / max(n, 1) for k, v in per_kind.items()},
+    }
 
 
 def main() -> None:
@@ -53,8 +60,14 @@ def main() -> None:
     df["task"] = df["task_ids"]
     # --- solve time / memory per task and tier ---
     g = df.groupby(["tier", "task", "solver"]).agg(
-        n=("solve_time_s", "size"), t_median=("solve_time_s", "median"), t_p90=("solve_time_s", lambda x: x.quantile(0.9)),
-        t_max=("solve_time_s", "max"), rss_max_mb=("maxrss_mb", "max"), conv=("converged", "mean"), qc=("qc_pass", "mean"))
+        n=("solve_time_s", "size"),
+        t_median=("solve_time_s", "median"),
+        t_p90=("solve_time_s", lambda x: x.quantile(0.9)),
+        t_max=("solve_time_s", "max"),
+        rss_max_mb=("maxrss_mb", "max"),
+        conv=("converged", "mean"),
+        qc=("qc_pass", "mean"),
+    )
     print("\n### Solve time (s) and peak RSS (MB) per tier × task × solver\n")
     print(g.round(3).to_markdown())
     # --- per-sample totals (all configs) ---
@@ -66,14 +79,25 @@ def main() -> None:
     print("\n### QC flags\n")
     flags = df[df.qc_flags != ""].groupby(["tier", "kind", "qc_flags"]).size()
     print(flags.to_markdown() if len(flags) else "no flags")
-    print("\nqc_pass rate:", round(df.qc_pass.mean(), 4), "| qc_trainval rate:", round(df.qc_trainval.mean(), 4))
+    print(
+        "\nqc_pass rate:",
+        round(df.qc_pass.mean(), 4),
+        "| qc_trainval rate:",
+        round(df.qc_trainval.mean(), 4),
+    )
     # --- storage ---
     print("\n### Storage (compressed HDF5)\n")
     rows = []
     for k, v in storage.items():
-        rows.append({"build": k, "samples": v["samples"], "total_MB": v["bytes_total"] / 1e6,
-                     "MB_per_sample": v["bytes_per_sample"] / 1e6,
-                     **{f"out_{kk}_MB": vv / 1e6 for kk, vv in v["output_bytes_per_kind"].items()}})
+        rows.append(
+            {
+                "build": k,
+                "samples": v["samples"],
+                "total_MB": v["bytes_total"] / 1e6,
+                "MB_per_sample": v["bytes_per_sample"] / 1e6,
+                **{f"out_{kk}_MB": vv / 1e6 for kk, vv in v["output_bytes_per_kind"].items()},
+            }
+        )
     print(pd.DataFrame(rows).round(3).to_markdown(index=False))
     # --- figure ---
     import matplotlib
@@ -101,8 +125,13 @@ def main() -> None:
     out = pathlib.Path(args.out) / f"{args.prefix}_solve_times.png"
     fig.savefig(out, dpi=110)
     print("\nwrote", out)
-    (pathlib.Path(args.out) / f"{args.prefix}_summary.json").write_text(json.dumps(
-        {"time": g.reset_index().to_dict("records"), "storage": storage}, indent=1, default=float))
+    (pathlib.Path(args.out) / f"{args.prefix}_summary.json").write_text(
+        json.dumps(
+            {"time": g.reset_index().to_dict("records"), "storage": storage},
+            indent=1,
+            default=float,
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -64,7 +64,9 @@ def coarsen_nodata(R: np.ndarray, nd: np.ndarray, f: int) -> tuple[np.ndarray, n
     return np.where(ndc, 1.0, np.nan_to_num(Rc, nan=1.0)).astype(np.float32), ndc
 
 
-def coarsen_advanced(S: np.ndarray, G: np.ndarray, ndc: np.ndarray, f: int) -> tuple[np.ndarray, np.ndarray]:
+def coarsen_advanced(
+    S: np.ndarray, G: np.ndarray, ndc: np.ndarray, f: int
+) -> tuple[np.ndarray, np.ndarray]:
     """Coarse T3 sources (block sum) and ground (any); ground wins where a block holds both, sources renormalised.
 
     Circuitscape leaves a node that is both source and ground ungrounded (verified on the mini: 27 of 32 coarse
@@ -86,7 +88,9 @@ def coarsen_advanced(S: np.ndarray, G: np.ndarray, ndc: np.ndarray, f: int) -> t
     return sc, gr
 
 
-def write_coarse_inputs(final_h5: str, out_h5: str, sample_ids: list[str], f: int = 4) -> dict[str, dict]:
+def write_coarse_inputs(
+    final_h5: str, out_h5: str, sample_ids: list[str], f: int = 4
+) -> dict[str, dict]:
     """Build a Julia-solvable inputs shard at 1/f resolution from a final shard; returns per-sample timings."""
     timings = {}
     skipped: list[tuple[str, str]] = []
@@ -127,7 +131,9 @@ def write_coarse_inputs(final_h5: str, out_h5: str, sample_ids: list[str], f: in
                 if "focal_mask" in gc["inputs"]:
                     gco.create_dataset("focal_mask", data=fc, **GZIP)
                 if kind == "advanced":
-                    sc, gr = coarsen_advanced(gc["inputs"]["source_strength"][...], gc["inputs"]["ground"][...], ndc, f)
+                    sc, gr = coarsen_advanced(
+                        gc["inputs"]["source_strength"][...], gc["inputs"]["ground"][...], ndc, f
+                    )
                     if sc.sum() <= 0 or not gr.any():
                         del gc_all[cname]
                         skipped.append((sid, cname))
@@ -135,14 +141,21 @@ def write_coarse_inputs(final_h5: str, out_h5: str, sample_ids: list[str], f: in
                     gco.create_dataset("source_strength", data=sc.astype(np.float32), **GZIP)
                     gco.create_dataset("ground", data=gr.astype(np.int8), **GZIP)
                 elif "source_strength" in gc["inputs"]:
-                    sc = block_reduce(gc["inputs"]["source_strength"][...].astype(np.float64), f, "mean")
+                    sc = block_reduce(
+                        gc["inputs"]["source_strength"][...].astype(np.float64), f, "mean"
+                    )
                     sc[ndc] = 0
                     gco.create_dataset("source_strength", data=sc.astype(np.float32), **GZIP)
                 if kind == "omniscape":
-                    gco.attrs["source_threshold"] = float(gc.attrs.get("source_meta", "{}") and json.loads(gc.attrs["source_meta"]).get("source_threshold", 0.0))
+                    gco.attrs["source_threshold"] = float(
+                        gc.attrs.get("source_meta", "{}")
+                        and json.loads(gc.attrs["source_meta"]).get("source_threshold", 0.0)
+                    )
             timings[sid] = time.perf_counter() - t0
     if skipped:
-        print(f"coarsen: {len(skipped)} configurations undefined on the coarse grid and skipped: {skipped[:5]}{' ...' if len(skipped) > 5 else ''}")
+        print(
+            f"coarsen: {len(skipped)} configurations undefined on the coarse grid and skipped: {skipped[:5]}{' ...' if len(skipped) > 5 else ''}"
+        )
     return timings
 
 
@@ -159,11 +172,21 @@ def infill_focal(a: np.ndarray, focal_coarse: np.ndarray) -> np.ndarray:
     return a[tuple(idx)]
 
 
-def write_predictions(final_h5: str, coarse_outputs_h5: str, pred_h5: str, f: int, coarsen_time: dict[str, float],
-                      append: bool = False) -> int:
+def write_predictions(
+    final_h5: str,
+    coarse_outputs_h5: str,
+    pred_h5: str,
+    f: int,
+    coarsen_time: dict[str, float],
+    append: bool = False,
+) -> int:
     """Upsample coarse solver outputs into the predictions format; inference_time = coarsen + solve + upsample."""
     n = 0
-    with h5py.File(final_h5, "r") as fi, h5py.File(coarse_outputs_h5, "r") as fc, h5py.File(pred_h5, "a" if append else "w") as fp:
+    with (
+        h5py.File(final_h5, "r") as fi,
+        h5py.File(coarse_outputs_h5, "r") as fc,
+        h5py.File(pred_h5, "a" if append else "w") as fp,
+    ):
         for sid in fc["samples"]:
             if sid not in fi or "complete" not in fc["samples"][sid].attrs:
                 continue
@@ -174,27 +197,55 @@ def write_predictions(final_h5: str, coarse_outputs_h5: str, pred_h5: str, f: in
                 t0 = time.perf_counter()
                 g = gp.require_group(cname)
                 focal = None
-                if cname in fi[sid]["configs"] and "focal_mask" in fi[sid]["configs"][cname]["inputs"]:
+                if (
+                    cname in fi[sid]["configs"]
+                    and "focal_mask" in fi[sid]["configs"][cname]["inputs"]
+                ):
                     focal = fi[sid]["configs"][cname]["inputs"]["focal_mask"][...]
                     focal_c = coarsen_labels(focal, f)
                 pi = go["pair_index"][...] if "pair_index" in go else None
                 s_fine = None
                 if cname == "advanced" and cname in fi[sid]["configs"]:
-                    s_fine = fi[sid]["configs"][cname]["inputs"]["source_strength"][...].astype(np.float64)
-                    _, ndc = coarsen_nodata(fi[sid]["inputs"]["resistance"][...], fi[sid]["inputs"]["nodata_mask"][...] > 0, f)
-                    s_coarse, _ = coarsen_advanced(s_fine, fi[sid]["configs"][cname]["inputs"]["ground"][...], ndc, f)
+                    s_fine = fi[sid]["configs"][cname]["inputs"]["source_strength"][...].astype(
+                        np.float64
+                    )
+                    _, ndc = coarsen_nodata(
+                        fi[sid]["inputs"]["resistance"][...],
+                        fi[sid]["inputs"]["nodata_mask"][...] > 0,
+                        f,
+                    )
+                    s_coarse, _ = coarsen_advanced(
+                        s_fine, fi[sid]["configs"][cname]["inputs"]["ground"][...], ndc, f
+                    )
                 for k in go:
                     a = go[k][...]
-                    if k in ("cum_current", "current", "voltage", "flow_potential", "normalized", "pairwise_current"):
+                    if k in (
+                        "cum_current",
+                        "current",
+                        "voltage",
+                        "flow_potential",
+                        "normalized",
+                        "pairwise_current",
+                    ):
                         if k == "current" and s_fine is not None:
                             # node current = max(inflow, outflow) = inflow + injected at source nodes; the coarse node
                             # injects the block sum (f^2 fine sources) while its through-flow scales with f -> remove the
                             # coarse injection before scaling and add back the fine injection afterwards
                             a = a - s_coarse[: a.shape[0], : a.shape[1]]
-                        if k in ("cum_current", "current", "pairwise_current") and focal is not None:
+                        if (
+                            k in ("cum_current", "current", "pairwise_current")
+                            and focal is not None
+                        ):
                             if a.ndim == 3:
-                                a = np.stack([infill_focal(x, np.isin(focal_c, pi[q]) if pi is not None else focal_c)
-                                              for q, x in enumerate(a)])
+                                a = np.stack(
+                                    [
+                                        infill_focal(
+                                            x,
+                                            np.isin(focal_c, pi[q]) if pi is not None else focal_c,
+                                        )
+                                        for q, x in enumerate(a)
+                                    ]
+                                )
                             else:
                                 a = infill_focal(a, focal_c)
                         if a.ndim == 3:
@@ -203,7 +254,10 @@ def write_predictions(final_h5: str, coarse_outputs_h5: str, pred_h5: str, f: in
                             up = upsample(a, f, shape)
                         if k == "cum_current" and cname == "advanced":
                             continue
-                        if k in ("cum_current", "current", "pairwise_current") and cname != "omniscape":
+                        if (
+                            k in ("cum_current", "current", "pairwise_current")
+                            and cname != "omniscape"
+                        ):
                             # pairwise / advanced: a coarse node collects the flow crossing a width of f fine pixels ->
                             # divide by f for current per fine pixel; focal pixels (exactly 1 A per pair) are restored
                             # below. Omniscape sources were mean-pooled, so its maps are already per-pixel scale.
@@ -227,7 +281,9 @@ def write_predictions(final_h5: str, coarse_outputs_h5: str, pred_h5: str, f: in
                         c = g["cum_current"][...]
                         c[focal > 0] = 1.0
                         g["cum_current"][...] = c
-                g.attrs["inference_time_s"] = float(coarsen_time.get(sid, 0.0) + st["wall_s"] + (time.perf_counter() - t0))
+                g.attrs["inference_time_s"] = float(
+                    coarsen_time.get(sid, 0.0) + st["wall_s"] + (time.perf_counter() - t0)
+                )
                 g.attrs["coarse_solver"] = st["solver"]
             n += 1
     return n

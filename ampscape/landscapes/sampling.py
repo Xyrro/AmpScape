@@ -15,12 +15,23 @@ import numpy as np
 
 REALM_TO_GRIP_REGION = {
     # RESOLVE realm -> GRIP4 region number(s); Palearctic is split by longitude/latitude below
-    "Nearctic": [1], "Neotropic": [2], "Afrotropic": [3], "Australasia": [7], "Oceania": [7],
-    "Indomalayan": [6], "Antarctica": [],
+    "Nearctic": [1],
+    "Neotropic": [2],
+    "Afrotropic": [3],
+    "Australasia": [7],
+    "Oceania": [7],
+    "Indomalayan": [6],
+    "Antarctica": [],
 }
 REALM_TO_HYDRO_REGION = {
-    "Nearctic": ["na", "ar"], "Neotropic": ["sa", "na"], "Afrotropic": ["af"], "Australasia": ["au"],
-    "Oceania": ["au"], "Indomalayan": ["as"], "Palearctic": ["eu", "as", "si", "af"], "Antarctica": [],
+    "Nearctic": ["na", "ar"],
+    "Neotropic": ["sa", "na"],
+    "Afrotropic": ["af"],
+    "Australasia": ["au"],
+    "Oceania": ["au"],
+    "Indomalayan": ["as"],
+    "Palearctic": ["eu", "as", "si", "af"],
+    "Antarctica": [],
 }
 
 
@@ -28,10 +39,10 @@ def grip_region(realm: str, lat: float, lon: float) -> int | None:
     """GRIP4 regional file that covers a point (approximate split of the Palearctic)."""
     if realm == "Palearctic":
         if lon < 60.0 and lat > 35.0:
-            return 4          # Europe
+            return 4  # Europe
         if lon < 100.0:
-            return 5          # Middle East & Central Asia
-        return 6              # East Asia
+            return 5  # Middle East & Central Asia
+        return 6  # East Asia
     r = REALM_TO_GRIP_REGION.get(realm, [])
     return r[0] if r else None
 
@@ -59,8 +70,9 @@ class Candidate:
         return d
 
 
-def sample_land_points(ecoregions, n: int, rng: np.random.Generator, min_lat: float = -60.0,
-                       max_lat: float = 72.0):
+def sample_land_points(
+    ecoregions, n: int, rng: np.random.Generator, min_lat: float = -60.0, max_lat: float = 72.0
+):
     """Uniform-on-sphere candidate points that fall on a RESOLVE ecoregion polygon.
 
     Returns a GeoDataFrame with ecoregion attributes joined. Rock-and-ice, lakes and
@@ -80,8 +92,11 @@ def sample_land_points(ecoregions, n: int, rng: np.random.Generator, min_lat: fl
         # uniform on the sphere: sin(lat) uniform
         smin, smax = math.sin(math.radians(min_lat)), math.sin(math.radians(max_lat))
         lat = np.degrees(np.arcsin(rng.uniform(smin, smax, batch)))
-        cand = gpd.GeoDataFrame({"lat": lat, "lon": lon},
-                                geometry=[Point(x, y) for x, y in zip(lon, lat, strict=True)], crs="EPSG:4326")
+        cand = gpd.GeoDataFrame(
+            {"lat": lat, "lon": lon},
+            geometry=[Point(x, y) for x, y in zip(lon, lat, strict=True)],
+            crs="EPSG:4326",
+        )
         joined = gpd.sjoin(cand, eco, how="inner", predicate="within")
         joined = joined[~joined.index.duplicated()]
         pts.append(joined)
@@ -113,8 +128,9 @@ def sample_ghm(ghm_path: str, lats: np.ndarray, lons: np.ndarray) -> np.ndarray:
     return vals
 
 
-def assign_terciles(values: np.ndarray, edges: tuple[float, float] | None = None
-                    ) -> tuple[np.ndarray, tuple[float, float]]:
+def assign_terciles(
+    values: np.ndarray, edges: tuple[float, float] | None = None
+) -> tuple[np.ndarray, tuple[float, float]]:
     """Tercile index 0/1/2 of ``values``; edges computed from the data unless given (recorded)."""
     v = np.asarray(values, dtype=np.float64)
     if edges is None:
@@ -125,8 +141,13 @@ def assign_terciles(values: np.ndarray, edges: tuple[float, float] | None = None
     return t.astype(int), edges
 
 
-def balance_strata(candidates: list[Candidate], n_target: int, rng: np.random.Generator,
-                   per_stratum_cap: int | None = None, min_biomes: int = 5) -> list[Candidate]:
+def balance_strata(
+    candidates: list[Candidate],
+    n_target: int,
+    rng: np.random.Generator,
+    per_stratum_cap: int | None = None,
+    min_biomes: int = 5,
+) -> list[Candidate]:
     """Round-robin selection across strata so counts are as balanced as possible.
 
     Strata are visited in random order; each round takes one candidate from every stratum that
@@ -157,5 +178,7 @@ def balance_strata(candidates: list[Candidate], n_target: int, rng: np.random.Ge
         if not progressed:
             break
     if len({c.biome_num for c in chosen}) < min_biomes:
-        raise RuntimeError(f"only {len({c.biome_num for c in chosen})} biomes covered; need {min_biomes}")
+        raise RuntimeError(
+            f"only {len({c.biome_num for c in chosen})} biomes covered; need {min_biomes}"
+        )
     return chosen

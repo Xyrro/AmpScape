@@ -1,5 +1,6 @@
 """2-D Fourier Neural Operator baseline (Li et al. 2021; brief §12.3): lifting, L spectral layers with a pointwise
 skip, projection. Resolution-agnostic; the number of retained modes is the only spatial hyper-parameter."""
+
 from __future__ import annotations
 
 import torch
@@ -20,17 +21,28 @@ class SpectralConv2d(nn.Module):
         xf = torch.fft.rfft2(x.float(), norm="ortho")
         out = torch.zeros(B, self.w1.shape[1], H, W // 2 + 1, dtype=torch.cfloat, device=x.device)
         out[:, :, :m, :m] = torch.einsum("bixy,ioxy->boxy", xf[:, :, :m, :m], self.w1[:, :, :m, :m])
-        out[:, :, -m:, :m] = torch.einsum("bixy,ioxy->boxy", xf[:, :, -m:, :m], self.w2[:, :, :m, :m])
+        out[:, :, -m:, :m] = torch.einsum(
+            "bixy,ioxy->boxy", xf[:, :, -m:, :m], self.w2[:, :, :m, :m]
+        )
         return torch.fft.irfft2(out, s=(H, W), norm="ortho")
 
 
 class FNO2d(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int = 1, width: int = 32, modes: int = 16, layers: int = 4):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int = 1,
+        width: int = 32,
+        modes: int = 16,
+        layers: int = 4,
+    ):
         super().__init__()
         self.lift = nn.Conv2d(in_channels + 2, width, 1)
         self.spec = nn.ModuleList([SpectralConv2d(width, width, modes) for _ in range(layers)])
         self.skip = nn.ModuleList([nn.Conv2d(width, width, 1) for _ in range(layers)])
-        self.proj = nn.Sequential(nn.Conv2d(width, 4 * width, 1), nn.GELU(), nn.Conv2d(4 * width, out_channels, 1))
+        self.proj = nn.Sequential(
+            nn.Conv2d(width, 4 * width, 1), nn.GELU(), nn.Conv2d(4 * width, out_channels, 1)
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, _, H, W = x.shape

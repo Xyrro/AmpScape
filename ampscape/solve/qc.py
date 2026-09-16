@@ -35,12 +35,20 @@ INFO_FLAGS = {"fallback_solver"}
 def _f(x) -> float:
     """None / missing (JSON null from Julia's NaN sanitiser) -> NaN."""
     return float("nan") if x is None else float(x)
+
+
 TRAINVAL_ONLY_FLAGS = {"rmax_saturated"}
 
 
-def kirchhoff_residual(R: np.ndarray, nodata: np.ndarray, voltage: np.ndarray, injection: np.ndarray,
-                       grounded: np.ndarray | None = None, supernode: np.ndarray | None = None,
-                       graph: tuple | None = None) -> float:
+def kirchhoff_residual(
+    R: np.ndarray,
+    nodata: np.ndarray,
+    voltage: np.ndarray,
+    injection: np.ndarray,
+    grounded: np.ndarray | None = None,
+    supernode: np.ndarray | None = None,
+    graph: tuple | None = None,
+) -> float:
     """‖L v − b‖₂ / ‖b‖₂ on the exact solver graph (matches AmpScapeSolve.kirchhoff_residual).
 
     ``injection`` (H,W) holds the current injected per pixel, ``grounded`` marks pixels held at 0 V
@@ -70,7 +78,9 @@ def kirchhoff_residual(R: np.ndarray, nodata: np.ndarray, voltage: np.ndarray, i
     return float(np.linalg.norm(r[keep]) / nb) if nb > 0 else float("nan")
 
 
-def qc_pairwise(R, nodata, focal, out: dict, r_max: float | None, residual_tol=1e-6, rmax_frac=0.5) -> dict:
+def qc_pairwise(
+    R, nodata, focal, out: dict, r_max: float | None, residual_tol=1e-6, rmax_frac=0.5
+) -> dict:
     flags = []
     stats = json.loads(out["stats"])
     if not stats["converged"]:
@@ -93,7 +103,7 @@ def qc_pairwise(R, nodata, focal, out: dict, r_max: float | None, residual_tol=1
         flags.append("residual_high")
     if "voltage" in out and stats["converged"] and np.isfinite(out["voltage"]).all():
         pair_index = out["pair_index"]
-        G, idx = build_conductance_graph(R, nodata)      # build the exact graph once per sample
+        G, idx = build_conductance_graph(R, nodata)  # build the exact graph once per sample
         graph = (laplacian(G), idx)
         worst = 0.0
         worst_c = 0.0
@@ -103,20 +113,40 @@ def qc_pairwise(R, nodata, focal, out: dict, r_max: float | None, residual_tol=1
             gnd, src = focal == i, focal == j
             inj = np.zeros(R.shape, np.float64)
             inj[src] = 1.0 / src.sum()
-            worst = max(worst, kirchhoff_residual(R, nodata, out["voltage"][p], inj, grounded=gnd,
-                                                  supernode=src if src.sum() > 1 else None, graph=graph))
+            worst = max(
+                worst,
+                kirchhoff_residual(
+                    R,
+                    nodata,
+                    out["voltage"][p],
+                    inj,
+                    grounded=gnd,
+                    supernode=src if src.sum() > 1 else None,
+                    graph=graph,
+                ),
+            )
             c = out["pairwise_current"][p]
             worst_c = max(worst_c, abs(c[src].max() - 1.0), abs(c[gnd].max() - 1.0))
-        resid_f32, cons = worst, worst_c   # resid_f32 is informational only (float32 rounding dominates it)
+        resid_f32, cons = (
+            worst,
+            worst_c,
+        )  # resid_f32 is informational only (float32 rounding dominates it)
         if cons > 1e-6:
             flags.append("conservation_high")
     if r_max is not None:
         frac = float((R[~nodata] >= r_max - 1e-6).mean())
         if frac > rmax_frac:
             flags.append("rmax_saturated")
-    return {"qc_flags": flags, "residual_rel": resid, "residual_rel_f32": resid_f32, "conservation_err": cons,
-            "solve_time_s": _f(stats["wall_s"]), "maxrss_mb": _f(stats["maxrss_mb"]), "solver": stats["solver"],
-            "converged": stats["converged"]}
+    return {
+        "qc_flags": flags,
+        "residual_rel": resid,
+        "residual_rel_f32": resid_f32,
+        "conservation_err": cons,
+        "solve_time_s": _f(stats["wall_s"]),
+        "maxrss_mb": _f(stats["maxrss_mb"]),
+        "solver": stats["solver"],
+        "converged": stats["converged"],
+    }
 
 
 def qc_advanced(R, nodata, source, ground, out: dict, residual_tol=1e-6) -> dict:
@@ -136,10 +166,19 @@ def qc_advanced(R, nodata, source, ground, out: dict, residual_tol=1e-6) -> dict
     if stats["converged"] and np.isfinite(resid) and resid > residual_tol:
         flags.append("residual_high")
     if stats["converged"] and np.isfinite(volt).all():
-        resid_f32 = kirchhoff_residual(R, nodata, volt, source.astype(np.float64), grounded=ground > 0)  # informational
-    return {"qc_flags": flags, "residual_rel": resid, "residual_rel_f32": resid_f32, "conservation_err": float("nan"),
-            "solve_time_s": _f(stats["wall_s"]), "maxrss_mb": _f(stats["maxrss_mb"]), "solver": stats["solver"],
-            "converged": stats["converged"]}
+        resid_f32 = kirchhoff_residual(
+            R, nodata, volt, source.astype(np.float64), grounded=ground > 0
+        )  # informational
+    return {
+        "qc_flags": flags,
+        "residual_rel": resid,
+        "residual_rel_f32": resid_f32,
+        "conservation_err": float("nan"),
+        "solve_time_s": _f(stats["wall_s"]),
+        "maxrss_mb": _f(stats["maxrss_mb"]),
+        "solver": stats["solver"],
+        "converged": stats["converged"],
+    }
 
 
 def qc_omniscape(R, nodata, out: dict, ring: int = 2) -> dict:
@@ -161,9 +200,16 @@ def qc_omniscape(R, nodata, out: dict, ring: int = 2) -> dict:
     edge_ratio = float(e_mean / i_mean) if i_mean > 0 else float("nan")
     if np.isfinite(edge_ratio) and edge_ratio > 3.0:
         flags.append("omniscape_edge_artifact")
-    return {"qc_flags": flags, "residual_rel": float("nan"), "conservation_err": float("nan"), "edge_ratio": edge_ratio,
-            "solve_time_s": _f(stats["wall_s"]), "maxrss_mb": _f(stats["maxrss_mb"]), "solver": stats["solver"],
-            "converged": stats["converged"]}
+    return {
+        "qc_flags": flags,
+        "residual_rel": float("nan"),
+        "conservation_err": float("nan"),
+        "edge_ratio": edge_ratio,
+        "solve_time_s": _f(stats["wall_s"]),
+        "maxrss_mb": _f(stats["maxrss_mb"]),
+        "solver": stats["solver"],
+        "converged": stats["converged"],
+    }
 
 
 def qc_pass(flags: list[str]) -> tuple[bool, bool]:

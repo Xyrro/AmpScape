@@ -1,4 +1,5 @@
 """v1.0 planner: prefix property and determinism (ampscape.solve.plan_v1)."""
+
 import json
 
 from ampscape.solve.plan_v1 import TIER_SEED_BASE, plan_v1_synthetic, split_counts, stable_seed
@@ -17,7 +18,9 @@ def test_synthetic_stream_is_a_prefix_and_deterministic():
     assert [s.sample_id for s in a] == [s.sample_id for s in b[:12]]
     assert [s.seed for s in a] == [TIER_SEED_BASE["S"] + i for i in range(12)]
     assert all(json.loads(s.extra)["design"] == "v1" for s in a)
-    assert [s.sample_id for s in plan_v1_synthetic("M", 5, 5)] != [s.sample_id for s in plan_v1_synthetic("S", 5, 5)]
+    assert [s.sample_id for s in plan_v1_synthetic("M", 5, 5)] != [
+        s.sample_id for s in plan_v1_synthetic("S", 5, 5)
+    ]
 
 
 def test_stable_seed_is_process_independent():

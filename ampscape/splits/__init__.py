@@ -10,5 +10,12 @@ from ampscape.splits.spatial import (
     synthetic_split,
 )
 
-__all__ = ["BlockGrid", "apply_holdouts", "assign_blocks", "assign_tiles", "check_no_cross_tier_overlap",
-           "ood_flags", "synthetic_split"]
+__all__ = [
+    "BlockGrid",
+    "apply_holdouts",
+    "assign_blocks",
+    "assign_tiles",
+    "check_no_cross_tier_overlap",
+    "ood_flags",
+    "synthetic_split",
+]

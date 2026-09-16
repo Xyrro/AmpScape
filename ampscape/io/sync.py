@@ -24,7 +24,11 @@ import pathlib
 from ampscape.io.schema import validate_shard
 
 REPO_LAYOUT = "data/{tier}/{task_group}/{name}"
-SUBSET_CORE_SHARDS = {"S": 100, "M": 100, "L": 250}       # core ≈ 20k S + 10k M + 5k L landscapes (≈ 50 GB)   # HF layout: any tier / task group downloadable alone
+SUBSET_CORE_SHARDS = {
+    "S": 100,
+    "M": 100,
+    "L": 250,
+}  # core ≈ 20k S + 10k M + 5k L landscapes (≈ 50 GB)   # HF layout: any tier / task group downloadable alone
 
 
 def sha256(path: pathlib.Path) -> str:
@@ -39,14 +43,48 @@ def repo_path(shard: pathlib.Path, tier: str, task_group: str = "all") -> str:
     return REPO_LAYOUT.format(tier=tier, task_group=task_group, name=shard.name)
 
 
-def validate(shard: pathlib.Path) -> bool:
+def expected_samples(build: pathlib.Path) -> dict[str, int]:
+    """Samples per shard from the manifest (shard name -> count); {} if there is no manifest."""
+    mp = build / "manifest.parquet"
+    if not mp.exists():
+        return {}
+    import pandas as pd
+
+    m = pd.read_parquet(mp, columns=["shard"])
+    return {f"shard-{int(k):05d}": int(v) for k, v in m.groupby("shard").size().items()}
+
+
+def validate(shard: pathlib.Path, expected: dict[str, int] | None = None) -> bool:
+    """Schema validation plus (2026-09-16) the sample count of the manifest: a shard truncated by a full disk can be
+    schema-valid with fewer samples (tier S shard 104 reached the Hub with 5 of 200)."""
     ok = shard.with_suffix(".ok")
     if ok.exists():
+        if expected and shard.stem in expected:
+            n = json.loads(ok.read_text()).get("n_samples")
+            if n != expected[shard.stem]:
+                ok.unlink()
+                shard.with_suffix(".invalid").write_text(
+                    f"sample count {n} != manifest {expected[shard.stem]}"
+                )
+                return False
         return True
     rep = validate_shard(str(shard))
+    if rep.ok and expected and shard.stem in expected and rep.n_samples != expected[shard.stem]:
+        shard.with_suffix(".invalid").write_text(
+            f"sample count {rep.n_samples} != manifest {expected[shard.stem]}"
+        )
+        return False
     if rep.ok:
-        ok.write_text(json.dumps({"validated_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
-                                  "n_samples": rep.n_samples, "n_configs": rep.n_configs, "sha256": sha256(shard)}))
+        ok.write_text(
+            json.dumps(
+                {
+                    "validated_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+                    "n_samples": rep.n_samples,
+                    "n_configs": rep.n_configs,
+                    "sha256": sha256(shard),
+                }
+            )
+        )
         return True
     shard.with_suffix(".invalid").write_text("\n".join(rep.errors))
     return False
@@ -62,23 +100,42 @@ def remote_sha256(api, repo_id: str, path_in_repo: str) -> str | None:
     return None
 
 
-def upload_and_verify(shard: pathlib.Path, repo_id: str, path_in_repo: str, push: bool, max_retries: int = 3) -> dict:
+def upload_and_verify(
+    shard: pathlib.Path, repo_id: str, path_in_repo: str, push: bool, max_retries: int = 3
+) -> dict:
     marker = shard.with_suffix(".uploaded")
     if marker.exists():
         return json.loads(marker.read_text())
     local = json.loads(shard.with_suffix(".ok").read_text())["sha256"]
     if not push:
-        return {"dry_run": True, "repo": repo_id, "path": path_in_repo, "sha256": local, "bytes": shard.stat().st_size}
+        return {
+            "dry_run": True,
+            "repo": repo_id,
+            "path": path_in_repo,
+            "sha256": local,
+            "bytes": shard.stat().st_size,
+        }
     from huggingface_hub import HfApi
 
     api = HfApi()
     for attempt in range(1, max_retries + 1):
-        res = api.upload_file(path_or_fileobj=str(shard), path_in_repo=path_in_repo, repo_id=repo_id, repo_type="dataset",
-                              commit_message=f"add {path_in_repo}")
+        res = api.upload_file(
+            path_or_fileobj=str(shard),
+            path_in_repo=path_in_repo,
+            repo_id=repo_id,
+            repo_type="dataset",
+            commit_message=f"add {path_in_repo}",
+        )
         remote = remote_sha256(api, repo_id, path_in_repo)
         if remote == local:
-            rec = {"repo": repo_id, "path": path_in_repo, "sha256": local, "commit": getattr(res, "oid", None),
-                   "uploaded_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "attempt": attempt}
+            rec = {
+                "repo": repo_id,
+                "path": path_in_repo,
+                "sha256": local,
+                "commit": getattr(res, "oid", None),
+                "uploaded_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+                "attempt": attempt,
+            }
             marker.write_text(json.dumps(rec))
             return rec
     raise RuntimeError(f"checksum mismatch after {max_retries} uploads: {shard}")
@@ -91,7 +148,9 @@ def delete_local(shard: pathlib.Path, push: bool) -> bool:
     return True
 
 
-def upload_parts_one_commit(parts: dict[str, pathlib.Path], staging: pathlib.Path, repo_id: str) -> dict[str, dict]:
+def upload_parts_one_commit(
+    parts: dict[str, pathlib.Path], staging: pathlib.Path, repo_id: str
+) -> dict[str, dict]:
     """Upload the task-group files of ONE shard in ONE Hub commit, then verify every file's sha256 on the Hub.
     Returns {group: record}; raises RuntimeError on any mismatch (the caller counts the attempt)."""
     from huggingface_hub import CommitOperationAdd, HfApi
@@ -102,20 +161,37 @@ def upload_parts_one_commit(parts: dict[str, pathlib.Path], staging: pathlib.Pat
         rel = str(part.relative_to(staging))
         rels[grp], shas[grp] = rel, sha256(part)
         ops.append(CommitOperationAdd(path_in_repo=rel, path_or_fileobj=str(part)))
-    res = api.create_commit(repo_id=repo_id, repo_type="dataset", operations=ops,
-                            commit_message=f"add {pathlib.Path(rels[next(iter(rels))]).name} ({len(ops)} task groups)")
+    res = api.create_commit(
+        repo_id=repo_id,
+        repo_type="dataset",
+        operations=ops,
+        commit_message=f"add {pathlib.Path(rels[next(iter(rels))]).name} ({len(ops)} task groups)",
+    )
     out = {}
     for grp, rel in rels.items():
         remote = remote_sha256(api, repo_id, rel)
         if remote != shas[grp]:
             raise RuntimeError(f"checksum mismatch on the Hub for {rel}")
-        out[grp] = {"repo": repo_id, "path": rel, "sha256": shas[grp], "bytes": parts[grp].stat().st_size,
-                    "commit": getattr(res, "oid", None), "uploaded_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}
+        out[grp] = {
+            "repo": repo_id,
+            "path": rel,
+            "sha256": shas[grp],
+            "bytes": parts[grp].stat().st_size,
+            "commit": getattr(res, "oid", None),
+            "uploaded_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+        }
     return out
 
 
-def sync_live(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib.Path, push: bool = True, delete: bool = True,
-              max_failures: int = 2) -> list[dict]:
+def sync_live(
+    build: pathlib.Path,
+    repo_id: str,
+    tier: str,
+    staging: pathlib.Path,
+    push: bool = True,
+    delete: bool = True,
+    max_failures: int = 2,
+) -> list[dict]:
     """v1.0 streaming mode (owner checklist e, revised 2026-09-16): one shard at a time —
     validate (schema) → split into the task-group files in a per-shard temporary staging dir → upload all parts in
     ONE commit → verify each part's sha256 on the Hub → `.uploaded` marker (with bytes) → delete the final shard, the
@@ -127,6 +203,7 @@ def sync_live(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib.Pat
     from ampscape.io.hf_layout import split_shard_by_task_group
 
     out = []
+    expected = expected_samples(build)
     for sh in sorted((build / "shards").glob("shard-*.h5")):
         rec: dict = {"shard": sh.name, "bytes": sh.stat().st_size}
         if sh.with_suffix(".uploaded").exists():
@@ -138,8 +215,8 @@ def sync_live(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib.Pat
             out.append(rec)
             continue
         try:
-            valid = validate(sh)
-        except Exception as e:                       # unreadable / truncated final
+            valid = validate(sh, expected)
+        except Exception as e:  # unreadable / truncated final
             sh.with_suffix(".invalid").write_text(f"unreadable: {e}")
             valid = False
         if not valid:
@@ -148,7 +225,11 @@ def sync_live(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib.Pat
             continue
         tmp = staging / "tmp" / sh.stem
         attempts_f = sh.with_suffix(".upload_attempts")
-        attempts = json.loads(attempts_f.read_text()) if attempts_f.exists() else {"failures": 0, "log": []}
+        attempts = (
+            json.loads(attempts_f.read_text())
+            if attempts_f.exists()
+            else {"failures": 0, "log": []}
+        )
         try:
             shutil.rmtree(tmp, ignore_errors=True)
             tmp.mkdir(parents=True, exist_ok=True)
@@ -159,9 +240,11 @@ def sync_live(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib.Pat
                 out.append(rec)
                 continue
             recs = upload_parts_one_commit(parts, tmp, repo_id)
-        except Exception as e:                       # disk full, network, checksum mismatch, ...
+        except Exception as e:  # disk full, network, checksum mismatch, ...
             attempts["failures"] += 1
-            attempts["log"].append({"at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "error": str(e)[:300]})
+            attempts["log"].append(
+                {"at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "error": str(e)[:300]}
+            )
             attempts_f.write_text(json.dumps(attempts))
             rec["status"] = "upload_error"
             rec["error"] = str(e)[:200]
@@ -172,13 +255,23 @@ def sync_live(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib.Pat
             continue
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
-        sh.with_suffix(".uploaded").write_text(json.dumps({"parts": recs, "bytes_final": sh.stat().st_size,
-                                                           "uploaded_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}))
+        sh.with_suffix(".uploaded").write_text(
+            json.dumps(
+                {
+                    "parts": recs,
+                    "bytes_final": sh.stat().st_size,
+                    "uploaded_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+                }
+            )
+        )
         attempts_f.unlink(missing_ok=True)
         rec["status"] = "uploaded"
         if delete:
             sh.unlink()
-            for f in (build / "inputs" / f"{sh.stem}.inputs.h5", build / "outputs" / f"{sh.stem}.outputs.h5"):
+            for f in (
+                build / "inputs" / f"{sh.stem}.inputs.h5",
+                build / "outputs" / f"{sh.stem}.outputs.h5",
+            ):
                 f.unlink(missing_ok=True)
             rec["status"] = "uploaded+deleted"
         out.append(rec)
@@ -196,10 +289,13 @@ def hub_gb(repo_id: str, prefix: str = "data/") -> float:
     return tot / 1e9
 
 
-def publish_index(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib.Path, push: bool = True) -> dict:
+def publish_index(
+    build: pathlib.Path, repo_id: str, tier: str, staging: pathlib.Path, push: bool = True
+) -> dict:
     """Upload the current per-tier index (from the finalized shards' index rows) and split lists to the Hub."""
-    from ampscape.io.hf_layout import CONFIG_TO_GROUP
     import pandas as pd
+
+    from ampscape.io.hf_layout import CONFIG_TO_GROUP
 
     rows = sorted((build / "index").glob("shard-*.parquet"))
     if not rows:
@@ -207,12 +303,14 @@ def publish_index(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib
     idx = pd.concat([pd.read_parquet(p) for p in rows], ignore_index=True)
     if "split" not in idx and (build / "index.parquet").exists():
         idx = pd.read_parquet(build / "index.parquet")
-    if "split" not in idx:                                   # per-shard finalize rows carry no split: apply the v1.0 rule now
+    if "split" not in idx:  # per-shard finalize rows carry no split: apply the v1.0 rule now
         from ampscape.splits.assign import add_splits
 
         idx = add_splits(idx, build)
     idx["task_group"] = idx.config.map(CONFIG_TO_GROUP)
-    idx["hf_path"] = [f"data/{tier}/{g}/{s}" for g, s in zip(idx.task_group, idx.shard, strict=True)]
+    idx["hf_path"] = [
+        f"data/{tier}/{g}/{s}" for g, s in zip(idx.task_group, idx.shard, strict=True)
+    ]
     # download subsets (plan §5.2, nested): mini = the first 3 shards of S (600 landscapes, all tasks, ≈ 0.4 GB);
     # core = the first SUBSET_CORE_SHARDS[tier] shards of S/M/L; full = everything
     shard_no = idx.shard.str.extract(r"(\d+)")[0].astype(int)
@@ -232,10 +330,20 @@ def publish_index(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib
     if push:
         from huggingface_hub import HfApi
 
-        HfApi().upload_folder(repo_id=repo_id, repo_type="dataset", folder_path=str(staging), allow_patterns=["index/*", "splits/**"],
-                              delete_patterns=[f"splits/*/{tier}_*"] if False else None,
-                              commit_message=f"index/{tier}: {idx.sample_id.nunique()} samples")
-    return {"status": "published" if push else "dry_run", "tier": tier, "samples": int(idx.sample_id.nunique()), "rows": len(idx)}
+        HfApi().upload_folder(
+            repo_id=repo_id,
+            repo_type="dataset",
+            folder_path=str(staging),
+            allow_patterns=["index/*", "splits/**"],
+            delete_patterns=[f"splits/*/{tier}_*"] if False else None,
+            commit_message=f"index/{tier}: {idx.sample_id.nunique()} samples",
+        )
+    return {
+        "status": "published" if push else "dry_run",
+        "tier": tier,
+        "samples": int(idx.sample_id.nunique()),
+        "rows": len(idx),
+    }
 
 
 def scratch_used_gb(root: pathlib.Path) -> float:
@@ -243,14 +351,23 @@ def scratch_used_gb(root: pathlib.Path) -> float:
     import subprocess
 
     try:
-        out = subprocess.run(["du", "-sb", str(root)], capture_output=True, text=True, timeout=600).stdout
+        out = subprocess.run(
+            ["du", "-sb", str(root)], capture_output=True, text=True, timeout=600
+        ).stdout
         return int(out.split()[0]) / 1e9
     except Exception:  # noqa: BLE001
         return 0.0
 
 
-def sync_build(build: pathlib.Path, repo_id: str, tier: str, push: bool = False, delete: bool = False,
-               soft_limit_gb: float = 120.0, hard_limit_gb: float = 150.0) -> list[dict]:
+def sync_build(
+    build: pathlib.Path,
+    repo_id: str,
+    tier: str,
+    push: bool = False,
+    delete: bool = False,
+    soft_limit_gb: float = 120.0,
+    hard_limit_gb: float = 150.0,
+) -> list[dict]:
     """One pass over a build's final shards. Returns per-shard records."""
     shards = sorted((build / "shards").glob("shard-*.h5"))
     used = sum(p.stat().st_size for p in shards) / 1e9
@@ -266,23 +383,47 @@ def sync_build(build: pathlib.Path, repo_id: str, tier: str, push: bool = False,
         if delete and delete_local(sh, push):
             rec["status"] = "uploaded+deleted"
         out.append(rec)
-    out.append({"shard": "_summary", "local_gb": round(used, 2), "soft_limit_gb": soft_limit_gb, "hard_limit_gb": hard_limit_gb,
-                "generation_allowed": used < hard_limit_gb, "warn": used >= soft_limit_gb})
+    out.append(
+        {
+            "shard": "_summary",
+            "local_gb": round(used, 2),
+            "soft_limit_gb": soft_limit_gb,
+            "hard_limit_gb": hard_limit_gb,
+            "generation_allowed": used < hard_limit_gb,
+            "warn": used >= soft_limit_gb,
+        }
+    )
     return out
 
 
 def main(argv=None) -> int:
     import argparse
 
-    ap = argparse.ArgumentParser(description="Validate, upload (gated), verify and delete finished shards")
+    ap = argparse.ArgumentParser(
+        description="Validate, upload (gated), verify and delete finished shards"
+    )
     ap.add_argument("--build", required=True)
     ap.add_argument("--tier", required=True)
     ap.add_argument("--repo", default=f"{os.environ.get('HF_ORG', 'Xirro')}/AmpScape")
-    ap.add_argument("--push", action="store_true", help="actually upload (owner-gated); default dry run")
-    ap.add_argument("--delete", action="store_true", help="delete local shards after verified upload")
-    ap.add_argument("--live", action="store_true", help="v1.0 streaming mode: split by task group, upload, verify, delete (implies --push --delete)")
-    ap.add_argument("--staging", default=None, help="HF-layout staging dir for --live (default <build>/hf)")
-    ap.add_argument("--publish-index", action="store_true", help="also upload the current index/<tier>.parquet and split lists")
+    ap.add_argument(
+        "--push", action="store_true", help="actually upload (owner-gated); default dry run"
+    )
+    ap.add_argument(
+        "--delete", action="store_true", help="delete local shards after verified upload"
+    )
+    ap.add_argument(
+        "--live",
+        action="store_true",
+        help="v1.0 streaming mode: split by task group, upload, verify, delete (implies --push --delete)",
+    )
+    ap.add_argument(
+        "--staging", default=None, help="HF-layout staging dir for --live (default <build>/hf)"
+    )
+    ap.add_argument(
+        "--publish-index",
+        action="store_true",
+        help="also upload the current index/<tier>.parquet and split lists",
+    )
     a = ap.parse_args(argv)
     build = pathlib.Path(a.build)
     if a.live:

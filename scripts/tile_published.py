@@ -3,6 +3,7 @@
 
 python scripts/tile_published.py --out data/tiles/published --max-per-source 30 [--tiers S] [--include-xxl]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -48,16 +49,36 @@ def main() -> None:
             tid = tile_id(src, tier, lat, lon)
             p = out / "tiles" / tier / f"{tid}.tif"
             sha = write_tile(str(p), R, nd, grid, prov)
-            rows.append({"tile_id": tid, "source_id": src.source_id, "tier": tier, "size": R.shape[0], "pixel_m": prov["pixel_size_m"],
-                         "lat": lat, "lon": lon, "epsg": grid.epsg, "path": str(p.relative_to(out)), "sha256": sha,
-                         "provenance": json.dumps(prov), "doi": src.doi, "license": src.license, "r_min": prov["r_min"], "r_max": prov["r_max"],
-                         "nodata_frac": prov["nodata_frac"]})
+            rows.append(
+                {
+                    "tile_id": tid,
+                    "source_id": src.source_id,
+                    "tier": tier,
+                    "size": R.shape[0],
+                    "pixel_m": prov["pixel_size_m"],
+                    "lat": lat,
+                    "lon": lon,
+                    "epsg": grid.epsg,
+                    "path": str(p.relative_to(out)),
+                    "sha256": sha,
+                    "provenance": json.dumps(prov),
+                    "doi": src.doi,
+                    "license": src.license,
+                    "r_min": prov["r_min"],
+                    "r_max": prov["r_max"],
+                    "nodata_frac": prov["nodata_frac"],
+                }
+            )
             n_ok += 1
         print(f"{src.source_id}: native {native} m -> tier {tier}: {n_ok} tiles")
     df = pd.DataFrame(rows)
     out.mkdir(parents=True, exist_ok=True)
     df.to_parquet(out / "published_tiles.parquet", index=False)
-    print(df.groupby(["source_id", "tier"]).agg(n=("tile_id", "size"), r_max=("r_max", "max"), nodata=("nodata_frac", "mean")).to_string())
+    print(
+        df.groupby(["source_id", "tier"])
+        .agg(n=("tile_id", "size"), r_max=("r_max", "max"), nodata=("nodata_frac", "mean"))
+        .to_string()
+    )
 
 
 if __name__ == "__main__":
