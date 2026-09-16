@@ -79,10 +79,11 @@ def plan_v1_real(tier: str, n_tiles: int, tiles_root: str | pathlib.Path, shard_
     return out
 
 
-def plan_v1(tier: str, n: int, tiles_root: str | pathlib.Path, shard_size: int, dataset_id: str = V1_DATASET_ID) -> pd.DataFrame:
+def plan_v1(tier: str, n: int, tiles_root: str | pathlib.Path, shard_size: int, dataset_id: str = V1_DATASET_ID,
+            n_tiles: int | None = None) -> pd.DataFrame:
     from ampscape.solve.manifest import assign_plan_splits, to_frame
 
-    n_syn, n_tiles = split_counts(n)
+    n_syn, n_tiles = split_counts(n) if n_tiles is None else (n - n_tiles * len(V1_TABLES), n_tiles)
     specs = plan_v1_synthetic(tier, n_syn, shard_size, 0, dataset_id)
     shard0 = (len(specs) + shard_size - 1) // shard_size
     specs += plan_v1_real(tier, n_tiles, tiles_root, shard_size, shard0, dataset_id)

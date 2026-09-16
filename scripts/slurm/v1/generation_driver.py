@@ -1,0 +1,270 @@
+#!/usr/bin/env python
+"""Autonomous v1.0 tier driver (owner instruction 2026-09-16): M → L → XL → XXL in waves per the runbook, without
+waiting for the owner; reports at tier boundaries; stops on the stop rule, scratch > 250 GB, or a dead sync supervisor.
+
+Runs detached on the login node (setsid nohup …); idempotent (state in logs/driver_state.json, pid lock); one cycle
+every CYCLE seconds. Everything heavy (plan, prepare, solve, finalize) is a Slurm job; the driver only submits, checks
+markers and starts the per-tier sync supervisor. Alerts are written to logs/ALERT.txt (and the driver exits);
+tier-boundary reports to logs/tier_boundary_<tier>.txt and docs/status/generation_log.md.
+"""
+from __future__ import annotations
+
+import datetime as dt
+import json
+import os
+import pathlib
+import subprocess
+import sys
+import time
+
+ROOT = pathlib.Path("/storage/ice1/1/8/yxiao413/EcoFlowBench")
+os.chdir(ROOT)
+sys.path.insert(0, str(ROOT))
+LOGS = ROOT / "logs"
+STATE = LOGS / "driver_state.json"
+CYCLE = 600
+SCRATCH_ALERT_GB = 250.0
+SCRATCH_SUBMIT_GB = 200.0
+# tier, landscapes, shard size, wave (shards), max concurrent jobs, extra plan args
+TIERS = [("M", 50000, 100, 80, 80, []), ("L", 20000, 20, 100, 100, []), ("XL", 4000, 6, 100, 100, []),
+         ("XXL", 400, 1, 64, 64, ["--n-tiles", "38"])]
+SB = ["sbatch", "--parsable", "-A", "coc", "-q", "coc-ice", "-p", "coc-cpu", "-N1", "-n1"]
+
+
+def now() -> str:
+    return dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
+
+
+def log(msg: str) -> None:
+    with open(LOGS / "driver.log", "a") as f:
+        f.write(f"{now()} {msg}\n")
+
+
+def sh(cmd: list[str], **kw) -> str:
+    return subprocess.run(cmd, capture_output=True, text=True, **kw).stdout.strip()
+
+
+def scratch_gb() -> float:
+    out = sh(["lfs", "quota", "-u", os.environ.get("USER", "yxiao413"), "/storage/ice1"])
+    for line in out.splitlines():
+        if "/storage/ice1" in line:
+            v = line.split()[1].rstrip("*")
+            return float(v) / 1e6 if v.isdigit() else float(v.rstrip("G")) if v.endswith("G") else float(v) / 1e6
+    return 0.0
+
+
+def data_gb() -> float:
+    return int(sh(["du", "-sb", str(ROOT / "data")]).split()[0]) / 1e9
+
+
+def build(tier: str) -> pathlib.Path:
+    return ROOT / "data" / "v1" / tier
+
+
+def counts(tier: str) -> dict:
+    b = build(tier)
+    sh_dir = b / "shards"
+    n_shards = 0
+    if (b / "manifest.parquet").exists():
+        import pandas as pd
+        n_shards = int(pd.read_parquet(b / "manifest.parquet", columns=["shard"]).shard.nunique())
+    return {"shards": n_shards, "inputs": len(list((b / "inputs").glob("*.h5"))) if (b / "inputs").exists() else 0,
+            "outputs": len(list((b / "outputs").glob("*.h5"))) if (b / "outputs").exists() else 0,
+            "finals": len(list(sh_dir.glob("shard-*.h5"))) if sh_dir.exists() else 0,
+            "ok": len(list(sh_dir.glob("shard-*.ok"))) if sh_dir.exists() else 0,
+            "uploaded": len(list(sh_dir.glob("shard-*.uploaded"))) if sh_dir.exists() else 0,
+            "failed": len(list(sh_dir.glob("shard-*.upload_failed"))) if sh_dir.exists() else 0,
+            "invalid": len(list(sh_dir.glob("shard-*.invalid"))) if sh_dir.exists() else 0}
+
+
+def qc_fail_rate(tier: str) -> float:
+    import pandas as pd
+    rows = sorted((build(tier) / "index").glob("shard-*.parquet"))
+    if not rows:
+        return 0.0
+    idx = pd.concat([pd.read_parquet(p, columns=["qc_pass"]) for p in rows], ignore_index=True)
+    return float(1 - idx.qc_pass.mean()) if len(idx) else 0.0
+
+
+def sync_alive(tier: str) -> bool:
+    pf = LOGS / f"sync_{tier}.pid"
+    if not pf.exists():
+        return False
+    try:
+        os.kill(int(pf.read_text().strip()), 0)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def start_sync(tier: str) -> None:
+    subprocess.Popen(["setsid", "nohup", str(ROOT / "scripts/slurm/v1/sync_loop.sh"), f"data/v1/{tier}", tier],
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, start_new_session=True)
+    time.sleep(5)
+
+
+def jobs_named(prefix: str) -> int:
+    out = sh(["squeue", "-u", os.environ.get("USER", "yxiao413"), "-h", "-o", "%j"])
+    return sum(1 for j in out.splitlines() if j.startswith(prefix))
+
+
+def alert(reason: str, state: dict) -> None:
+    (LOGS / "ALERT.txt").write_text(f"{now()} {reason}\n{json.dumps(state, indent=1)}\n")
+    log(f"ALERT: {reason}")
+    raise SystemExit(2)
+
+
+def boundary_report(tier: str, state: dict) -> None:
+    c = counts(tier)
+    rep = sh([sys.executable, "scripts/generation_log.py", "--builds", f"data/v1/{tier}", "--since", "2026-09-15"])
+    t0 = state["tiers"][tier].get("first_upload_at")
+    rate = ""
+    if t0:
+        hours = max((dt.datetime.now(dt.UTC) - dt.datetime.fromisoformat(t0)).total_seconds() / 3600, 0.01)
+        rate = f"{c['uploaded'] / hours:.0f} shards/h"
+    txt = f"TIER {tier} COMPLETE {now()}\n{json.dumps(c)}\nQC fail rate {qc_fail_rate(tier):.3%}\nupload rate {rate}\n{rep}\n"
+    (LOGS / f"tier_boundary_{tier}.txt").write_text(txt)
+    log(f"tier {tier} complete")
+
+
+def load_state() -> dict:
+    return json.loads(STATE.read_text()) if STATE.exists() else {"tiers": {}, "current": None}
+
+
+def save_state(st: dict) -> None:
+    STATE.write_text(json.dumps(st, indent=1))
+
+
+def run_tier(tier: str, n: int, shard_size: int, wave: int, maxc: int, extra: list[str], st: dict) -> bool:
+    """One cycle of work on a tier; returns True when the tier is complete (all shards uploaded)."""
+    ts = st["tiers"].setdefault(tier, {"submitted_upto": -1, "prepared_upto": -1, "prepare_job": None, "started": now()})
+    b = build(tier)
+    if not (b / "manifest.parquet").exists():
+        log(f"{tier}: planning")
+        out = sh([sys.executable, "scripts/plan_v1.py", "--tier", tier, "--n", str(n), "--out", str(b), "--shard-size", str(shard_size),
+                  "--tiles", "data/tiles/v1.0", "--dataset-version", "1.0.0", *extra])
+        log(f"{tier}: {out.splitlines()[0] if out else 'plan failed'}")
+        if not (b / "manifest.parquet").exists():
+            alert(f"{tier}: planning failed", st)
+    c = counts(tier)
+    n_shards = c["shards"]
+    if c["uploaded"] >= n_shards and n_shards > 0:
+        return True
+    # stop rule checks for this tier
+    if c["failed"]:
+        alert(f"{tier}: {c['failed']} shard(s) failed to upload twice", st)
+    if c["ok"] and qc_fail_rate(tier) > 0.01:
+        alert(f"{tier}: QC failure rate {qc_fail_rate(tier):.2%} > 1 %", st)
+    # prepare the next wave (one prepare job at a time, ahead of submission)
+    nxt_lo = ts["prepared_upto"] + 1
+    if nxt_lo < n_shards and ts.get("prepare_job") is None:
+        nxt_hi = min(nxt_lo + wave - 1, n_shards - 1)
+        jid = sh(SB + ["-c1", "--mem=12G", "-t", "06:00:00", "-J", f"prep-{tier}", "-o", f"data/v1/logs/prep_{tier}_%j.out",
+                       "scripts/slurm/v1/prepare_shards.sh", f"data/v1/{tier}", str(nxt_lo), str(nxt_hi)])
+        if jid.isdigit():
+            ts["prepare_job"] = {"id": jid, "lo": nxt_lo, "hi": nxt_hi}
+            log(f"{tier}: prepare {nxt_lo}-{nxt_hi} job {jid}")
+    if ts.get("prepare_job"):
+        pj = ts["prepare_job"]
+        if not sh(["squeue", "-h", "-j", pj["id"]]):
+            have = all((b / "inputs" / f"shard-{s:05d}.inputs.h5").exists() for s in range(pj["lo"], pj["hi"] + 1))
+            if have:
+                ts["prepared_upto"] = pj["hi"]
+                ts["prepare_job"] = None
+                log(f"{tier}: prepared through {pj['hi']}")
+            else:
+                alert(f"{tier}: prepare job {pj['id']} ended without all inputs {pj['lo']}-{pj['hi']}", st)
+    # submit the next wave when the previous wave's backlog is below one wave and scratch allows it
+    sub_lo = ts["submitted_upto"] + 1
+    if sub_lo < n_shards and ts["prepared_upto"] >= sub_lo:
+        sub_hi = min(sub_lo + wave - 1, ts["prepared_upto"], n_shards - 1)
+        backlog = (ts["submitted_upto"] + 1) - c["uploaded"]
+        if backlog < wave and data_gb() < SCRATCH_SUBMIT_GB and jobs_named(f"ampscape-{tier}") == 0:
+            out = sh([sys.executable, "scripts/generate.py", "submit", "--build", f"data/v1/{tier}", "--shards", f"{sub_lo}-{sub_hi}",
+                      "--max-concurrent", str(maxc), "--skip-precompile"])
+            if "Submitted batch job" in out:
+                ts["submitted_upto"] = sub_hi
+                log(f"{tier}: submitted wave {sub_lo}-{sub_hi}: {out.splitlines()[-1]}")
+                if not sync_alive(tier):
+                    start_sync(tier)
+                    log(f"{tier}: sync supervisor started")
+            elif "nothing to submit" in out:
+                ts["submitted_upto"] = sub_hi
+            else:
+                log(f"{tier}: submit refused: {out[-300:]}")
+    # a wave that ended with missing shards (node failures): resubmit once, then alert
+    if ts["submitted_upto"] >= 0 and jobs_named(f"ampscape-{tier}") == 0:
+        missing = [s for s in range(0, ts["submitted_upto"] + 1)
+                   if not any((b / d / f"shard-{s:05d}{suf}").exists() for d, suf in (("shards", ".h5"), ("shards", ".uploaded"), ("outputs", ".outputs.h5")))]
+        if missing:
+            key = tuple(missing)
+            if ts.get("resubmitted") == list(key):
+                alert(f"{tier}: shards {missing[:10]} missing after a resubmission", st)
+            out = sh([sys.executable, "scripts/generate.py", "submit", "--build", f"data/v1/{tier}", "--shards", f"{min(missing)}-{max(missing)}",
+                      "--max-concurrent", str(maxc), "--skip-precompile"])
+            ts["resubmitted"] = list(key)
+            log(f"{tier}: resubmitted missing shards {missing[:10]}…: {out.splitlines()[-1] if out else ''}")
+    if c["uploaded"] and not ts.get("first_upload_at"):
+        ts["first_upload_at"] = now()
+    if ts["submitted_upto"] >= 0 and not sync_alive(tier):
+        alert(f"{tier}: sync supervisor is not running", st)
+    return False
+
+
+def main() -> None:
+    LOGS.mkdir(exist_ok=True)
+    pidf = LOGS / "driver.pid"
+    if pidf.exists():
+        try:
+            os.kill(int(pidf.read_text()), 0)
+            print("driver already running")
+            return
+        except (OSError, ValueError):
+            pass
+    pidf.write_text(str(os.getpid()))
+    log(f"driver started pid {os.getpid()}")
+    try:
+        while True:
+            st = load_state()
+            if (LOGS / "ALERT.txt").exists():
+                log("ALERT present; driver idle")
+                return
+            g = scratch_gb()
+            if g > SCRATCH_ALERT_GB:
+                alert(f"scratch {g:.0f} GB > {SCRATCH_ALERT_GB:.0f} GB", st)
+            # tier S must be fully on the Hub first
+            cs = counts("S")
+            if cs["uploaded"] < cs["shards"]:
+                if cs["failed"]:
+                    alert(f"S: {cs['failed']} shard(s) failed to upload twice", st)
+                if not sync_alive("S"):
+                    alert("S: sync supervisor is not running", st)
+                log(f"S: {cs['uploaded']}/{cs['shards']} uploaded; waiting")
+            else:
+                if "S" not in st["tiers"]:
+                    st["tiers"]["S"] = {"first_upload_at": "2026-09-16T06:52:00+00:00"}
+                    boundary_report("S", st)
+                    save_state(st)
+                for tier, n, ssz, wave, maxc, extra in TIERS:
+                    if st["tiers"].get(tier, {}).get("complete"):
+                        continue
+                    done = run_tier(tier, n, ssz, wave, maxc, extra, st)
+                    save_state(st)
+                    if done:
+                        st["tiers"][tier]["complete"] = now()
+                        boundary_report(tier, st)
+                        save_state(st)
+                        continue
+                    break                     # work on one tier at a time
+                else:
+                    log("all tiers complete")
+                    (LOGS / "tier_boundary_ALL.txt").write_text(f"ALL TIERS COMPLETE {now()}\n")
+                    return
+            save_state(st)
+            time.sleep(CYCLE)
+    finally:
+        pidf.unlink(missing_ok=True)
+
+
+if __name__ == "__main__":
+    main()

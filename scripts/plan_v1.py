@@ -23,14 +23,15 @@ def main():
     ap.add_argument("--dataset-version", default="1.0.0-dev")
     ap.add_argument("--source-config", default="configs/tasks/sources_default.yaml")
     ap.add_argument("--solver-preset", default="configs/solver/circuitscape_reference.yaml")
+    ap.add_argument("--n-tiles", type=int, default=None, help="override the number of real tiles (XXL: all 38 incl. the 6 strict)")
     a = ap.parse_args()
     from ampscape.solve.plan_v1 import V1_DATASET_ID, plan_v1, split_counts
 
     build = pathlib.Path(a.out)
     build.mkdir(parents=True, exist_ok=True)
-    df = plan_v1(a.tier, a.n, str(ROOT / a.tiles), a.shard_size)
+    df = plan_v1(a.tier, a.n, str(ROOT / a.tiles), a.shard_size, n_tiles=a.n_tiles)
     df.to_parquet(build / "manifest.parquet", index=False)
-    n_syn, n_tiles = split_counts(a.n)
+    n_syn, n_tiles = split_counts(a.n) if a.n_tiles is None else (a.n - a.n_tiles * 5, a.n_tiles)
     cfg = {"dataset_id": V1_DATASET_ID, "design": "v1.0-prefix", "tier": a.tier, "n": a.n, "n_synthetic": n_syn, "n_real": n_tiles * 5,
            "n_tiles": n_tiles, "shard_size": a.shard_size, "pilot": a.tiles, "published": None, "source_config": a.source_config,
            "solver_preset": a.solver_preset, "dataset_version": a.dataset_version, "seed0": None}

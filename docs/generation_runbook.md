@@ -63,6 +63,21 @@ finals, sync skips `.uploaded` shards, uploads are verified by checksum before a
 `$AMPSCAPE_SCRATCH/logs/sync.log` (one block per 15-min cycle: finalize, sync records, counts). Stop with
 `kill $(cat $AMPSCAPE_SCRATCH/logs/sync_S.pid)`. Replace `S` by the tier for later tiers (one loop per tier).
 
+### 2.2 Autonomous tier driver (owner instruction 2026-09-16)
+
+```bash
+setsid nohup /storage/ice1/1/8/yxiao413/EcoFlowBench/.venv/bin/python /storage/ice1/1/8/yxiao413/EcoFlowBench/scripts/slurm/v1/generation_driver.py >/dev/null 2>&1 < /dev/null &
+```
+
+`scripts/slurm/v1/generation_driver.py` (detached, pid lock `logs/driver.pid`, state `logs/driver_state.json`, log
+`logs/driver.log`, 10-min cycles) waits until tier S is fully on the Hub, then runs M → L → XL → XXL: plans the tier,
+prepares one wave ahead (Slurm), submits a wave only when the upload backlog is below one wave, `data/` < 200 GB and
+no array of that tier is running, starts the tier's sync supervisor, resubmits missing shards once, and writes
+`logs/tier_boundary_<tier>.txt` + the generation log at every tier boundary. It stops (writing `logs/ALERT.txt` with
+the reason) when the stop rule triggers (QC fail > 1 %, a shard failing upload twice), scratch exceeds 250 GB, a sync
+supervisor exits, planning/prepare fails, or shards are still missing after one resubmission. Restart with the same
+command after removing `logs/ALERT.txt` once the cause is fixed.
+
 ## 3. Resume procedure
 
 Everything is idempotent at the shard level: `prepare` skips shards with inputs, the array skips shards with a
