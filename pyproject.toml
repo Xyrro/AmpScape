@@ -73,6 +73,9 @@ extend-exclude = ["notebooks", "julia_depot", ".venv", "data"]
 select = ["E", "F", "I", "W", "B", "UP"]
 ignore = ["E501"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["ampscape"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
