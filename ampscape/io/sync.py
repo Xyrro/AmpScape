@@ -23,7 +23,8 @@ import pathlib
 
 from ampscape.io.schema import validate_shard
 
-REPO_LAYOUT = "data/{tier}/{task_group}/{name}"   # HF layout: any tier / task group downloadable alone
+REPO_LAYOUT = "data/{tier}/{task_group}/{name}"
+SUBSET_CORE_SHARDS = {"S": 100, "M": 100, "L": 250}       # core ≈ 20k S + 10k M + 5k L landscapes (≈ 50 GB)   # HF layout: any tier / task group downloadable alone
 
 
 def sha256(path: pathlib.Path) -> str:
@@ -206,19 +207,33 @@ def publish_index(build: pathlib.Path, repo_id: str, tier: str, staging: pathlib
     idx = pd.concat([pd.read_parquet(p) for p in rows], ignore_index=True)
     if "split" not in idx and (build / "index.parquet").exists():
         idx = pd.read_parquet(build / "index.parquet")
+    if "split" not in idx:                                   # per-shard finalize rows carry no split: apply the v1.0 rule now
+        from ampscape.splits.assign import add_splits
+
+        idx = add_splits(idx, build)
     idx["task_group"] = idx.config.map(CONFIG_TO_GROUP)
     idx["hf_path"] = [f"data/{tier}/{g}/{s}" for g, s in zip(idx.task_group, idx.shard, strict=True)]
+    # download subsets (plan §5.2, nested): mini = the first 3 shards of S (600 landscapes, all tasks, ≈ 0.4 GB);
+    # core = the first SUBSET_CORE_SHARDS[tier] shards of S/M/L; full = everything
+    shard_no = idx.shard.str.extract(r"(\d+)")[0].astype(int)
+    idx["subset_mini"] = (tier == "S") & (shard_no < 3)
+    idx["subset_core"] = idx["subset_mini"] | (shard_no < SUBSET_CORE_SHARDS.get(tier, 0))
+    idx["subset_full"] = True
     (staging / "index").mkdir(parents=True, exist_ok=True)
     idx.to_parquet(staging / "index" / f"{tier}.parquet", index=False)
-    if "split" in idx:
-        d = staging / "splits" / "full"
+    for sub in ("mini", "core", "full"):
+        part = idx[idx[f"subset_{sub}"]]
+        if not len(part):
+            continue
+        d = staging / "splits" / sub
         d.mkdir(parents=True, exist_ok=True)
-        for split, g in idx.groupby("split"):
+        for split, g in part.groupby("split"):
             g[["sample_id"]].drop_duplicates().to_parquet(d / f"{split}.parquet", index=False)
     if push:
         from huggingface_hub import HfApi
 
         HfApi().upload_folder(repo_id=repo_id, repo_type="dataset", folder_path=str(staging), allow_patterns=["index/*", "splits/**"],
+                              delete_patterns=[f"splits/*/{tier}_*"] if False else None,
                               commit_message=f"index/{tier}: {idx.sample_id.nunique()} samples")
     return {"status": "published" if push else "dry_run", "tier": tier, "samples": int(idx.sample_id.nunique()), "rows": len(idx)}
 
