@@ -177,9 +177,13 @@ def prepare_shard(
                 d.attrs["channels"] = ",".join(CHANNELS)
             gc_all = g.create_group("configs")
             src_meta = {}
+            skipped = []
             for cname in wanted:
                 s = samples.get(cname)
                 if s is None:
+                    skipped.append(
+                        cname
+                    )  # undefined on this landscape (empty strip / degenerate ground / no patches)
                     continue
                 gc = gc_all.create_group(cname)
                 gc.attrs["kind"] = s.kind
@@ -209,6 +213,8 @@ def prepare_shard(
                 src_meta[cname] = {"focal_table": s.focal_table, "meta": s.meta}
             meta.update(
                 {
+                    "planned_configs": wanted,
+                    "skipped_configs": skipped,
                     "sample_id": spec.sample_id,
                     "dataset_id": spec.dataset_id,
                     "family": spec.family,

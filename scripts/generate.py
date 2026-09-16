@@ -331,6 +331,16 @@ def cmd_finalize(a) -> None:
         p = shard_paths(build, sh)
         if p["final"].with_suffix(".uploaded").exists() and not a.force:
             continue  # streamed to the Hub; intermediates deleted (sync_live)
+        done_marker = pathlib.Path(
+            str(p["outputs"]) + ".done"
+        )  # written LAST by the solver (owner requirement)
+        if (
+            p["outputs"].exists()
+            and not done_marker.exists()
+            and not getattr(a, "legacy_no_marker", False)
+        ):
+            print(f"shard {sh}: no solver completion marker ({done_marker.name}) — not finalizing")
+            continue
         if (
             p["outputs"].exists() and not a.force
         ):  # never finalize a shard whose solver is still adding samples
@@ -358,6 +368,15 @@ def cmd_finalize(a) -> None:
         from ampscape.io.sync import validate as validate_and_mark
 
         valid = validate_and_mark(p["final"])
+        if valid:  # full integrity: planned sample ids and configurations
+            from ampscape.io.sync import integrity_check, planned_configs
+
+            errs = integrity_check(p["final"], planned_configs(build).get(p["final"].stem, {}))
+            if errs:
+                p["final"].with_suffix(".ok").unlink(missing_ok=True)
+                p["final"].with_suffix(".invalid").write_text("\n".join(errs))
+                print(f"shard {sh}: INVALID — {errs[0][:160]}")
+                valid = False
         if valid:  # sample count must match the manifest (truncation guard)
             import h5py
 
@@ -484,6 +503,11 @@ def main() -> None:
                 "--keep-raw",
                 action="store_true",
                 help="keep the per-shard inputs/outputs after a validated finalize",
+            )
+            q.add_argument(
+                "--legacy-no-marker",
+                action="store_true",
+                help="finalize shards solved before the solver wrote completion markers (tier S array 5834442 only)",
             )
         q.set_defaults(func=fn)
     s = sub.add_parser("solve")

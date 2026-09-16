@@ -54,7 +54,49 @@ def expected_samples(build: pathlib.Path) -> dict[str, int]:
     return {f"shard-{int(k):05d}": int(v) for k, v in m.groupby("shard").size().items()}
 
 
-def validate(shard: pathlib.Path, expected: dict[str, int] | None = None) -> bool:
+def planned_configs(build: pathlib.Path) -> dict[str, dict[str, set[str]]]:
+    """shard name -> {sample_id: set(planned configs)} from the manifest."""
+    mp = build / "manifest.parquet"
+    if not mp.exists():
+        return {}
+    import pandas as pd
+
+    m = pd.read_parquet(mp, columns=["shard", "sample_id", "configs"])
+    out: dict[str, dict[str, set[str]]] = {}
+    for r in m.itertuples():
+        out.setdefault(f"shard-{int(r.shard):05d}", {})[r.sample_id] = set(json.loads(r.configs))
+    return out
+
+
+def integrity_check(final_h5: pathlib.Path, planned: dict[str, set[str]]) -> list[str]:
+    """Owner requirement (2026-09-16): a shard is complete only if its sample ids are exactly the planned set and every
+    sample holds every planned configuration except those prepare recorded as undefined (`skipped_configs`)."""
+    import h5py
+
+    errors: list[str] = []
+    with h5py.File(final_h5, "r") as f:
+        ids = set(f.keys())
+        if ids != set(planned):
+            errors.append(
+                f"sample ids differ from the plan: {len(ids - set(planned))} unexpected, {len(set(planned) - ids)} missing"
+            )
+        for sid in sorted(ids & set(planned)):
+            meta = json.loads(f[sid].attrs["meta"])
+            skipped = set(meta.get("skipped_configs", []))
+            present = set(f[sid]["configs"].keys())
+            want = planned[sid] - skipped
+            if present != want:
+                errors.append(
+                    f"{sid}: configs present {sorted(present)} != planned {sorted(want)} (skipped {sorted(skipped)})"
+                )
+    return errors
+
+
+def validate(
+    shard: pathlib.Path,
+    expected: dict[str, int] | None = None,
+    planned: dict[str, dict[str, set[str]]] | None = None,
+) -> bool:
     """Schema validation plus (2026-09-16) the sample count of the manifest: a shard truncated by a full disk can be
     schema-valid with fewer samples (tier S shard 104 reached the Hub with 5 of 200)."""
     ok = shard.with_suffix(".ok")
@@ -74,6 +116,11 @@ def validate(shard: pathlib.Path, expected: dict[str, int] | None = None) -> boo
             f"sample count {rep.n_samples} != manifest {expected[shard.stem]}"
         )
         return False
+    if rep.ok and planned and shard.stem in planned:
+        errs = integrity_check(shard, planned[shard.stem])
+        if errs:
+            shard.with_suffix(".invalid").write_text("\n".join(errs))
+            return False
     if rep.ok:
         ok.write_text(
             json.dumps(
@@ -204,6 +251,7 @@ def sync_live(
 
     out = []
     expected = expected_samples(build)
+    planned = planned_configs(build)
     for sh in sorted((build / "shards").glob("shard-*.h5")):
         rec: dict = {"shard": sh.name, "bytes": sh.stat().st_size}
         if sh.with_suffix(".uploaded").exists():
@@ -215,7 +263,7 @@ def sync_live(
             out.append(rec)
             continue
         try:
-            valid = validate(sh, expected)
+            valid = validate(sh, expected, planned)
         except Exception as e:  # unreadable / truncated final
             sh.with_suffix(".invalid").write_text(f"unreadable: {e}")
             valid = False

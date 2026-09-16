@@ -743,7 +743,20 @@ function solve_shard(inputs_h5::AbstractString, outputs_h5::AbstractString; solv
             @info @sprintf("solved %d samples (%d skipped) in %.1f s", n_done, n_skip, time() - t_start)
         end
     end
+    # completion marker (owner requirement 2026-09-16): written LAST, after both files are closed, and only when every
+    # sample of the inputs file has a complete outputs group; finalize refuses shards without it
+    all_ids = String[]
+    hin = h5open(inputs_h5, "r"); all_ids = collect(keys(hin["samples"])); close(hin)
     close(fin); close(fout)
+    hout = h5open(outputs_h5, "r")
+    complete = all(haskey(hout["samples"], sid) && haskey(attrs(hout["samples"][sid]), "complete") for sid in all_ids)
+    close(hout)
+    if complete && only === nothing && configs === nothing && max_samples == typemax(Int)
+        open(outputs_h5 * ".done", "w") do io
+            JSON.print(io, Dict("n_samples" => length(all_ids), "finished_utc" => Dates.format(Dates.now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS"),
+                                "inputs_h5" => inputs_h5, "outputs_h5" => outputs_h5))
+        end
+    end
     @info @sprintf("shard done: %d solved, %d skipped, %.1f s", n_done, n_skip, time() - t_start)
     return (solved = n_done, skipped = n_skip, seconds = time() - t_start)
 end
