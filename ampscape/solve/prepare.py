@@ -232,3 +232,32 @@ def prepare_shard(
             g.attrs["meta"] = json.dumps(meta, default=float)
             n += 1
     return n
+
+
+def derive_skipped_configs(meta: dict, planned: set[str], tiles_root: str | None) -> set[str]:
+    """Planned configurations that are undefined on this landscape, re-derived exactly as prepare would (regenerating
+    the landscape and its sources from the seed / tile). Used for samples prepared before `skipped_configs` was
+    recorded in the meta (tier S), by the integrity check and the tier audit."""
+    from ampscape.solve.manifest import SampleSpec
+    from ampscape.sources import SourceConfig
+
+    gp = meta.get("generator_params") or {}
+    spec = SampleSpec(
+        sample_id=meta["sample_id"],
+        dataset_id=meta.get("dataset_id", ""),
+        family=meta["family"],
+        tier=meta["tier"],
+        size=int(meta["H"]),
+        pixel_m=float(meta.get("pixel_size_m", 0.0)),
+        seed=int(meta["seed"]),
+        configs=json.dumps(sorted(planned)),
+        tile_id=meta.get("tile_id"),
+        table_id=meta.get("resistance_table_id"),
+        extra=json.dumps({"design": "v1"} if gp.get("design") == "v1.0" else {}),
+    )
+    R, nd, lc, _cov, _m = load_landscape(spec, tiles_root)
+    cfg = SourceConfig.from_yaml(
+        str(pathlib.Path(__file__).resolve().parents[2] / "configs/tasks/sources_default.yaml")
+    ).for_tier(meta["tier"])
+    got = set(generate_all(R, nd, cfg, spec.seed, landcover=lc))
+    return set(planned) - got

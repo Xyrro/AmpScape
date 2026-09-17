@@ -135,6 +135,46 @@ def alert(reason: str, state: dict) -> None:
     raise SystemExit(2)
 
 
+def audit_clean(tier: str, st: dict) -> bool:
+    """True when <build>/audit_<tier>.json exists, is newer than the last upload marker, and reports no discrepancy.
+    Otherwise submits the audit job (once) and returns False; a dirty audit raises an alert (repair, never drop)."""
+    b = build(tier)
+    aj = b / f"audit_{tier}.json"
+    marks = list((b / "shards").glob("shard-*.uploaded"))
+    latest_upload = max((m.stat().st_mtime for m in marks), default=0.0)
+    if aj.exists() and aj.stat().st_mtime > latest_upload:
+        d = json.loads(aj.read_text())
+        if d.get("n_bad", 1) == 0 and d.get("n_shards") == counts(tier)["shards"]:
+            return True
+        alert(
+            f"{tier}: audit found {d.get('n_bad')} shard(s) with discrepancies — repair required",
+            st,
+        )
+    ts = st["tiers"].setdefault(tier, {})
+    job = ts.get("audit_job")
+    if job and sh(["squeue", "-h", "-j", job]):
+        return False  # audit running
+    jid = sh(
+        SB
+        + [
+            "-c4",
+            "--mem=24G",
+            "-t",
+            "12:00:00",
+            "-J",
+            f"audit-{tier}",
+            "-o",
+            f"data/v1/logs/audit_{tier}_%j.out",
+            "--wrap",
+            f"source scripts/env.sh; python scripts/audit_tier.py --build data/v1/{tier} --tier {tier} --workers 4",
+        ]
+    )
+    if jid.isdigit():
+        ts["audit_job"] = jid
+        log(f"{tier}: audit job {jid} submitted")
+    return False
+
+
 def boundary_report(tier: str, state: dict) -> None:
     c = counts(tier)
     rep = sh(
@@ -202,7 +242,7 @@ def run_tier(
     c = counts(tier)
     n_shards = c["shards"]
     if c["uploaded"] >= n_shards and n_shards > 0:
-        return True
+        return audit_clean(tier, st)  # complete only when the full Hub-vs-plan audit passes
     # stop rule checks for this tier
     if c["failed"]:
         alert(f"{tier}: {c['failed']} shard(s) failed to upload twice", st)
@@ -344,7 +384,7 @@ def main() -> None:
                 alert(f"scratch {g:.0f} GB > {SCRATCH_ALERT_GB:.0f} GB", st)
             # tier S must be fully on the Hub first
             cs = counts("S")
-            if cs["uploaded"] < cs["shards"]:
+            if cs["uploaded"] < cs["shards"] or not audit_clean("S", st):
                 if cs["failed"]:
                     alert(f"S: {cs['failed']} shard(s) failed to upload twice", st)
                 if not sync_alive("S"):

@@ -371,7 +371,9 @@ def cmd_finalize(a) -> None:
         if valid:  # full integrity: planned sample ids and configurations
             from ampscape.io.sync import integrity_check, planned_configs
 
-            errs = integrity_check(p["final"], planned_configs(build).get(p["final"].stem, {}))
+            errs = integrity_check(
+                p["final"], planned_configs(build).get(p["final"].stem, {}), cfg.get("pilot")
+            )
             if errs:
                 p["final"].with_suffix(".ok").unlink(missing_ok=True)
                 p["final"].with_suffix(".invalid").write_text("\n".join(errs))

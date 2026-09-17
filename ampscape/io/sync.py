@@ -54,6 +54,11 @@ def expected_samples(build: pathlib.Path) -> dict[str, int]:
     return {f"shard-{int(k):05d}": int(v) for k, v in m.groupby("shard").size().items()}
 
 
+def tiles_root_of(build: pathlib.Path) -> str | None:
+    bj = build / "build.json"
+    return json.loads(bj.read_text()).get("pilot") if bj.exists() else None
+
+
 def planned_configs(build: pathlib.Path) -> dict[str, dict[str, set[str]]]:
     """shard name -> {sample_id: set(planned configs)} from the manifest."""
     mp = build / "manifest.parquet"
@@ -68,7 +73,9 @@ def planned_configs(build: pathlib.Path) -> dict[str, dict[str, set[str]]]:
     return out
 
 
-def integrity_check(final_h5: pathlib.Path, planned: dict[str, set[str]]) -> list[str]:
+def integrity_check(
+    final_h5: pathlib.Path, planned: dict[str, set[str]], tiles_root: str | None = None
+) -> list[str]:
     """Owner requirement (2026-09-16): a shard is complete only if its sample ids are exactly the planned set and every
     sample holds every planned configuration except those prepare recorded as undefined (`skipped_configs`)."""
     import h5py
@@ -82,8 +89,17 @@ def integrity_check(final_h5: pathlib.Path, planned: dict[str, set[str]]) -> lis
             )
         for sid in sorted(ids & set(planned)):
             meta = json.loads(f[sid].attrs["meta"])
-            skipped = set(meta.get("skipped_configs", []))
             present = set(f[sid]["configs"].keys())
+            if "skipped_configs" in meta:
+                skipped = set(meta["skipped_configs"])
+            elif (
+                planned[sid] - present
+            ):  # legacy meta: re-derive which planned configurations are undefined
+                from ampscape.solve.prepare import derive_skipped_configs
+
+                skipped = derive_skipped_configs(meta, planned[sid], tiles_root)
+            else:
+                skipped = set()
             want = planned[sid] - skipped
             if present != want:
                 errors.append(
@@ -117,7 +133,7 @@ def validate(
         )
         return False
     if rep.ok and planned and shard.stem in planned:
-        errs = integrity_check(shard, planned[shard.stem])
+        errs = integrity_check(shard, planned[shard.stem], tiles_root_of(shard.parents[1]))
         if errs:
             shard.with_suffix(".invalid").write_text("\n".join(errs))
             return False

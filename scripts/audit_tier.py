@@ -43,27 +43,13 @@ def hub_files(repo: str, tier: str) -> dict[str, dict]:
     return out
 
 
-def undefined_by_regeneration(meta: dict, planned: set[str], present: set[str]) -> set[str]:
-    """Legacy samples (no `skipped_configs`): regenerate the sources and return the planned configs that are undefined."""
-    if meta["family"] != "synthetic":
-        return set()  # real: would need the tile stack; reported as a discrepancy instead
-    from ampscape.landscapes.synthetic import sample_landscape, sample_landscape_v1
-    from ampscape.sources import SourceConfig
-    from ampscape.sources.generators import generate_all
+def undefined_by_regeneration(
+    meta: dict, planned: set[str], present: set[str], tiles_root: str | None
+) -> set[str]:
+    """Legacy samples (no `skipped_configs`): re-derive the undefined planned configurations exactly as prepare would."""
+    from ampscape.solve.prepare import derive_skipped_configs
 
-    gp = meta.get("generator_params") or {}
-    fn = sample_landscape_v1 if gp.get("design") == "v1.0" else sample_landscape
-    ls = fn(int(meta["seed"]), (int(meta["H"]), int(meta["W"])))
-    cfg = SourceConfig.from_yaml(str(ROOT / "configs/tasks/sources_default.yaml")).for_tier(
-        meta["tier"]
-    )
-    lc = None
-    if "patch_mosaic" in gp and "regions" in planned:
-        import numpy as np
-
-        lc = np.where((ls.resistance <= 1.0) & ~ls.nodata_mask, 10, 0).astype(np.int16)
-    got = set(generate_all(ls.resistance, ls.nodata_mask, cfg, int(meta["seed"]), landcover=lc))
-    return planned - got
+    return derive_skipped_configs(meta, planned, tiles_root)
 
 
 def audit_shard(
@@ -155,12 +141,13 @@ def main():
         lo, hi = (int(x) for x in a.shards.split("-"))
         shards = [s for s in shards if lo <= s <= hi]
     hub = hub_files(a.repo, a.tier)
+    tiles_root = json.loads((build / "build.json").read_text()).get("pilot")
     from joblib import Parallel, delayed
 
     def one(sh):
         tmp = pathlib.Path(tempfile.mkdtemp(prefix=f"audit_{sh}_", dir=str(build)))
         try:
-            return audit_shard(sh, a.tier, build, plan, hub, a.repo, tmp)
+            return audit_shard(sh, a.tier, build, plan, hub, a.repo, tmp, tiles_root)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
