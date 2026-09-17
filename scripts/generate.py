@@ -282,6 +282,34 @@ def cmd_submit(a) -> None:
     todo = [
         s for s in todo if not shard_paths(build, s)["final"].with_suffix(".uploaded").exists()
     ]  # streamed already
+    # never queue a shard that already has a pending/running array task for this build (2026-09-16: a double
+    # submission made two tasks write the same outputs file and corrupted 19 tier-S shards)
+    q = subprocess.run(
+        ["squeue", "-u", os.environ.get("USER", ""), "-h", "-o", "%j|%K"],
+        capture_output=True,
+        text=True,
+    ).stdout
+    active: set[int] = set()
+    for line in q.splitlines():
+        name, _, tid = line.partition("|")
+        tid = tid.strip()
+        if name != f"ampscape-{build.name}":
+            continue
+        if tid.isdigit():
+            active.add(int(tid))
+        else:  # pending array expression such as "[3-9,12%20]"
+            for part in tid.strip("[]").split("%")[0].split(","):
+                if "-" in part:
+                    lo, hi = part.split("-")
+                    if lo.isdigit() and hi.isdigit():
+                        active.update(range(int(lo), int(hi) + 1))
+                elif part.isdigit():
+                    active.add(int(part))
+    if active and any(s in active for s in todo):
+        print(
+            f"skipping {sum(s in active for s in todo)} shard(s) that already have a pending/running task"
+        )
+        todo = [s for s in todo if s not in active]
     if not todo:
         print("nothing to submit")
         return
