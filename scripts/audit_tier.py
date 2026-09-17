@@ -60,6 +60,7 @@ def audit_shard(
     hub: dict,
     repo: str,
     tmp: pathlib.Path,
+    tiles_root: str | None,
 ) -> dict:
     from huggingface_hub import hf_hub_download
 
