@@ -104,7 +104,7 @@ the QC failure rate of any tier exceeds 1 % or any shard fails to upload twice (
 
 ## 5. Scratch budget and submission waves (revised 2026-09-16 after the tier-S quota incident)
 
-Measured on tier S: a finalized shard of 200 landscapes is ≈ 130 MB; its raw intermediates are ≈ 245 MB (inputs
+Measured on tier S (final numbers): a finalized shard of 200 landscapes is 130–250 MB (mean ≈ 250 MB incl. K ≤ 4 pair maps; the five task-group files on the Hub sum to 1.14× the final because each carries the sample inputs), tier S occupies 142 GB on the Hub; its raw intermediates are ≈ 245 MB (inputs
 37 MB + outputs 208 MB) and exist from `prepare` until the finalize inside the array task deletes them; the
 validated final exists until the sync loop has verified it on the Hub (one commit per shard, five task-group files;
 measured throughput ≈ 25–30 shards/h ≈ 3.5 GB/h for S). Scratch is 300 GB; the fixed footprint (sources 19 GB,

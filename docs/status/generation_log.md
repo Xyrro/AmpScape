@@ -49,3 +49,11 @@ finalize with the solver completion marker). Fix: `generate.py submit` now skips
 pending or running array task for the build. Also in this window: the first integrity check flagged 53 complete
 shards as invalid because their meta predated `skipped_configs`; the check now re-derives undefined configurations
 exactly (regenerating sources), and the published index carries `skipped_configs` with reasons per sample.
+## 2026-09-17T08:48+00:00
+
+| tier | shards | solved | finalized | uploaded | upload failed | invalid | QC fail | GB on Hub | GB local |
+|---|---|---|---|---|---|---|---|---|---|
+| S | 500 | 500 | 500 | 500 | 0 | 0 | 0.000% | 142.2 | 0.0 |
+
+Core-hours used since 2026-09-15 (ampscape-* jobs): **2061**. Stop rule: not triggered.
+
