@@ -19,11 +19,13 @@ import pathlib
 import shutil
 import sys
 import tempfile
+import threading
 
 import h5py
 import pandas as pd
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+REGEN_LOCK = threading.Lock()
 sys.path.insert(0, str(ROOT))
 from ampscape.io.hf_layout import CONFIG_TO_GROUP  # noqa: E402
 
@@ -49,7 +51,10 @@ def undefined_by_regeneration(
     """Legacy samples (no `skipped_configs`): re-derive the undefined planned configurations exactly as prepare would."""
     from ampscape.solve.prepare import derive_skipped_configs
 
-    return derive_skipped_configs(meta, planned, tiles_root)
+    # the synthetic generators drive NLMpy through NumPy's *global* RNG (seeded_global_rng), which is not thread-safe:
+    # serialise regenerations across the audit's download threads or two samples corrupt each other's landscapes
+    with REGEN_LOCK:
+        return derive_skipped_configs(meta, planned, tiles_root)
 
 
 def audit_shard(
@@ -109,7 +114,9 @@ def audit_shard(
         else:
             missing = planned[sid] - present[sid]
             skipped = (
-                undefined_by_regeneration(meta, planned[sid], present[sid]) if missing else set()
+                undefined_by_regeneration(meta, planned[sid], present[sid], tiles_root)
+                if missing
+                else set()
             )
             n_regen += bool(missing)
         want = planned[sid] - skipped
