@@ -57,3 +57,19 @@ exactly (regenerating sources), and the published index carries `skipped_configs
 
 Core-hours used since 2026-09-15 (ampscape-* jobs): **2061**. Stop rule: not triggered.
 
+## 2026-09-17T10:16+00:00
+
+| tier | shards | solved | finalized | uploaded | upload failed | invalid | QC fail | GB on Hub | GB local |
+|---|---|---|---|---|---|---|---|---|---|
+| S | 500 | 500 | 500 | 500 | 0 | 0 | 0.000% | 142.2 | 0.0 |
+
+Core-hours used since 2026-09-15 (ampscape-* jobs): **2061**. Stop rule: not triggered.
+
+## 2026-09-17T10:17+00:00
+
+| tier | shards | solved | finalized | uploaded | upload failed | invalid | QC fail | GB on Hub | GB local |
+|---|---|---|---|---|---|---|---|---|---|
+| S | 500 | 500 | 500 | 500 | 0 | 0 | 0.000% | 142.2 | 0.0 |
+
+Core-hours used since 2026-09-15 (ampscape-* jobs): **2061**. Stop rule: not triggered.
+
