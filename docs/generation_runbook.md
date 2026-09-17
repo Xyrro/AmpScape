@@ -117,7 +117,7 @@ use **≤ 200 GB** in flight:
 | tier | landscapes / shard | final / shard | intermediates / shard | max shards in flight (110 GB) | wave size | shards per tier |
 |---|---|---|---|---|---|---|
 | S | 200 | 0.13 GB | 0.25 GB | ≈ 290 (all raw) → 400 if raw is deleted at finalize | **200** | 500 |
-| M | 100 | 0.36 GB | 0.7 GB | ≈ 100 | **80** | 500 |
+| M | 100 | 0.30 GB (measured, median) | 0.7 GB | ≈ 100 | **80** | 500 |
 | L | 20 | 0.26 GB | 0.5 GB | ≈ 140 | **100** | 1 000 |
 | XL | 6 | 0.30 GB | 0.6 GB | ≈ 120 | **100** | 667 |
 | XXL | 1 | 0.17 GB | 0.35 GB | ≈ 200 | **64** | 400 |

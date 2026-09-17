@@ -258,7 +258,12 @@ def run_tier(
         alert(f"{tier}: QC failure rate {qc_fail_rate(tier):.2%} > 1 %", st)
     # prepare the next wave (one prepare job at a time, ahead of submission)
     nxt_lo = ts["prepared_upto"] + 1
-    if nxt_lo < n_shards and ts.get("prepare_job") is None:
+    # prepare at most ONE wave beyond the last submitted wave (inputs are scratch; L/XL inputs are large)
+    if (
+        nxt_lo < n_shards
+        and ts.get("prepare_job") is None
+        and nxt_lo <= ts["submitted_upto"] + wave + 1
+    ):
         nxt_hi = min(nxt_lo + wave - 1, n_shards - 1)
         jid = sh(
             SB
