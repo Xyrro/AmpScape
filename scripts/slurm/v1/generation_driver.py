@@ -216,29 +216,37 @@ def run_tier(
     )
     b = build(tier)
     if not (b / "manifest.parquet").exists():
-        log(f"{tier}: planning")
-        out = sh(
-            [
-                sys.executable,
-                "scripts/plan_v1.py",
-                "--tier",
-                tier,
-                "--n",
-                str(n),
-                "--out",
-                str(b),
-                "--shard-size",
-                str(shard_size),
-                "--tiles",
-                "data/tiles/v1.0",
-                "--dataset-version",
-                "1.0.0",
-                *extra,
+        # planning is a 20–40 min single-core job (tens of thousands of landscapes are sampled): run it under Slurm,
+        # not on the shared login node, and come back next cycle
+        pj = ts.get("plan_job")
+        if pj and sh(["squeue", "-h", "-j", pj]):
+            return False
+        if pj and not (b / "manifest.parquet").exists():
+            alert(f"{tier}: planning job {pj} ended without a manifest", st)
+        b.mkdir(parents=True, exist_ok=True)
+        cmd = (
+            f"source scripts/env.sh; python scripts/plan_v1.py --tier {tier} --n {n} --out {b} --shard-size {shard_size} "
+            f"--tiles data/tiles/v1.0 --dataset-version 1.0.0 {' '.join(extra)}"
+        )
+        jid = sh(
+            SB
+            + [
+                "-c1",
+                "--mem=16G",
+                "-t",
+                "04:00:00",
+                "-J",
+                f"plan-{tier}",
+                "-o",
+                f"data/v1/logs/plan_{tier}_%j.out",
+                "--wrap",
+                cmd,
             ]
         )
-        log(f"{tier}: {out.splitlines()[0] if out else 'plan failed'}")
-        if not (b / "manifest.parquet").exists():
-            alert(f"{tier}: planning failed", st)
+        if jid.isdigit():
+            ts["plan_job"] = jid
+            log(f"{tier}: planning job {jid} submitted")
+        return False
     c = counts(tier)
     n_shards = c["shards"]
     if c["uploaded"] >= n_shards and n_shards > 0:
