@@ -78,6 +78,9 @@ the reason) when the stop rule triggers (QC fail > 1 %, a shard failing upload t
 supervisor exits, planning/prepare fails, or shards are still missing after one resubmission. Restart with the same
 command after removing `logs/ALERT.txt` once the cause is fixed.
 
+**Never submit the same shard twice**: `generate.py submit` skips shards with a pending/running task for the build; do not
+bypass it with hand-written `sbatch` calls (incident (c), 2026-09-16).
+
 ## 3. Resume procedure
 
 Everything is idempotent at the shard level: `prepare` skips shards with inputs, the array skips shards with a

@@ -38,3 +38,14 @@ count) and were uploaded; their raw outputs were then deleted by the quota recov
 shard until all manifest samples are solved, validation and finalize compare the sample count with the manifest,
 and the 73 shards are re-prepared, re-solved (≈ 220 core-hours), re-finalized and re-uploaded (the Hub files are
 overwritten in place; the index is re-published).
+
+## Incident 2026-09-16 (c) — double submission of the tier-S repair
+
+The repair solve of the 72 short shards was submitted twice (the first submission's output was hidden by a log filter
+and the driver-independent `submit` did not check the queue), so two array tasks solved the same shards concurrently:
+50 tasks failed on opening a locked outputs file, 19 shards ended with corrupted outputs (both tasks writing the same
+HDF5 file). Repair: corrupt outputs deleted, the 19 shards re-prepared and re-solved alone (6 h walltime, in-task
+finalize with the solver completion marker). Fix: `generate.py submit` now skips any shard that already has a
+pending or running array task for the build. Also in this window: the first integrity check flagged 53 complete
+shards as invalid because their meta predated `skipped_configs`; the check now re-derives undefined configurations
+exactly (regenerating sources), and the published index carries `skipped_configs` with reasons per sample.
