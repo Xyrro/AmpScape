@@ -371,6 +371,36 @@ def publish_index(
         from ampscape.splits.assign import add_splits
 
         idx = add_splits(idx, build)
+    # per-sample skipped configurations with reasons (owner requirement 2026-09-16): rows written before the field existed
+    # get it from the plan minus the configurations present, with the kind's documented reason (legitimate absences only —
+    # the tier audit guarantees that every other planned configuration is present)
+    from ampscape.solve.prepare import skip_reason
+
+    planned = planned_configs(build)
+    present = idx.groupby("sample_id").config.apply(set).to_dict()
+    u = idx.drop_duplicates("sample_id").set_index("sample_id")
+    shard_of = u.shard.str.replace(".h5", "", regex=False).to_dict()
+    has_lc = (
+        (u.family == "real")
+        | (u.get("generator", pd.Series(index=u.index, dtype=object)) == "mosaic")
+    ).to_dict()
+
+    def legacy_col(sid: str) -> str:
+        want = planned.get(shard_of.get(sid, ""), {}).get(sid, set())
+        return "; ".join(
+            f"{c} ({skip_reason(c, bool(has_lc.get(sid)))})"
+            for c in sorted(want - present.get(sid, set()))
+        )
+
+    if "skipped_configs" not in idx:
+        idx["skipped_configs"] = ""
+    idx["skipped_configs"] = idx["skipped_configs"].fillna("")
+    need = idx.skipped_configs.eq("") & idx.sample_id.map(
+        lambda sid: bool(
+            planned.get(shard_of.get(sid, ""), {}).get(sid, set()) - present.get(sid, set())
+        )
+    )
+    idx.loc[need, "skipped_configs"] = idx.loc[need, "sample_id"].map(legacy_col)
     idx["task_group"] = idx.config.map(CONFIG_TO_GROUP)
     idx["hf_path"] = [
         f"data/{tier}/{g}/{s}" for g, s in zip(idx.task_group, idx.shard, strict=True)

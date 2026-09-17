@@ -34,6 +34,17 @@ KIND_TASK = {
 GZIP = {"compression": "gzip", "compression_opts": 4, "shuffle": True}
 
 
+def skipped_column(meta: dict) -> str:
+    """Index column: 'config (task: reason); ...' for planned configurations undefined on this landscape ('' if none)."""
+    sk = meta.get("skipped_configs") or []
+    reasons = meta.get("skipped_reasons") or {}
+    if not sk:
+        return ""
+    from ampscape.solve.prepare import skip_reason
+
+    return "; ".join(f"{c} ({reasons.get(c) or skip_reason(c, True)})" for c in sk)
+
+
 def git_tag() -> str:
     """Exact tag on HEAD (e.g. v1.0-pipeline), else AMPSCAPE_PIPELINE_TAG, else ""."""
     import os
@@ -189,6 +200,7 @@ def finalize_shard(
                         "qc_flags": ",".join(q["qc_flags"]),
                         "qc_pass": ok_all,
                         "qc_trainval": ok_trainval,
+                        "skipped_configs": skipped_column(meta),
                         "shard": pathlib.Path(final_h5).name,
                         "dataset_version": dataset_version,
                         "pipeline_git_sha": sha,
@@ -298,6 +310,7 @@ def index_rows_from_final(final_h5: str, shard_name: str | None = None) -> pd.Da
                         "qc_flags": ",".join(q["qc_flags"]),
                         "qc_pass": ok_all,
                         "qc_trainval": ok_trainval,
+                        "skipped_configs": skipped_column(meta),
                         "shard": shard,
                         "dataset_version": dv,
                         "pipeline_git_sha": sha,

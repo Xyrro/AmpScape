@@ -62,6 +62,14 @@ realm (Australasia) is held out. Other OOD sets: held-out resistance table (`for
 contrast (10⁶), held-out scale (XL/XXL for models trained ≤ L), and a synthetic→real flag. **Pilot caveat:** the mini's 50 real tiles over-represent the held-out regions
 (20 of 50) because the Phase 2 pilot sampled those strata for coverage; this is not a v1.0 property.
 
+## Absent configurations are labelled, not missing
+
+Some planned source configurations are undefined on a given landscape — a wall-to-wall strip that is entirely NoData,
+a real tile without two habitat patches for the focal-region task, a degenerate source/ground draw. Such samples keep
+their other configurations, and the index column `skipped_configs` (and the sample meta) lists each absent
+configuration with its task and reason, e.g. `regions (T1R: no eligible habitat patches …)`. Every other planned
+configuration is present: the per-tier audit against the plan enforces it before a tier is declared complete.
+
 ## Reproducibility
 
 Generation note: during the tier-S run the scratch disk filled and 149 S shards had to be re-finalized from their

@@ -215,6 +215,7 @@ def prepare_shard(
                 {
                     "planned_configs": wanted,
                     "skipped_configs": skipped,
+                    "skipped_reasons": {c: skip_reason(c, lc is not None) for c in skipped},
                     "sample_id": spec.sample_id,
                     "dataset_id": spec.dataset_id,
                     "family": spec.family,
@@ -232,6 +233,36 @@ def prepare_shard(
             g.attrs["meta"] = json.dumps(meta, default=float)
             n += 1
     return n
+
+
+SKIP_REASONS = {
+    "regions": (
+        "T1R",
+        "no eligible habitat patches (fewer than 2 patches of >= min_patch_px habitat pixels on the largest component)",
+    ),
+    "wall_to_wall_NS": (
+        "T1W",
+        "north/south edge strip has no valid pixel on the largest component (NoData)",
+    ),
+    "wall_to_wall_EW": (
+        "T1W",
+        "east/west edge strip has no valid pixel on the largest component (NoData)",
+    ),
+    "advanced": (
+        "T3",
+        "degenerate source/ground configuration (no ground or no source on the largest component)",
+    ),
+    "points": ("T1", "fewer than 2 placeable focal nodes"),
+    "omniscape": ("T4", "no source pixel"),
+}
+
+
+def skip_reason(cname: str, has_landcover: bool) -> str:
+    """Human-readable reason for a planned configuration being undefined on a landscape (index column)."""
+    task, why = SKIP_REASONS.get(cname, ("?", "undefined"))
+    if cname == "regions" and not has_landcover:
+        why = "no habitat information (synthetic landscape without a patch mosaic)"
+    return f"{task}: {why}"
 
 
 def derive_skipped_configs(meta: dict, planned: set[str], tiles_root: str | None) -> set[str]:
