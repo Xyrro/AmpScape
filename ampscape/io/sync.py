@@ -380,16 +380,13 @@ def publish_index(
     present = idx.groupby("sample_id").config.apply(set).to_dict()
     u = idx.drop_duplicates("sample_id").set_index("sample_id")
     shard_of = u.shard.str.replace(".h5", "", regex=False).to_dict()
-    has_lc = (
-        (u.family == "real")
-        | (u.get("generator", pd.Series(index=u.index, dtype=object)) == "mosaic")
-    ).to_dict()
 
+    # `regions` is only planned where habitat information exists (real tiles; synthetic patch mosaics), so an
+    # absent planned `regions` always means "no eligible habitat patches"
     def legacy_col(sid: str) -> str:
         want = planned.get(shard_of.get(sid, ""), {}).get(sid, set())
         return "; ".join(
-            f"{c} ({skip_reason(c, bool(has_lc.get(sid)))})"
-            for c in sorted(want - present.get(sid, set()))
+            f"{c} ({skip_reason(c, True)})" for c in sorted(want - present.get(sid, set()))
         )
 
     if "skipped_configs" not in idx:
