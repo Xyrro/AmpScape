@@ -62,3 +62,14 @@ Omniscape solves one window per block centre (a block of block_size² source pix
 targets at block > 1 are the *block-centred* Omniscape map, with `correct_artifacts` smoothing block seams. Cost per
 map ∝ (source pixels) / block². This approximation is part of the method definition recorded per sample; it is not a
 data defect, but it bounds the fidelity a learned model can meaningfully be measured against — hence WP1 item 4.
+
+## Owner decision (2026-09-18) — evaluation surface for T4 at M and L
+
+Production targets stay as they are. The block-1 reference subsets (`aux/t4_bs1_reference/<tier>/`, index keyed by
+`sample_id`, with `rel_l2`, `ns_rel_l2`, `top5_iou`, `pinch_recall`, `max_diff_over_max` of the production target against
+block 1, solve times, and `tail_gt5pct` = rel-L2 > 0.05) are the **official T4 evaluation surface at M and L**: leaderboard
+T4 metrics at those tiers are computed against the exact block-1 map on the reference subset
+(`scripts/evaluate.py --t4-reference aux/t4_bs1_reference/<tier>`), with the same metrics against the block-centred
+production target reported as secondary (`bc_*`). Sizes: M ≈ 1 000 samples over test_id and every OOD split (synthetic
+and real), L 45–60 as a sanity set. S needs no reference (block 1 in production). XL/XXL T4 metrics are against the
+production targets only, with the M/L measurements as the stated fidelity bound.

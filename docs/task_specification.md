@@ -246,7 +246,7 @@ constraints in `docs/compute_env.md` (300 GB scratch quota).
 | T1 / T1W | MAE in log10(C + ε·max C) space (ε = 1e-6), relative L2 | top-q% IoU, pinch-point recall, Spearman, conservation residual; SSIM/PSNR secondary |
 | T2 | relative error of Reff (pairs), Spearman over pairs | log-MAE, nearest-neighbour rank agreement |
 | T3 | log10-ε MAE of current; MAE of voltage | conservation + Kirchhoff residuals; **solver acceleration** (CG iterations from predicted voltage vs zero) |
-| T4 | log10-ε MAE of cum_current and normalized | top-q% IoU, corridor Dice; SSIM/PSNR secondary |
+| T4 | log10-ε MAE of cum_current and normalized. **At M and L: computed against the exact block-1 Omniscape map on the official reference subsets (`aux/t4_bs1_reference/<tier>`, ≈ 1 000 M / 45–60 L samples over test_id and every OOD split); metrics against the block-centred production target are secondary (`bc_*`).** At S the production target is exact; at XL/XXL only the production target exists (fidelity bound in `docs/t4_fidelity.md`) | top-q% IoU, corridor Dice, non-source rel-L2; SSIM/PSNR secondary |
 | all | inference time vs `solve_time_s` → speed-up; metric vs size on `test_ood_scale` | |
 | T1, T3 (acceleration track) | CG iterations and wall time to reach the reference residual when warm-started from the predicted voltage map vs from zero (`SolveStats.cg_baseline`), on `test_id` and every OOD split | |
 
