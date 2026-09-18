@@ -62,6 +62,12 @@ realm (Australasia) is held out. Other OOD sets: held-out resistance table (`for
 contrast (10⁶), held-out scale (XL/XXL for models trained ≤ L), and a synthetic→real flag. **Pilot caveat:** the mini's 50 real tiles over-represent the held-out regions
 (20 of 50) because the Phase 2 pilot sampled those strata for coverage; this is not a v1.0 property.
 
+## Scale split caveat
+
+Pixel size, raster size and (for T4) the physical window radius co-vary across tiers (only S → M changes the raster
+alone), so `test_ood_scale` measures combined scale transfer; a controlled probe set separating the axes is planned
+(`docs/addendum_WP5_report.md`).
+
 ## Absent configurations are labelled, not missing
 
 Some planned source configurations are undefined on a given landscape — a wall-to-wall strip that is entirely NoData,
