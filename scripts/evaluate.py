@@ -25,6 +25,11 @@ def main() -> None:
         action="store_true",
         help="run the Julia warm-start evaluation on predicted voltages",
     )
+    ap.add_argument(
+        "--t4-reference",
+        default=None,
+        help="aux block-1 reference build (docs/t4_fidelity.md): T4 primary metrics against exact targets, production as bc_*",
+    )
     a = ap.parse_args()
     splits = a.split.split(",")
     out = a.out or str(pathlib.Path(a.predictions) / f"eval_{'+'.join(splits)}")
