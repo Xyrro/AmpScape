@@ -31,25 +31,50 @@ sys.path.insert(0, str(ROOT))
 
 
 def cmd_select(a):
+    """Stratified, deterministic selection: quotas per (split, stratum) where stratum = family for test_id/ood_region and
+    the hold-out kind for test_ood (contrast 10^6 vs forest_bird table); restricted to samples whose production shard is
+    validated and uploaded; re-running tops up quotas as more shards become available (existing picks are kept)."""
     build = pathlib.Path(a.build)
     man = pd.read_parquet(build / "manifest.parquet")
     up = {int(p.stem.split("-")[1]) for p in (build / "shards").glob("shard-*.uploaded")}
-    avail = man[man.shard.isin(up) & man.configs.str.contains("omniscape")]
+    avail = man[man.shard.isin(up) & man.configs.str.contains("omniscape")].copy()
+    avail["stratum"] = np.where(
+        avail.split == "test_ood",
+        np.where(
+            avail.contrast.fillna(0) >= 1e6,
+            "contrast1e6",
+            np.where(avail.table_id == "forest_bird", "forest_bird", "other"),
+        ),
+        avail.family,
+    )
+    quotas = {}
+    for item in a.quota.split(","):
+        key, n = item.split("=")
+        quotas[tuple(key.split(":"))] = int(n)
     out = pathlib.Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     prev = (
         pd.read_parquet(out / "selection.parquet") if (out / "selection.parquet").exists() else None
     )
+    if prev is not None and "stratum" not in prev:
+        prev["stratum"] = np.where(
+            prev.split == "test_ood",
+            np.where(prev.contrast.fillna(0) >= 1e6, "contrast1e6", "forest_bird"),
+            prev.family,
+        )
     rows = []
-    for split in a.splits.split(","):
-        have = prev[prev.split == split] if prev is not None else None
-        n_have = 0 if have is None else len(have)
-        cand = avail[avail.split == split]
+    for (split, stratum), n in quotas.items():
+        n_have = (
+            0 if prev is None else int(((prev.split == split) & (prev.stratum == stratum)).sum())
+        )
+        cand = avail[(avail.split == split) & (avail.stratum == stratum)]
         if prev is not None:
             cand = cand[~cand.sample_id.isin(prev.sample_id)]
-        take = cand.sort_values(["shard", "sample_id"]).head(max(0, a.n_per_split - n_have))
+        take = cand.sort_values(["shard", "sample_id"]).head(max(0, n - n_have))
         rows.append(take)
-        print(f"{split}: {n_have} already, {len(take)} added ({len(cand)} available)")
+        print(
+            f"{split}/{stratum}: quota {n}, {n_have} already, {len(take)} added ({len(cand)} available now)"
+        )
     sel = pd.concat(([prev] if prev is not None else []) + rows, ignore_index=True)
     sel.to_parquet(out / "selection.parquet", index=False)
     print(f"selection: {len(sel)} samples ->", out / "selection.parquet")
@@ -90,6 +115,8 @@ def cmd_prepare(a):
     (out / "build.json").write_text(json.dumps(cfg, indent=1))
     scfg = SourceConfig.from_yaml(ROOT / cfg["source_config"])
     for sh in sorted(sel.shard.unique()):
+        if (out / "outputs" / f"shard-{sh:05d}.outputs.h5").exists():
+            continue  # already solved (top-up run)
         specs = from_frame(sel[sel.shard == sh])
         p = out / "inputs" / f"shard-{sh:05d}.inputs.h5"
         prepare_shard(specs, str(p), scfg, pilot_root=str(ROOT / cfg["pilot"]), overwrite=True)
@@ -124,6 +151,99 @@ def _production_maps(
                 int(sp.get("radius", 0)),
             )
     return out
+
+
+def _aux_maps(build: pathlib.Path) -> dict[str, tuple[np.ndarray, float]]:
+    out = {}
+    for o in sorted((build / "outputs").glob("shard-*.outputs.h5")):
+        with h5py.File(o, "r") as f:
+            for sid in f["samples"]:
+                g = f["samples"][sid]
+                if "outputs" in g and "omniscape" in g["outputs"]:
+                    st = json.loads(g["outputs"]["omniscape"].attrs["stats"])
+                    out[sid] = (g["outputs"]["omniscape"]["cum_current"][...], float(st["wall_s"]))
+    return out
+
+
+def _inputs_for(build: pathlib.Path, sel: pd.DataFrame, sid: str) -> tuple[np.ndarray, np.ndarray]:
+    sh = int(sel[sel.sample_id == sid].shard.iloc[0])
+    with h5py.File(build / "inputs" / f"shard-{sh:05d}.inputs.h5", "r") as fi:
+        g = fi["samples"][sid]
+        return g["inputs"]["nodata_mask"][...] > 0, g["configs"]["omniscape"]["source_strength"][
+            ...
+        ]
+
+
+def cmd_compare_ref(a):
+    """WP2: score one aux block-size build against the block-1 reference build (truth); writes <out>/vs_bs1.{parquet,md}."""
+    from ampscape.metrics import domain, nonsource, pixel
+
+    out, ref = pathlib.Path(a.out), pathlib.Path(a.reference)
+    sel = pd.read_parquet(out / "manifest.parquet")
+    cfg = json.loads((out / "build.json").read_text())
+    ref_sel = pd.read_parquet(ref / "manifest.parquet")
+    truth = _aux_maps(ref)
+    maps = _aux_maps(out)
+    rows = []
+    for sid in sel.sample_id:
+        if sid not in maps or sid not in truth:
+            continue
+        nd, S = _inputs_for(ref, ref_sel, sid)
+        m = ~nd
+        t, tt = truth[sid]
+        pmap, tp = maps[sid]
+        pix = pixel.all_pixel(pmap, t, m)
+        dom = domain.all_domain(pmap, t, m)
+        ns = nonsource.all_nonsource(
+            pmap, t, nonsource.nonsource_mask("omniscape", m, source_strength=S), m
+        )
+        r = sel[sel.sample_id == sid].iloc[0]
+        rows.append(
+            {
+                "sample_id": sid,
+                "split": r.split,
+                "family": r.family,
+                "contrast": r.contrast,
+                "block": cfg["aux"]["block_size"],
+                "correct_artifacts": cfg["aux"]["correct_artifacts"],
+                "solve_s": tp,
+                "bs1_solve_s": tt,
+                "rel_l2": pix["rel_l2"],
+                "mae_log10eps": pix["mae_log10eps"],
+                "top5_iou": dom["top5_iou"],
+                "top10_iou": dom["top10_iou"],
+                "pinch_recall": dom["pinch_recall"],
+                "spearman": dom["spearman"],
+                "ns_rel_l2": ns["ns_rel_l2"],
+                "ns_top5_iou": ns["ns_top5_iou"],
+            }
+        )
+    df = pd.DataFrame(rows)
+    df.to_parquet(out / "vs_bs1.parquet", index=False)
+    keys = [
+        "rel_l2",
+        "mae_log10eps",
+        "top5_iou",
+        "top10_iou",
+        "pinch_recall",
+        "spearman",
+        "ns_rel_l2",
+        "ns_top5_iou",
+    ]
+    lines = [
+        f"# {out.name} (block {cfg['aux']['block_size']}, correct_artifacts={cfg['aux']['correct_artifacts']}) vs block-1 reference — {len(df)} samples",
+        "",
+        "| split | n | " + " | ".join(keys) + " | solve s (median) | bs1 s (median) |",
+        "|---|---|" + "---|" * len(keys) + "---|---|",
+    ]
+    for split, g in df.groupby("split"):
+        lines.append(
+            f"| {split} | {len(g)} | "
+            + " | ".join(f"{g[k].mean():.4f}" for k in keys)
+            + f" | {g.solve_s.median():.0f} | {g.bs1_solve_s.median():.0f} |"
+        )
+    (out / "vs_bs1.md").write_text("\n".join(lines) + "\n")
+    print("\n".join(lines))
 
 
 def cmd_compare(a):
@@ -273,8 +393,11 @@ def main():
     s.add_argument("--tier", required=True)
     s.add_argument("--build", required=True)
     s.add_argument("--out", required=True)
-    s.add_argument("--n-per-split", type=int, default=100)
-    s.add_argument("--splits", default="test_id,test_ood,ood_region")
+    s.add_argument(
+        "--quota",
+        default="test_id:synthetic=200,test_id:real=200,test_ood:contrast1e6=150,test_ood:forest_bird=150,ood_region:real=300",
+        help="comma list of split:stratum=n (stratum = family, or contrast1e6 / forest_bird for test_ood)",
+    )
     s.set_defaults(fn=cmd_select)
     p = sub.add_parser("prepare")
     p.add_argument("--out", required=True)
@@ -283,6 +406,10 @@ def main():
     p.add_argument("--correct-artifacts", type=int, default=1)
     p.add_argument("--shard-size", type=int, default=12)
     p.set_defaults(fn=cmd_prepare)
+    cr = sub.add_parser("compare-ref")
+    cr.add_argument("--out", required=True)
+    cr.add_argument("--reference", required=True)
+    cr.set_defaults(fn=cmd_compare_ref)
     c = sub.add_parser("compare")
     c.add_argument("--out", required=True)
     c.add_argument("--tier", required=True)

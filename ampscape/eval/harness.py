@@ -48,8 +48,31 @@ def _mask(nodata: np.ndarray, focal: np.ndarray | None, kind: str) -> np.ndarray
     return m
 
 
+def load_t4_reference(ref_dir: str | pathlib.Path | None) -> dict[str, np.ndarray]:
+    """{sample_id: block-1 cum_current} from an aux block-1 reference build (docs/t4_fidelity.md); {} if None."""
+    if not ref_dir:
+        return {}
+    import h5py
+
+    out: dict[str, np.ndarray] = {}
+    for o in sorted((pathlib.Path(ref_dir) / "outputs").glob("shard-*.outputs.h5")):
+        with h5py.File(o, "r") as f:
+            for sid in f["samples"]:
+                g = f["samples"][sid]
+                if "outputs" in g and "omniscape" in g["outputs"]:
+                    out[sid] = g["outputs"]["omniscape"]["cum_current"][...]
+    return out
+
+
 def evaluate_sample(
-    kind: str, gs: h5py.Group, gc: h5py.Group, gp: h5py.Group, R: np.ndarray, nd: np.ndarray
+    kind: str,
+    gs: h5py.Group,
+    gc: h5py.Group,
+    gp: h5py.Group,
+    R: np.ndarray,
+    nd: np.ndarray,
+    t4_reference: dict | None = None,
+    sid: str | None = None,
 ) -> dict:
     out: dict = {}
     o = gc["outputs"]
@@ -58,6 +81,15 @@ def evaluate_sample(
     if kind in ("points", "wall_to_wall", "regions"):
         if "cum_current" in gp:
             p, t = gp["cum_current"][...], o["cum_current"][...]
+            if kind == "omniscape" and t4_reference and sid in t4_reference:
+                # official T4 surface at M/L (owner decision 2026-09-18): primary metrics against the exact block-1 map,
+                # the block-centred production target becomes the secondary `bc_*` set
+                t_bc, t = t, t4_reference[sid]
+                for k, v in pixel.all_pixel(p, t_bc, m).items():
+                    out[f"bc_{k}"] = v
+                for k, v in domain.all_domain(p, t_bc, m).items():
+                    out[f"bc_{k}"] = v
+                out["t4_target"] = "block1_reference"
             out.update(pixel.all_pixel(p, t, m))
             out.update(domain.all_domain(p, t, m))
             out.update(
@@ -146,6 +178,7 @@ def evaluate(
     subset: str | None = None,
     out_dir: str | pathlib.Path | None = None,
     acceleration: bool = False,
+    t4_reference: str | pathlib.Path | None = None,
 ) -> dict:
     pred_dir = pathlib.Path(pred_dir)
     meta = (
@@ -154,6 +187,7 @@ def evaluate(
         else {}
     )
     idx = _load_index(pathlib.Path(root), tier)
+    t4_ref = load_t4_reference(t4_reference)
     splits = [split] if isinstance(split, str) else list(split)
     idx = idx[idx.split.isin(splits) & idx.qc_pass]
     if subset and f"subset_{subset}" in idx:
@@ -168,7 +202,16 @@ def evaluate(
                 gc = gs["configs"][r.config]
                 R = gs["inputs"]["resistance"][...]
                 nd = gs["inputs"]["nodata_mask"][...]
-                m = evaluate_sample(r.kind, gs, gc, fp[r.sample_id][r.config], R, nd)
+                m = evaluate_sample(
+                    r.kind,
+                    gs,
+                    gc,
+                    fp[r.sample_id][r.config],
+                    R,
+                    nd,
+                    t4_reference=t4_ref,
+                    sid=r.sample_id,
+                )
             m.update(
                 {
                     "sample_id": r.sample_id,
@@ -257,6 +300,10 @@ PRIMARY = [
     "normalized_mae_log10eps",
 ]
 SECONDARY = [
+    "bc_mae_log10eps",
+    "bc_rel_l2",
+    "bc_top5_iou",
+    "bc_pinch_recall",
     "ns_top1_iou",
     "ns_top10_iou",
     "ns_fraction",

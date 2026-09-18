@@ -28,7 +28,16 @@ def main() -> None:
     a = ap.parse_args()
     splits = a.split.split(",")
     out = a.out or str(pathlib.Path(a.predictions) / f"eval_{'+'.join(splits)}")
-    r = evaluate(a.predictions, splits, a.root, a.tier, a.subset, out, acceleration=a.acceleration)
+    r = evaluate(
+        a.predictions,
+        splits,
+        a.root,
+        a.tier,
+        a.subset,
+        out,
+        acceleration=a.acceleration,
+        t4_reference=a.t4_reference,
+    )
     print(f"{r['n_rows']} rows -> {out}/results.json, results.md")
     for task, agg in r["per_task"].items():
         keys = [

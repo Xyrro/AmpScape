@@ -40,6 +40,9 @@ predictions file are skipped (the row count is reported), so any subset can be e
   source and ground pixels plus the halo — because currents are singular at injection pixels and dominate the plain pixel
   metrics; `ns_fraction` = share of evaluable pixels kept. Masks come from the stored inputs (`focal_mask`,
   `source_strength`, `ground`), available for every task.
+- **T4 at M and L** (owner decision 2026-09-18): with `--t4-reference aux/t4_bs1_reference/<tier>` the primary T4 metrics of
+  samples in the reference subset are computed against the exact block-1 Omniscape map; the same metrics against the
+  block-centred production target are reported as `bc_*` (secondary); `t4_target` per sample records which target was used.
 - **Efficiency**: `speedup` = solver wall time / inference time per configuration; median and geometric mean.
 - **Solver acceleration** (`--acceleration`, needs `voltage`): AMG-PCG iterations and wall time to
   rtol 1e-6 from the predicted voltage vs from zero, computed in Julia with the same preconditioner and
