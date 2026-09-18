@@ -39,6 +39,24 @@ anchors, **not itself a measurement**, and the max-difference metric already sho
 extrapolation into a measurement on a reference subset with block 1 (M, L) and adds top-q IoU, pinch-point recall,
 log-MAE and the non-source rel-L2 (WP3); WP2 adds the block-size Pareto rows. Results: `docs/addendum_WP1_report.md`.
 
+## Measured (WP1, 2026-09-18): production M block 3 vs block 1, 200 synthetic test/OOD landscapes
+
+| metric on cum_current (valid pixels) | test_id (n = 100) mean / median / max | test_ood (n = 100, contrast 10⁶ dominated) mean / median / max |
+|---|---|---|
+| relative L2 | **0.031** / 0.028 / 0.254 | 0.031 / 0.024 / 0.247 |
+| non-source relative L2 (WP3) | 0.040 / 0.034 / 0.155 | 0.054 / 0.041 / 0.366 |
+| log10-ε MAE | 0.012 / 0.011 / 0.029 | 0.012 / 0.010 / 0.079 |
+| top-1 % / top-5 % / top-10 % IoU | 0.911 / 0.945 / 0.956 | 0.933 / 0.959 / 0.969 |
+| pinch-point recall | 0.953 | 0.958 |
+| max \|Δ\| / max | 0.090 / 0.087 / 0.399 | 0.073 / 0.057 / 0.521 |
+| Spearman | 0.998 | 0.998 |
+| solve time (median) | 108 s vs 704 s (block 1 is 6.7× more) | 103 s vs 667 s |
+
+So the ≈ 1 % extrapolation was optimistic: the production M block deviates from the exact map by **3.1 % relative L2 on
+average (median 2.8 %)**, 4–5 % on non-source pixels, with a tail (9 % of landscapes above 5 %, 2 % above 10 %,
+worst 25 %) concentrated on `random_cluster` landscapes at contrast ≥ 10⁴; the domain quantities are much more stable
+(top-5 % IoU 0.95, pinch-point recall 0.95). L (block 5) and the real-tile / ood_region parts are pending (see the report).
+
 ## How `block_size` enters the target
 Omniscape solves one window per block centre (a block of block_size² source pixels is treated as one source), so
 targets at block > 1 are the *block-centred* Omniscape map, with `correct_artifacts` smoothing block seams. Cost per
