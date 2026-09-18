@@ -4,7 +4,7 @@
 profile_id: ice
 scheduler: slurm
 account: coc                 # sbatch --account (null = scheduler default)
-qos: null                    # sbatch --qos
+qos: coc-ice                 # sbatch --qos (required since 2026-09-18: submissions without it are rejected)
 scratch_root: /storage/ice1/1/8/yxiao413/EcoFlowBench     # AMPSCAPE_SCRATCH; repo lives here
 node_tmp: /tmp               # node-local scratch used for Circuitscape ASCII grids
 modules:                     # `module load` before anything else (empty list = nothing to load)
