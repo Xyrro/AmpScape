@@ -35,6 +35,11 @@ predictions file are skipped (the row count is reported), so any subset can be e
   predictions), `phys_focal_current_err` (per-pair maps only: current at a unit source/ground pixel vs 1 A;
   for T1W the cumulative map is the pair map),
   `phys_neg_fraction` / `phys_neg_min_over_max` (non-negativity), `phys_throughput_err` (proxy).
+- **Non-source-pixel metrics** (review addendum WP3): `ns_rel_l2`, `ns_mae_log10eps`, `ns_top1/5/10_iou` restricted to
+  the matrix pixels — T4: source strength = 0; T1/T1W/T1R: outside the focal pixels plus a 2-px Chebyshev halo; T3: outside
+  source and ground pixels plus the halo — because currents are singular at injection pixels and dominate the plain pixel
+  metrics; `ns_fraction` = share of evaluable pixels kept. Masks come from the stored inputs (`focal_mask`,
+  `source_strength`, `ground`), available for every task.
 - **Efficiency**: `speedup` = solver wall time / inference time per configuration; median and geometric mean.
 - **Solver acceleration** (`--acceleration`, needs `voltage`): AMG-PCG iterations and wall time to
   rtol 1e-6 from the predicted voltage vs from zero, computed in Julia with the same preconditioner and

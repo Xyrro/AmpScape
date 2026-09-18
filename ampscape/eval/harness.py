@@ -30,7 +30,7 @@ import numpy as np
 import pandas as pd
 
 from ampscape.data.dataset import _load_index
-from ampscape.metrics import domain, efficiency, physics, pixel, reff
+from ampscape.metrics import domain, efficiency, nonsource, physics, pixel, reff
 
 KIND_TASK = {
     "points": "T1",
@@ -60,6 +60,9 @@ def evaluate_sample(
             p, t = gp["cum_current"][...], o["cum_current"][...]
             out.update(pixel.all_pixel(p, t, m))
             out.update(domain.all_domain(p, t, m))
+            out.update(
+                nonsource.all_nonsource(p, t, nonsource.nonsource_mask(kind, m, focal=focal), m)
+            )
             out.update({f"phys_{k}": v for k, v in physics.nonnegativity(p, m).items()})
             out["phys_throughput_err"] = physics.throughput_error(p, t, m)
             if (
@@ -98,6 +101,19 @@ def evaluate_sample(
             p, t = gp["current"][...], o["current"][...]
             out.update(pixel.all_pixel(p, t, m))
             out.update(domain.all_domain(p, t, m))
+            out.update(
+                nonsource.all_nonsource(
+                    p,
+                    t,
+                    nonsource.nonsource_mask(
+                        kind,
+                        m,
+                        source_strength=gc["inputs"]["source_strength"][...],
+                        ground=gc["inputs"]["ground"][...] if "ground" in gc["inputs"] else None,
+                    ),
+                    m,
+                )
+            )
             out.update({f"phys_{k}": v for k, v in physics.nonnegativity(p, m).items()})
             out["phys_throughput_err"] = physics.throughput_error(p, t, m)
         if "voltage" in gp:
@@ -224,6 +240,9 @@ def evaluate(
 
 PRIMARY = [
     "mae_log10eps",
+    "ns_rel_l2",
+    "ns_mae_log10eps",
+    "ns_top5_iou",
     "rel_l2",
     "top5_iou",
     "pinch_recall",
@@ -238,6 +257,9 @@ PRIMARY = [
     "normalized_mae_log10eps",
 ]
 SECONDARY = [
+    "ns_top1_iou",
+    "ns_top10_iou",
+    "ns_fraction",
     "ssim",
     "psnr_db",
     "mse",
