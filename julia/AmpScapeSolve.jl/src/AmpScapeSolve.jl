@@ -724,7 +724,8 @@ function solve_shard(inputs_h5::AbstractString, outputs_h5::AbstractString; solv
                     S = h5_hw(gc, "source_strength")
                     radius = Int(attrs(gin)["omni_radius"]); bs = Int(attrs(gin)["omni_block_size"])
                     thr = haskey(attrs(gc), "source_threshold") ? Float64(attrs(gc)["source_threshold"]) : 0.0
-                    res = solve_omniscape(R, nodata, S; radius, block_size = bs, solver = omniscape_solver, source_threshold = thr, workdir = wd)
+                    ca = haskey(attrs(gin), "omni_correct_artifacts") ? Int(attrs(gin)["omni_correct_artifacts"]) != 0 : true   # aux block-size studies
+                    res = solve_omniscape(R, nodata, S; radius, block_size = bs, solver = omniscape_solver, source_threshold = thr, workdir = wd, correct_artifacts = ca)
                     h5_hw!(og, "cum_current", res.cum_current)
                     h5_hw!(og, "flow_potential", res.flow_potential)
                     h5_hw!(og, "normalized", res.normalized)
