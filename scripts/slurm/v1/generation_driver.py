@@ -256,6 +256,45 @@ def run_tier(
         alert(f"{tier}: {c['failed']} shard(s) failed to upload twice", st)
     if c["ok"] and qc_fail_rate(tier) > 0.01:
         alert(f"{tier}: QC failure rate {qc_fail_rate(tier):.2%} > 1 %", st)
+    if c["invalid"]:
+        alert(
+            f"{tier}: {c['invalid']} shard(s) marked .invalid — repair required (never dropped)", st
+        )
+    # shards solved (completion marker) but never finalized (a finalize step that died): run finalize for them
+    stale = [
+        o
+        for o in (b / "outputs").glob("shard-*.outputs.h5.done")
+        if not (b / "shards" / (o.name.split(".")[0] + ".h5")).exists()
+        and not (b / "shards" / (o.name.split(".")[0] + ".uploaded")).exists()
+    ]
+    if (
+        stale
+        and not ts.get("refinalize_job")
+        or (
+            ts.get("refinalize_job")
+            and not sh(["squeue", "-h", "-j", ts["refinalize_job"]])
+            and stale
+        )
+    ):
+        ids = " ".join(o.name.split(".")[0].split("-")[1].lstrip("0") or "0" for o in stale[:50])
+        jid = sh(
+            SB
+            + [
+                "-c1",
+                "--mem=8G",
+                "-t",
+                "04:00:00",
+                "-J",
+                f"refin-{tier}",
+                "-o",
+                f"data/v1/logs/refin_{tier}_%j.out",
+                "--wrap",
+                f"source scripts/env.sh; for s in {ids}; do python scripts/generate.py finalize --build data/v1/{tier} --shard $s --quicklooks 2>&1 | grep -v Warning | tail -1; done",
+            ]
+        )
+        if jid.isdigit():
+            ts["refinalize_job"] = jid
+            log(f"{tier}: re-finalize job {jid} for {len(stale)} solved-but-unfinalized shard(s)")
     # prepare the next wave (one prepare job at a time, ahead of submission)
     nxt_lo = ts["prepared_upto"] + 1
     # prepare at most ONE wave beyond the last submitted wave (inputs are scratch; L/XL inputs are large)
