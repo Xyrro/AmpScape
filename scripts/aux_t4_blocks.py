@@ -117,7 +117,12 @@ def cmd_prepare(a):
     for sh in sorted(sel.shard.unique()):
         if (out / "outputs" / f"shard-{sh:05d}.outputs.h5").exists():
             continue  # already solved (top-up run)
-        specs = from_frame(sel[sel.shard == sh])
+        from dataclasses import fields
+
+        from ampscape.solve.manifest import SampleSpec
+
+        cols = [f.name for f in fields(SampleSpec)]
+        specs = from_frame(sel[sel.shard == sh][[c for c in cols if c in sel.columns]])
         p = out / "inputs" / f"shard-{sh:05d}.inputs.h5"
         prepare_shard(specs, str(p), scfg, pilot_root=str(ROOT / cfg["pilot"]), overwrite=True)
         with h5py.File(p, "a") as f:
