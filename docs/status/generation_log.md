@@ -82,3 +82,13 @@ Core-hours used since 2026-09-15 (ampscape-* jobs): **2061**. Stop rule: not tri
 
 Core-hours used since 2026-09-15 (ampscape-* jobs): **2336**. Stop rule: not triggered.
 
+## 2026-09-18T22:11+00:00
+
+| tier | shards | solved | finalized | uploaded | upload failed | invalid | QC fail | GB on Hub | GB local |
+|---|---|---|---|---|---|---|---|---|---|
+| S | 500 | 500 | 500 | 500 | 0 | 0 | 0.000% | 142.2 | 0.0 |
+| M | 500 | 500 | 499 | 499 | 0 | 1 | 0.002% | 250.8 | 0.2 |
+| L | 1000 | 0 | 0 | 0 | 0 | 0 | nan% | 0.0 | 0.0 |
+
+Core-hours used since 2026-09-15 (ampscape-* jobs): **3794**. Stop rule: not triggered.
+
