@@ -452,13 +452,19 @@ def acquire_lease(name: str, root: pathlib.Path, fresh_s: float = 1500.0) -> boo
         cur = json.loads(lf.read_text())
     except Exception:  # noqa: BLE001
         cur = None
+    mine = os.environ.get("AMPSCAPE_LEASE_OWNER", str(os.getppid()))
     if (
         cur
         and time.time() - cur.get("ts", 0) < fresh_s
-        and (cur.get("host"), cur.get("owner"))
-        != (me["host"], os.environ.get("AMPSCAPE_LEASE_OWNER", str(os.getppid())))
+        and (cur.get("host"), cur.get("owner")) != (me["host"], mine)
     ):
-        return False
+        if cur.get("host") != me["host"]:
+            return False  # another login node: cannot inspect its processes
+        try:  # same host: the lease is free only if its owner process is gone
+            os.kill(int(cur.get("owner", 0)), 0)
+            return False
+        except (OSError, ValueError):
+            pass
     lf.parent.mkdir(exist_ok=True)
     lf.write_text(
         json.dumps(
