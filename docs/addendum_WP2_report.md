@@ -1,52 +1,51 @@
 # Addendum WP2 report — block-size Pareto baseline for T4 (tier M)
 
-Date: 2026-09-19. Compute: ≈ 55 CPU-h (3 000 Omniscape solves on the 1 000-sample M reference subset). Artefacts:
-`aux/t4_blocksize_baselines/M_b{3,7}_ca{0,1}/` (inputs, outputs with solve times, `vs_bs1.parquet` / `.md` scored
-against the block-1 reference), `docs/tables/t4_pareto_M.md`, `docs/figures/t4_pareto_M.png`. Nothing in v1.0 changed.
+Date: 2026-09-19. Compute: ≈ 55 CPU-h (3 000 Omniscape solves on the 1 000-sample M reference subset). Nothing in v1.0 changed.
 
-## Design
-Blocks ≈ {0.05, 0.1, 0.2}·r at r = 32 px → odd blocks {1, 3, 7}; `correct_artifacts` on and off (the installed
-Omniscape 0.6.2 exposes the key `correct_artifacts`, verified in its source; it is inert at block 1). Block 1 is the
-reference (WP1), block 3 with correction is the production target. All rows score against the exact block-1 map on the
-same 1 000 samples (test_id 400, test_ood 300, ood_region 300; real and synthetic), so they are directly comparable with
-learned models evaluated with `scripts/evaluate.py --t4-reference` (`scripts/t4_pareto.py --runs …` adds the learned rows
-with their batch-amortised inference cost once M-trained models exist — none yet: Phase 10 trained at S only).
+## Setup
+Same 1 000 landscapes as the block-1 reference (`aux/t4_bs1_reference/M_bs1`: test_id 400, test_ood 300, ood_region 300;
+real and synthetic). Radius 32 px. Rows: block 1 (exact), production block 3 with `correct_artifacts` (b/r 0.094),
+block 3 without artefact correction, block 7 (b/r 0.22) with and without. `correct_artifacts` is a real config key of
+Omniscape 0.6.2 (`src/config.jl`; it only acts when block > 1) and is passed through the aux inputs
+(`omni_correct_artifacts` attr → `solve_omniscape(...; correct_artifacts)`). Outputs and timings under
+`aux/t4_blocksize_baselines/M_b{3,7}_ca{0,1}/` (`vs_bs1.parquet`, `vs_bs1.md`); table `docs/tables/t4_pareto_M.md`;
+figure `docs/figures/t4_pareto_M.png`; `scripts/t4_pareto.py` and `evaluate.py --t4-blocks` print the block rows beside a
+learned model on every split (no M-trained model exists yet — the learned rows are added with the three-seed baselines).
 
-## Results (mean over samples; cost = median single-core Omniscape solve per 256² landscape)
+## Result (errors against the exact block-1 map; mean over the split; cost = median single-core solve time)
 
 | split | method | cost s | rel-L2 | ns rel-L2 | log-MAE | top-5 % IoU | pinch recall | Spearman |
 |---|---|---|---|---|---|---|---|---|
 | test_id | block 1 (exact) | 776 | 0 | 0 | 0 | 1 | 1 | 1 |
-| test_id | **block 3, corrected (production)** | 111 | **0.029** | 0.037 | 0.012 | 0.936 | 0.931 | 0.998 |
-| test_id | block 3, uncorrected | 112 | 0.111 | 0.107 | 0.026 | 0.611 | 0.766 | 0.986 |
-| test_id | block 7, corrected | 25.5 | 0.098 | 0.106 | 0.053 | 0.808 | 0.808 | 0.985 |
-| test_id | block 7, uncorrected | 25.4 | 0.292 | 0.377 | 0.068 | 0.547 | 0.966* | 0.966 |
-| test_ood | block 3, corrected (production) | 133 | 0.032 | 0.052 | 0.011 | 0.915 | 0.925 | 0.995 |
-| test_ood | block 3, uncorrected | 132 | 0.115 | 0.152 | 0.027 | 0.600 | 0.779 | 0.963 |
-| test_ood | block 7, corrected | 30.2 | 0.103 | 0.149 | 0.089 | 0.768 | 0.822 | 0.963 |
-| test_ood | block 7, uncorrected | 30.7 | 0.299 | 0.548 | 0.106 | 0.537 | 0.958* | 0.922 |
-| ood_region | block 3, corrected (production) | 123 | 0.027 | 0.035 | 0.012 | 0.917 | 0.914 | 0.998 |
-| ood_region | block 3, uncorrected | 121 | 0.109 | 0.100 | 0.027 | 0.496 | 0.728 | 0.981 |
-| ood_region | block 7, corrected | 29.1 | 0.093 | 0.095 | 0.044 | 0.763 | 0.772 | 0.983 |
-| ood_region | block 7, uncorrected | 25.3 | 0.292 | 0.331 | 0.060 | 0.443 | 0.975* | 0.960 |
-
-\* pinch-point recall is inflated for the uncorrected maps: the block-seam spikes create spurious local maxima that hit
-every true pinch point by chance — the top-q IoU columns show the real loss (0.44–0.55).
+| test_id | **production block 3, ca on** | 111 | **0.029** | 0.037 | 0.012 | 0.936 | 0.931 | 0.998 |
+| test_id | block 3, ca off | 112 | 0.111 | 0.107 | 0.026 | 0.611 | 0.766 | 0.986 |
+| test_id | block 7, ca on | 25.5 | 0.098 | 0.106 | 0.053 | 0.808 | 0.808 | 0.985 |
+| test_id | block 7, ca off | 25.4 | 0.292 | 0.377 | 0.068 | 0.547 | 0.966 | 0.966 |
+| test_ood | production block 3, ca on | 133 | 0.032 | 0.052 | 0.011 | 0.915 | 0.925 | 0.995 |
+| test_ood | block 3, ca off | 132 | 0.115 | 0.152 | 0.027 | 0.600 | 0.779 | 0.963 |
+| test_ood | block 7, ca on | 30.2 | 0.103 | 0.149 | 0.089 | 0.768 | 0.822 | 0.963 |
+| test_ood | block 7, ca off | 30.7 | 0.299 | 0.548 | 0.106 | 0.537 | 0.958 | 0.922 |
+| ood_region | production block 3, ca on | 123 | 0.027 | 0.035 | 0.012 | 0.917 | 0.914 | 0.998 |
+| ood_region | block 3, ca off | 121 | 0.109 | 0.100 | 0.027 | 0.496 | 0.728 | 0.981 |
+| ood_region | block 7, ca on | 29.1 | 0.093 | 0.095 | 0.044 | 0.763 | 0.772 | 0.983 |
+| ood_region | block 7, ca off | 25.3 | 0.292 | 0.331 | 0.060 | 0.443 | 0.975 | 0.960 |
 
 ## Reading
-- **Artefact correction is the dominant factor**, not the block size: block 3 uncorrected is 4× worse than the production
-  block 3 corrected (0.11 vs 0.03 rel-L2) and no better than block 7 corrected at 4.4× the cost. The Omniscape default
-  (`correct_artifacts = true`) is the right production choice and is what the benchmark's targets use.
-- The block-size ladder at fixed correction gives the expected cost–error trade-off: 1 → 3 → 7 costs 776 → 111 → 26 s per
-  landscape for 0 → 0.03 → 0.10 rel-L2 (top-5 % IoU 1 → 0.94 → 0.81). These are the non-learned rows every learned T4
-  model must beat at its inference cost.
-- **OOD behaviour**: the block-size rows degrade little from test_id to test_ood / ood_region (e.g. production 0.029 → 0.032
-  → 0.027; block 7 corrected 0.098 → 0.103 → 0.093), as the addendum expected; the learned-model comparison on the same
-  axis needs M-trained models (Phase 12 full baselines), after which `t4_pareto.py` prints both families side by side per
-  split with cost columns.
-- Spearman stays ≥ 0.92 for every row, including block 7 uncorrected with rel-L2 0.29 — rank correlation hides pixel-level
-  and hot-spot error, as the pilot suggested; the paper should not report Spearman alone for T4.
+- **The artefact correction is worth 4× in relative L2 at no cost** (block 3: 0.029 with vs 0.111 without; block 7: 0.098
+  vs 0.292) and it is what keeps the hot spots (top-5 % IoU 0.94 vs 0.61 at block 3). Without it the block seams dominate;
+  the addendum's pilot (own re-implementation without the correction) was measuring that seam error, which the production
+  pipeline does not have. Pinch-point recall *rises* without the correction (0.97 at block 7 ca off) because seam spikes
+  create spurious local maxima that happen to cover the true ones — a reminder that recall alone is not a fidelity metric.
+- **Block-size degradation is nearly split-independent**: production block 3 costs 0.027–0.032 rel-L2 on every split,
+  block 7 (ca on) 0.093–0.103, with only the non-source rel-L2 on the contrast-10⁶ split noticeably worse (0.149). This
+  is the expected "block_size degrades little OOD" behaviour; the learned-model rows will show whether models degrade
+  more (Phase 10 dev evidence says they do on scale, less on biome/table hold-outs).
+- **Cost–error frontier at M**: 776 s (exact) → 111 s (block 3, 2.9 % error) → 25 s (block 7, 9.8 %). A learned model has
+  to land below 0.03 rel-L2 at ≈ 0.01 s/landscape to dominate the production block on this axis; the dev-scale U-Net was at
+  0.09 rel-L2 on its own (exact, tier S) targets, i.e. currently comparable to block 7 in error and 2 500× cheaper.
+- Spearman is ≥ 0.92 for every row including the worst — rank correlation cannot separate these baselines, which is why
+  the harness reports rel-L2, non-source rel-L2 and top-q IoU as primary (WP3).
 
-## Not done / pending
-L (block 5 production; blocks {3, 7, 13}) after the L block-1 sanity reference exists (WP1, on approval of the ≈ 210
-CPU-h). Learned rows: after the M-trained baselines. Stopping here for the owner's confirmation (addendum §6).
+## Pending
+L rows (block 1 reference of 45–60 samples + block {3, 5 production, 11} once L production exists: ≈ 210 CPU-h) and the
+learned-model rows (three-seed baselines after the GPU allocation). Stopping for confirmation per the addendum.
