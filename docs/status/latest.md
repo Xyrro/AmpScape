@@ -1,12 +1,14 @@
-# Status — 2026-09-19 (tiers S and M complete and audited; L running; addendum WP1/WP2 in progress)
+# Status — 2026-09-19 (WP1 + WP2 delivered; L generating; supervisor incident closed)
 
-- **Tier M complete**: 500 / 500 shards (50 000 landscapes) validated, uploaded and **audited clean** (full Hub-vs-plan audit
-  gate in the driver); QC fail rate 0.002 % (one contrast-10⁶ configuration at the residual threshold); 251.5 GB on the Hub
-  for M (394 GB total with S). One shard (434) needed a re-finalize after a write race between two finalize jobs; the driver
-  now alerts on `.invalid` shards and re-finalizes solved-but-unfinalized shards itself.
-- **Tier L started** (1 000 shards of 20, waves of 100, prepare-ahead one wave). Generation core-hours so far ≈ 3 850.
-- **Addendum**: WP3 done; WP5 analysis done (probe design + ≈ 60 CPU-h estimate awaiting confirmation); WP1 part 1 done and the
-  owner decision implemented (block-1 reference = official T4 surface at M/L, `--t4-reference` in the harness, tail flag,
-  docs); the M reference is being grown to 1 000 samples (800 block-1 solves queued) and the three WP2 block-size builds
-  (block 3 without artefact correction, block 7 with/without) are queued on the same samples; ICE changed the default QoS
-  (explicit `coc-ice` now required — fixed in the profile after two silent submission failures).
+- **Addendum WP1 (`docs/addendum_WP1_report.md`)**: 1 000-sample block-1 reference at M (official T4 evaluation surface):
+  production block 3 deviates from exact by 0.029 rel-L2 mean (median 0.027), 4.7 % of samples above 5 % (11 % of
+  synthetic, 1.4 % of real), top-5 % IoU 0.93, pinch recall 0.93; per-sample index with the tail flag published under
+  `aux/t4_bs1_reference/M/` on the Hub; `evaluate.py --t4-reference`.
+- **Addendum WP2 (`docs/addendum_WP2_report.md`, `docs/tables/t4_pareto_M.md`, `docs/figures/t4_pareto_M.png`)**: block-size
+  Pareto at M — the artefact correction is worth 4× in rel-L2 at no cost (block 3: 0.029 vs 0.111 without); block 7 with
+  correction 0.098 at 25 s; block-size error is nearly split-independent; `evaluate.py --t4-blocks` prints block rows beside
+  a model. L rows and learned-model rows pending (L production; GPU allocation). **Stopped for confirmation.**
+- **Generation**: S and M complete and audited; L wave 2 of 10 running (87 of 1 000 shards on the Hub), scratch 180 GB,
+  ≈ 5 100 core-hours. Incident (d): a session restart on another login node started duplicate supervisors; caught in
+  10 min, no double submission, cross-host leases added (`logs/lease_*.json`); the driver is being restarted under the
+  lease protocol; the S/M/L sync loops from the previous session keep running on `login-ice-gnr-2`.
