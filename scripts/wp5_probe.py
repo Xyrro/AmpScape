@@ -206,6 +206,7 @@ def cmd_build(a):
                     "ghm_tercile": int(v1t.loc[r.source_tile, "ghm_tercile"]),
                     "stratum": str(v1t.loc[r.source_tile, "stratum"]),
                     "path": str(tp.relative_to(out)),
+                    "transform": json.dumps(list(tr)[:6]),
                     "probe_cell": cell,
                     "source_tile": r.source_tile,
                     "split": r.split,

@@ -310,6 +310,12 @@ def cmd_submit(a) -> None:
             f"skipping {sum(s in active for s in todo)} shard(s) that already have a pending/running task"
         )
         todo = [s for s in todo if s not in active]
+    missing_inputs = [s for s in todo if not shard_paths(build, s)["inputs"].exists()]
+    if missing_inputs:  # 2026-09-19: a crashed prepare left a manifest without inputs and an array was queued for nothing
+        print(
+            f"skipping {len(missing_inputs)} shard(s) without inputs (run prepare first): {missing_inputs[:10]}"
+        )
+        todo = [s for s in todo if s not in missing_inputs]
     if not todo:
         print("nothing to submit")
         return
