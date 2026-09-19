@@ -53,3 +53,4 @@ tools/
 .cache/
 envs/
 .conda_pkgs/
+aux/

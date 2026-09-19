@@ -261,12 +261,17 @@ def run_tier(
             f"{tier}: {c['invalid']} shard(s) marked .invalid — repair required (never dropped)", st
         )
     # shards solved (completion marker) but never finalized (a finalize step that died): run finalize for them
+    # only markers older than 30 min with no array task of the tier running count as stale: the array task writes the
+    # marker and then finalizes itself, and a second finalize on the same shard corrupts the final (tier-M shard 434)
     stale = [
         o
         for o in (b / "outputs").glob("shard-*.outputs.h5.done")
         if not (b / "shards" / (o.name.split(".")[0] + ".h5")).exists()
         and not (b / "shards" / (o.name.split(".")[0] + ".uploaded")).exists()
+        and time.time() - o.stat().st_mtime > 1800
     ]
+    if stale and jobs_named(f"ampscape-{tier}") > 0:
+        stale = []
     if (
         stale
         and not ts.get("refinalize_job")
