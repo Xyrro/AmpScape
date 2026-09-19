@@ -388,11 +388,14 @@ def run_tier(
                 ts["submitted_upto"] = sub_hi
             else:
                 log(f"{tier}: submit refused: {out[-300:]}")
-    # a wave that ended with missing shards (node failures): resubmit once, then alert
-    if ts["submitted_upto"] >= 0 and jobs_named(f"ampscape-{tier}") == 0:
+    # shards of *earlier* waves that ended without a completion marker (node failure, walltime): resubmit once — also
+    # while a later wave runs; `generate.py submit` skips shards that still have a queued/running task
+    if ts["submitted_upto"] >= 0:
+        last_wave_lo = max(0, ts["submitted_upto"] - wave + 1)
+        upto = ts["submitted_upto"] + 1 if jobs_named(f"ampscape-{tier}") == 0 else last_wave_lo
         missing = [
             s
-            for s in range(0, ts["submitted_upto"] + 1)
+            for s in range(0, upto)
             if not any(
                 (b / d / f"shard-{s:05d}{suf}").exists()
                 for d, suf in (
