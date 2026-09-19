@@ -125,3 +125,13 @@ before starting any supervisor, never trust a pid file across login nodes. Follo
 alerted "L sync supervisor not running" for the same reason (its liveness check read the host-local pid file); the
 check now uses the sync lease's freshness on any host. The duplicate L sync's lease made the real L loop on the other
 node stand down for one 25-min lease window; no data was affected.
+## 2026-09-19T07:07+00:00
+
+| tier | shards | solved | finalized | uploaded | upload failed | invalid | QC fail | GB on Hub | GB local |
+|---|---|---|---|---|---|---|---|---|---|
+| S | 500 | 500 | 500 | 500 | 0 | 0 | 0.000% | 142.2 | 0.0 |
+| M | 500 | 500 | 500 | 500 | 0 | 0 | 0.002% | 251.5 | 0.0 |
+| L | 1000 | 200 | 87 | 87 | 0 | 0 | 0.033% | 21.4 | 0.0 |
+
+Core-hours used since 2026-09-15 (ampscape-* jobs): **5331**. Stop rule: not triggered.
+
