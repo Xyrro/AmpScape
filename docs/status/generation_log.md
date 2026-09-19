@@ -161,3 +161,13 @@ once per cycle.
 a final caught mid-write failed to open ("bad object header"), was marked `.invalid`, and the driver alerted; both
 shards were re-finalized from their intact outputs (no solve lost). Fix: finalize writes `<shard>.h5.part` and
 renames atomically on completion; the sync skips `.part` files and any final younger than three minutes.
+## 2026-09-19T12:19+00:00
+
+| tier | shards | solved | finalized | uploaded | upload failed | invalid | QC fail | GB on Hub | GB local |
+|---|---|---|---|---|---|---|---|---|---|
+| S | 500 | 500 | 500 | 500 | 0 | 0 | 0.000% | 142.2 | 0.0 |
+| M | 500 | 500 | 500 | 500 | 0 | 0 | 0.002% | 251.5 | 0.0 |
+| L | 1000 | 300 | 178 | 170 | 0 | 0 | 0.027% | 41.6 | 1.8 |
+
+Core-hours used since 2026-09-15 (ampscape-* jobs): **6381**. Stop rule: not triggered.
+
