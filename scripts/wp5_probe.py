@@ -10,7 +10,7 @@ Radius 128 px / block 11 at 100 m, 64 px / block 5 at 200 m (both 12.8 km); tabl
   extract  --out aux/scale_probe [--workers 4]                    # cell C: 512² @ 100 m stacks (Slurm)
   build    --out aux/scale_probe                                  # probe tile root: A/B/C/D rasters + tiles/resistance parquet
   plan     --out aux/scale_probe [--shard-size 8]                 # manifest + inputs with per-sample radius/block attrs
-Then: generate.py submit --build aux/scale_probe/build ...; finalize; evaluate per cell with --root aux/scale_probe/build.
+Then: generate.py submit --build aux/scale_probe/probe_L ...; finalize; evaluate per cell with --root aux/scale_probe/build.
 """
 
 from __future__ import annotations
@@ -239,7 +239,7 @@ def cmd_plan(a):
     from ampscape.sources import SourceConfig
 
     out = pathlib.Path(a.out)
-    build = out / "build"
+    build = out / "probe_L"
     build.mkdir(parents=True, exist_ok=True)
     tiles = pd.read_parquet(out / "tiles.parquet")
     syn = pd.read_parquet(out / "selection_syn.parquet")
@@ -324,7 +324,7 @@ def cmd_plan(a):
         "dataset_id": "ampscape-scale-probe",
         "tier": "L",
         "shard_size": a.shard_size,
-        "pilot": str(out.relative_to(ROOT)),
+        "pilot": str(out.resolve().relative_to(ROOT.resolve())),
         "published": None,
         "source_config": "configs/tasks/sources_default.yaml",
         "solver_preset": "configs/solver/circuitscape_reference.yaml",
