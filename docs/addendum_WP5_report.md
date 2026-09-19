@@ -57,3 +57,25 @@ effect, to (100 m, 512²) the size effect.
 ## 4. Recommendation
 Do (b) now — the confound is stated in `docs/task_specification.md` / `docs/dataset_card.md` by this report — and build
 the probe (a) after WP1/WP2 on your confirmation of the ≈ 60 CPU-h.
+
+## 5. Probe set built (2026-09-19; owner approval of the ≈ 60 CPU-h estimate)
+
+`aux/scale_probe/`: 60 real L tiles (30 `test_id`, 30 `ood_region`, table large_mammal) × 4 cells + 60 synthetic seeds
+(900 000 000 + i, disjoint from every v1.0 stream) × 2 sizes = **360 landscapes, all five configurations (T1R where
+patches exist), CHOLMOD, 100 % QC pass, 47 CPU-h** (45 shards of 8, one array). Cells: A = 256² @ 100 m (central crop of
+C), B = 256² @ 200 m (central crop of the L tile), C = 512² @ 100 m (new extraction around the L centre, same reader as
+v1.0), D = 512² @ 200 m (L-native); T4 window fixed at 12.8 km (radius 128 px / block 11 at 100 m, 64 px / block 5 at
+200 m). `probe_index.parquet` (sample_id → probe_cell, source_tile, family, intended split, size, pixel_m) is the key;
+the build's own `index.parquet` carries the finalize-time split labels, which for the synthetic seeds follow the seed
+hash and are irrelevant here — use `probe_index.parquet`.
+
+Median T4 solve time per landscape by cell: A 133 s, B 181 s, C 714 s, D 768 s (synthetic 256² 164 s, 512² 709 s):
+at fixed physical window the 100 m cells are as expensive as the 200 m cells of the same raster size (the window has
+4× the pixels but block 11 vs 5 compensates), so the probe's cost axis is raster size.
+
+Evaluation recipe (after the three-seed baselines): a model trained on S + M (100 m) is evaluated with
+`scripts/evaluate.py --root aux/scale_probe/probe_L --tier L --split test_id,ood_region` and the per-sample rows grouped
+by `probe_cell`; A → C isolates raster-size extrapolation at fixed pixel size, A → B isolates resolution at fixed
+raster size, B → D the size axis at 200 m, and D vs (`test_ood_scale` at L) shows how much of the production scale gap
+each axis explains. The finalized shards (≈ 2 GB) stay on scratch until the evaluation is done; publishing them under
+`aux/scale_probe/` on the Hub is a public push and is left for the owner's call.
