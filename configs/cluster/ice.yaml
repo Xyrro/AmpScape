@@ -25,10 +25,10 @@ limits:
 defaults:                    # per-tier resources for solve shards (measured Phase 5: peak RSS S 1.4 GB ... XXL 9.5 GB)
   S:   {cpus: 1, mem: "6G",  time: "04:00:00", shard_size: 200}
   M:   {cpus: 1, mem: "6G",  time: "04:00:00", shard_size: 100}
-  L:   {cpus: 1, mem: "8G",  time: "06:00:00", shard_size: 20}   # 14 % of L shards exceeded 4 h (2026-09-19)
-  XL:  {cpus: 4, mem: "16G", time: "04:00:00", shard_size: 8}
-  XXL: {cpus: 8, mem: "12G", time: "04:00:00", shard_size: 2}        # train/val shards: 9.5 GB peak (no CG baseline)
-  XXL_test: {cpus: 8, mem: "20G", time: "04:00:00", shard_size: 2}   # test/OOD shards: ~14.5 GB peak (AMG-CG baseline)
+  L:   {cpus: 1, mem: "8G",  time: "08:00:00", shard_size: 20}   # measured L: p99 1072 s/landscape -> 20 x 1072 x 1.15 + 20 min = 7.2 h
+  XL:  {cpus: 4, mem: "16G", time: "10:00:00", shard_size: 6}    # tail rule with the L tail ratio (p99/median 1.8): 6 x 3500 x 1.15 + 20 min
+  XXL: {cpus: 8, mem: "12G", time: "10:00:00", shard_size: 1}    # published tile 10 435 s; x 1.8 tail x 1.15 + start-up        # train/val shards: 9.5 GB peak (no CG baseline)
+  XXL_test: {cpus: 8, mem: "20G", time: "10:00:00", shard_size: 1}   # test/OOD shards: ~14.5 GB peak (AMG-CG baseline)
 network:
   compute_nodes_have_internet: true      # verified 2026-09-05 but never relied upon
   installs_on: login
