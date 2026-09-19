@@ -181,3 +181,19 @@ Core-hours used since 2026-09-15 (ampscape-* jobs): **6381**. Stop rule: not tri
 
 Core-hours used since 2026-09-15 (ampscape-* jobs): **7254**. Stop rule: not triggered.
 
+
+## Incident 2026-09-19 (f) — L walltime undersized; timed-out shards never resubmitted
+
+Walltime for L shards was 04:00:00 (runbook estimate 590 s × 20 = 3.3 h). Measured on 6 760 finalized L landscapes:
+median 604 s, p90 939 s, p99 1 072 s, max 1 198 s per landscape (slowest: GRF and `random_cluster` landscapes, several
+`rmax_saturated`), i.e. **3.6 h median / 3.9 h max of solve per 20-landscape shard before ~4 min Julia start-up and the
+finalize step** — 62 of the 400 shards of waves 1–4 timed out. They were never re-queued because both the submit filter
+and the driver treated an existing outputs file as "solved"; the sync backlog stayed small, so the waves kept going.
+Cost: 569 core-hours were spent in timed-out L tasks (2 cores × 4 h × 62 + partial), but the solver is resumable and
+1 165 of the 1 240 landscapes in those shards are complete inside the partial outputs, so the loss is ≈ 75 landscapes ×
+~10 min plus 62 Julia start-ups ≈ 20 core-hours of solve; the larger waste is the second allocated core (BLAS threads
+only) on every L task since the tier started (≈ 40 % of L core-hours). S and M also had 16 + 1 timed-out tasks
+(64 + 4 core-hours), all re-run at the time. Fixes: "solved" = solver completion marker (submit filter and driver);
+the driver re-queues every submitted shard without a marker at each 10-min cycle regardless of running arrays (the
+submit guard skips queued/running shards; alert after three rounds); walltimes from the measured tail —
+shard_size × p99 × 1.15 + 20 min: L 08:00 (20 landscapes), XL 10:00 (6), XXL 10:00 (1); L now 1 core.
