@@ -48,6 +48,7 @@ def main() -> None:
         out,
         acceleration=a.acceleration,
         t4_reference=a.t4_reference,
+        t4_blocks=a.t4_blocks,
     )
     print(f"{r['n_rows']} rows -> {out}/results.json, results.md")
     for task, agg in r["per_task"].items():
