@@ -145,3 +145,12 @@ Core-hours used since 2026-09-15 (ampscape-* jobs): **5331**. Stop rule: not tri
 
 Core-hours used since 2026-09-15 (ampscape-* jobs): **5660**. Stop rule: not triggered.
 
+
+## Note 2026-09-19 — waves stalled by aux job names
+
+The driver submits the next wave only when no array of the tier is queued or running, and it tested that with a
+job-name *prefix* (`ampscape-L…`), so the auxiliary arrays `ampscape-M_bs1`, `ampscape-M_b3_ca0`, … (block-size
+studies) and `ampscape-L_bs1` counted as tier work: several M waves and L wave 3 waited for hours behind them. Fixed
+(exact name match, commit 08:53Z); wave 3 of L went out ten seconds after the restart. Also widened the driver's sync
+liveness window to 60 min: a sync cycle is a 15-min sleep plus up to ~15 min of uploads, and the lease is refreshed
+once per cycle.
