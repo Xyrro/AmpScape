@@ -22,7 +22,7 @@ while true; do
     # finalize runs inside the Slurm array tasks (solve_shard.sbatch) or a finalize array — never here: 500 shards of
     # QC would be hours of CPU on the shared login node. This loop only validates, uploads, verifies and deletes.
     echo "== $(date -u +%FT%TZ) $TIER sync"
-    python scripts/sync_shards.py --build "$BUILD" --tier "$TIER" --live --publish-index 2>&1 | grep -v Warning | grep -v '"already"' | tail -8
+    AMPSCAPE_LEASE_OWNER=$$ python scripts/sync_shards.py --build "$BUILD" --tier "$TIER" --live --publish-index 2>&1 | grep -v Warning | grep -v '"already"' | tail -8
     rc=${PIPESTATUS[0]}
     if [ "$rc" -eq 2 ]; then echo "$(date -u +%FT%TZ) STOP RULE: a shard failed to upload twice — loop pausing (exit 2); report to the owner"; exit 2; fi
     echo "== $(date -u +%FT%TZ) $TIER uploaded=$(ls "$BUILD"/shards/*.uploaded 2>/dev/null | wc -l) final_local=$(ls "$BUILD"/shards/*.h5 2>/dev/null | wc -l) failed=$(ls "$BUILD"/shards/*.upload_failed 2>/dev/null | wc -l)"

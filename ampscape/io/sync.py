@@ -437,6 +437,41 @@ def publish_index(
     }
 
 
+def acquire_lease(name: str, root: pathlib.Path, fresh_s: float = 1500.0) -> bool:
+    """Cross-host single-instance lease in <root>/logs/lease_<name>.json ({host, pid, ts}). Returns True when this
+    process may run: no lease, a stale lease (older than fresh_s), or a lease held by this very host:pid. A fresh lease
+    held by another host:pid means another instance is active (e.g. started from a different login node, where pid
+    locks cannot see this node's processes, 2026-09-19) — the caller must stand down."""
+    import os
+    import socket
+    import time
+
+    lf = root / "logs" / f"lease_{name}.json"
+    me = {"host": socket.gethostname(), "pid": os.getpid()}
+    try:
+        cur = json.loads(lf.read_text())
+    except Exception:  # noqa: BLE001
+        cur = None
+    if (
+        cur
+        and time.time() - cur.get("ts", 0) < fresh_s
+        and (cur.get("host"), cur.get("owner"))
+        != (me["host"], os.environ.get("AMPSCAPE_LEASE_OWNER", str(os.getppid())))
+    ):
+        return False
+    lf.parent.mkdir(exist_ok=True)
+    lf.write_text(
+        json.dumps(
+            {
+                **me,
+                "owner": os.environ.get("AMPSCAPE_LEASE_OWNER", str(os.getppid())),
+                "ts": time.time(),
+            }
+        )
+    )
+    return True
+
+
 def scratch_used_gb(root: pathlib.Path) -> float:
     """Bytes under root via `du -sb` (a Python walk over the ~100k tile files takes minutes on Lustre)."""
     import subprocess
@@ -518,6 +553,17 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     build = pathlib.Path(a.build)
     if a.live:
+        root = pathlib.Path(__file__).resolve().parents[2]
+        if not acquire_lease(f"sync_{a.tier}", root):
+            print(
+                json.dumps(
+                    {
+                        "summary": True,
+                        "skipped": "another sync instance holds the lease (other host/pid)",
+                    }
+                )
+            )
+            return 0
         staging = pathlib.Path(a.staging) if a.staging else build / "hf"
         recs = sync_live(build, a.repo, a.tier, staging, push=True, delete=True)
         if a.publish_index:

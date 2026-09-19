@@ -433,6 +433,12 @@ def main() -> None:
     try:
         while True:
             st = load_state()
+            from ampscape.io.sync import acquire_lease
+
+            os.environ["AMPSCAPE_LEASE_OWNER"] = str(os.getpid())
+            if not acquire_lease("driver", ROOT, fresh_s=1500.0):
+                log("another driver instance holds the lease (other host) — exiting")
+                return
             if (LOGS / "ALERT.txt").exists():
                 log("ALERT present; driver idle")
                 return
