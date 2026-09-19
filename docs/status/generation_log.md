@@ -121,4 +121,7 @@ No double submission occurred (one L array in the queue; `generate.py submit` sk
 and no shard was touched twice (uploads are marker-gated). Fix (commit b0fb76c): cross-host single-instance leases
 (`logs/lease_<name>.json` with host, pid, owner, timestamp; a fresh lease held by another host/pid makes a new
 instance stand down) for the driver and every sync loop. Rule from now on: check `logs/lease_*.json` (host + age)
-before starting any supervisor, never trust a pid file across login nodes.
+before starting any supervisor, never trust a pid file across login nodes. Follow-up (06:40Z): the restarted driver
+alerted "L sync supervisor not running" for the same reason (its liveness check read the host-local pid file); the
+check now uses the sync lease's freshness on any host. The duplicate L sync's lease made the real L loop on the other
+node stand down for one 25-min lease window; no data was affected.
