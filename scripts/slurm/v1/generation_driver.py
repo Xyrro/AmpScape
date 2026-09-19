@@ -409,6 +409,26 @@ def run_tier(
                 )
             )
         ]
+        # shards with a queued/running task are in progress, not missing (2026-09-19: a running wave was counted as
+        # missing three times and raised a false alert)
+        q = sh(["squeue", "-u", os.environ.get("USER", "yxiao413"), "-h", "-o", "%j|%K"])
+        active: set[int] = set()
+        for line in q.splitlines():
+            name, _, tid = line.partition("|")
+            tid = tid.strip()
+            if name != f"ampscape-{tier}":
+                continue
+            if tid.isdigit():
+                active.add(int(tid))
+            else:
+                for part in tid.strip("[]").split("%")[0].split(","):
+                    if "-" in part:
+                        lo, hi = part.split("-")
+                        if lo.isdigit() and hi.isdigit():
+                            active.update(range(int(lo), int(hi) + 1))
+                    elif part.isdigit():
+                        active.add(int(part))
+        missing = [s for s in missing if s not in active]
         if missing:
             key = tuple(missing)
             n_prev = ts.get("resubmit_rounds", {}).get(str(key), 0)
