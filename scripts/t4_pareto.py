@@ -128,6 +128,7 @@ def main():
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+        import matplotlib.ticker
 
         splits = sorted(df.split.unique())
         fig, axes = plt.subplots(1, len(splits), figsize=(4.2 * len(splits), 3.6), squeeze=False)
@@ -143,6 +144,7 @@ def main():
                     textcoords="offset points",
                 )
             ax.set_xscale("log")
+            ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
             ax.set_xlabel("cost per landscape (s)")
             ax.set_ylabel("rel-L2 vs block-1 map")
             ax.set_title(split, fontsize=9)

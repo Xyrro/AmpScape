@@ -46,6 +46,9 @@ predictions file are skipped (the row count is reported), so any subset can be e
 - **Block-size rows (WP2)**: `--t4-blocks <aux build> ...` (with `--t4-reference`) appends a T4 error-vs-cost table to
   `results.md` with the production block, the block-size baselines and the learned model side by side on the evaluated
   splits; the standalone `scripts/t4_pareto.py` produces the same table plus the Pareto figure across runs.
+- **T4 Pareto rows** (addendum WP2): `scripts/t4_pareto.py --reference aux/t4_bs1_reference/<tier> --blocks aux/t4_blocksize_baselines/<tier>_* --runs runs/...`
+  prints, per split incl. every OOD split, the block-size baselines (blocks ≈ {0.05, 0.1, 0.2}·r, artefact correction on/off) and the
+  learned models side by side with their cost per landscape, all scored against the exact block-1 map; figure `docs/figures/t4_pareto_<tier>.png`.
 - **Efficiency**: `speedup` = solver wall time / inference time per configuration; median and geometric mean.
 - **Solver acceleration** (`--acceleration`, needs `voltage`): AMG-PCG iterations and wall time to
   rtol 1e-6 from the predicted voltage vs from zero, computed in Julia with the same preconditioner and
