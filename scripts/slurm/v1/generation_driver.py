@@ -108,7 +108,9 @@ def sync_alive(tier: str) -> bool:
     lf = LOGS / f"lease_sync_{tier}.json"
     try:
         d = json.loads(lf.read_text())
-        if time.time() - float(d.get("ts", 0)) < 1800:
+        if (
+            time.time() - float(d.get("ts", 0)) < 3600
+        ):  # a sync cycle = 15 min sleep + up to ~15 min of uploads
             return True
     except Exception:  # noqa: BLE001
         pass
@@ -133,9 +135,11 @@ def start_sync(tier: str) -> None:
     time.sleep(5)
 
 
-def jobs_named(prefix: str) -> int:
+def jobs_named(name: str) -> int:
+    """Queued/running jobs whose name is exactly `name` (2026-09-19: a prefix match counted the aux array
+    `ampscape-L_bs1` as tier-L work and stalled the L waves)."""
     out = sh(["squeue", "-u", os.environ.get("USER", "yxiao413"), "-h", "-o", "%j"])
-    return sum(1 for j in out.splitlines() if j.startswith(prefix))
+    return sum(1 for j in out.splitlines() if j.strip() == name)
 
 
 def alert(reason: str, state: dict) -> None:
