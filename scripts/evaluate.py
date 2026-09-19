@@ -30,6 +30,12 @@ def main() -> None:
         default=None,
         help="aux block-1 reference build (docs/t4_fidelity.md): T4 primary metrics against exact targets, production as bc_*",
     )
+    ap.add_argument(
+        "--t4-blocks",
+        nargs="*",
+        default=None,
+        help="aux block-size builds scored against the reference (vs_bs1.parquet): printed beside the model (WP2)",
+    )
     a = ap.parse_args()
     splits = a.split.split(",")
     out = a.out or str(pathlib.Path(a.predictions) / f"eval_{'+'.join(splits)}")

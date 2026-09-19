@@ -43,6 +43,9 @@ predictions file are skipped (the row count is reported), so any subset can be e
 - **T4 at M and L** (owner decision 2026-09-18): with `--t4-reference aux/t4_bs1_reference/<tier>` the primary T4 metrics of
   samples in the reference subset are computed against the exact block-1 Omniscape map; the same metrics against the
   block-centred production target are reported as `bc_*` (secondary); `t4_target` per sample records which target was used.
+- **Block-size rows (WP2)**: `--t4-blocks <aux build> ...` (with `--t4-reference`) appends a T4 error-vs-cost table to
+  `results.md` with the production block, the block-size baselines and the learned model side by side on the evaluated
+  splits; the standalone `scripts/t4_pareto.py` produces the same table plus the Pareto figure across runs.
 - **Efficiency**: `speedup` = solver wall time / inference time per configuration; median and geometric mean.
 - **Solver acceleration** (`--acceleration`, needs `voltage`): AMG-PCG iterations and wall time to
   rtol 1e-6 from the predicted voltage vs from zero, computed in Julia with the same preconditioner and

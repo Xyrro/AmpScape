@@ -179,6 +179,7 @@ def evaluate(
     out_dir: str | pathlib.Path | None = None,
     acceleration: bool = False,
     t4_reference: str | pathlib.Path | None = None,
+    t4_blocks: list[str] | None = None,
 ) -> dict:
     pred_dir = pathlib.Path(pred_dir)
     meta = (
@@ -263,6 +264,79 @@ def evaluate(
                 g.solve_time_s.tolist(), g.inference_time_s.tolist()
             )
             result["per_task"][task] = agg
+    if t4_reference and t4_blocks:
+        import pandas as pd
+
+        rows = []
+        ref_idx = pd.read_parquet(pathlib.Path(t4_reference) / "index.parquet")
+        for split, g in ref_idx.groupby("split"):
+            if split in splits:
+                rows.append(
+                    {
+                        "split": split,
+                        "method": f"production block {int(g.prod_block.iloc[0])} (correct_artifacts=1)",
+                        "n": len(g),
+                        "cost_s": float(g.prod_solve_s.median()),
+                        **{
+                            k: float(g[k].mean())
+                            for k in (
+                                "rel_l2",
+                                "ns_rel_l2",
+                                "mae_log10eps",
+                                "top5_iou",
+                                "pinch_recall",
+                            )
+                        },
+                    }
+                )
+        for b in t4_blocks:
+            p = pathlib.Path(b) / "vs_bs1.parquet"
+            if not p.exists():
+                continue
+            d = pd.read_parquet(p)
+            for split, g in d.groupby("split"):
+                if split in splits:
+                    rows.append(
+                        {
+                            "split": split,
+                            "method": f"block {int(g.block.iloc[0])} (correct_artifacts={int(g.correct_artifacts.iloc[0])})",
+                            "n": len(g),
+                            "cost_s": float(g.solve_s.median()),
+                            **{
+                                k: float(g[k].mean())
+                                for k in (
+                                    "rel_l2",
+                                    "ns_rel_l2",
+                                    "mae_log10eps",
+                                    "top5_iou",
+                                    "pinch_recall",
+                                )
+                            },
+                        }
+                    )
+        # the learned model: its T4 rows against the exact target, cost = median inference time
+        for task, agg in result["per_task"].items():
+            if task != "T4":
+                continue
+            ps = [
+                x
+                for x in result["per_sample"]
+                if x.get("task") == "T4" or x.get("config") == "omniscape"
+            ]
+            ts = [x["inference_time_s"] for x in ps if x.get("inference_time_s")]
+            rows.append(
+                {
+                    "split": "+".join(splits),
+                    "method": f"{result['model']} (learned)",
+                    "n": agg.get("rel_l2", {}).get("n"),
+                    "cost_s": float(np.median(ts)) if ts else float("nan"),
+                    **{
+                        k: agg.get(k, {}).get("mean")
+                        for k in ("rel_l2", "ns_rel_l2", "mae_log10eps", "top5_iou", "pinch_recall")
+                    },
+                }
+            )
+        result["t4_blocks"] = rows
     if acceleration:
         from ampscape.metrics.acceleration import run_warm_start_eval, summarize
 
@@ -338,6 +412,25 @@ def markdown_table(result: dict) -> str:
         if sp.get("speedup_median") is not None and not np.isnan(sp.get("speedup_median", np.nan)):
             lines.append(
                 f"| speed-up vs solver (median / geomean) | {sp['speedup_median']:.3g} | {sp['speedup_geomean']:.3g} | |"
+            )
+        lines.append("")
+    if result.get("t4_blocks"):
+        # WP2 (review addendum): block-size rows beside the learned model on every split, with cost columns
+        lines += [
+            "## T4 error vs cost: learned model and block-size baselines (errors vs the exact block-1 map)",
+            "",
+            "| split | method | n | cost s / landscape | rel_l2 | ns_rel_l2 | mae_log10eps | top5_iou | pinch_recall |",
+            "|---|---|---|---|---|---|---|---|---|",
+        ]
+        for r in result["t4_blocks"]:
+            f = lambda v: "–" if v is None else f"{v:.4f}"
+            lines.append(
+                f"| {r['split']} | {r['method']} | {r['n']} | {r['cost_s']:.3g} | "
+                + " | ".join(
+                    f(r.get(k))
+                    for k in ("rel_l2", "ns_rel_l2", "mae_log10eps", "top5_iou", "pinch_recall")
+                )
+                + " |"
             )
         lines.append("")
     if "acceleration" in result:
