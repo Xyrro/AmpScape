@@ -135,3 +135,13 @@ node stand down for one 25-min lease window; no data was affected.
 
 Core-hours used since 2026-09-15 (ampscape-* jobs): **5331**. Stop rule: not triggered.
 
+## 2026-09-19T08:51+00:00
+
+| tier | shards | solved | finalized | uploaded | upload failed | invalid | QC fail | GB on Hub | GB local |
+|---|---|---|---|---|---|---|---|---|---|
+| S | 500 | 500 | 500 | 500 | 0 | 0 | 0.000% | 142.2 | 0.0 |
+| M | 500 | 500 | 500 | 500 | 0 | 0 | 0.002% | 251.5 | 0.0 |
+| L | 1000 | 200 | 165 | 157 | 0 | 0 | 0.024% | 38.6 | 1.9 |
+
+Core-hours used since 2026-09-15 (ampscape-* jobs): **5660**. Stop rule: not triggered.
+
