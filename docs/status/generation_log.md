@@ -110,3 +110,15 @@ Core-hours used since 2026-09-15 (ampscape-* jobs): **3852**. Stop rule: not tri
 
 Core-hours used since 2026-09-15 (ampscape-* jobs): **5123**. Stop rule: not triggered.
 
+
+## Incident 2026-09-19 (d) — duplicate supervisors after a session restart on a different login node
+
+The operator session restarted on `login-ice-gnr-1` while the driver and the S/M/L sync supervisors from the previous
+session were still running on `login-ice-gnr-2`; the pid-file liveness check (`kill -0`) cannot see processes on
+another node, so the driver and an L sync loop were started a second time (05:59Z). Detected within ten minutes and
+held via `logs/ALERT.txt`; the duplicate driver exited on the alert and the duplicate L sync loop was killed (06:1xZ).
+No double submission occurred (one L array in the queue; `generate.py submit` skips shards with queued/running tasks)
+and no shard was touched twice (uploads are marker-gated). Fix (commit b0fb76c): cross-host single-instance leases
+(`logs/lease_<name>.json` with host, pid, owner, timestamp; a fresh lease held by another host/pid makes a new
+instance stand down) for the driver and every sync loop. Rule from now on: check `logs/lease_*.json` (host + age)
+before starting any supervisor, never trust a pid file across login nodes.
