@@ -265,8 +265,6 @@ def evaluate(
             )
             result["per_task"][task] = agg
     if t4_reference and t4_blocks:
-        import pandas as pd
-
         rows = []
         ref_idx = pd.read_parquet(pathlib.Path(t4_reference) / "index.parquet")
         for split, g in ref_idx.groupby("split"):
