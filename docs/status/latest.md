@@ -8,6 +8,10 @@
   Pareto at M — the artefact correction is worth 4× in rel-L2 at no cost (block 3: 0.029 vs 0.111 without); block 7 with
   correction 0.098 at 25 s; block-size error is nearly split-independent; `evaluate.py --t4-blocks` prints block rows beside
   a model. L rows and learned-model rows pending (L production; GPU allocation). **Stopped for confirmation.**
+- **CI**: green again from `849ca68` (unused locals and lambdas fixed); commits touching only `docs/status`, `docs/tables`,
+  `docs/figures`, `DECISIONS.md` or `CHANGELOG.md` no longer trigger CI.
+- **Approved work in flight**: L block-1 reference (first 20 samples solving; topped up as L real shards land), WP5 probe set
+  (60 real L tiles × 4 cells + 60 synthetic seeds × 2 sizes = 360 samples solving under `aux/scale_probe/probe_L`).
 - **Generation**: S and M complete and audited; L wave 2 of 10 running (87 of 1 000 shards on the Hub), scratch 180 GB,
   ≈ 5 100 core-hours. Incident (d): a session restart on another login node started duplicate supervisors; caught in
   10 min, no double submission, cross-host leases added (`logs/lease_*.json`); the driver is being restarted under the
