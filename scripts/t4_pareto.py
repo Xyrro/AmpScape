@@ -114,7 +114,10 @@ def main():
     ]
     for split, g in df.groupby("split"):
         for r in g.sort_values("cost_s", ascending=False).itertuples():
-            f = lambda v: "–" if v is None or pd.isna(v) else f"{v:.4f}"
+
+            def f(v):
+                return "–" if v is None or pd.isna(v) else f"{v:.4f}"
+
             lines.append(
                 f"| {split} | {r.method} | {r.n} | {'–' if pd.isna(r.cost_s) else f'{r.cost_s:.3g}'} | "
                 + " | ".join(f(getattr(r, k)) for k in KEYS)

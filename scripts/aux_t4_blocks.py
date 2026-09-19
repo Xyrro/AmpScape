@@ -87,15 +87,6 @@ def cmd_prepare(a):
 
     out = pathlib.Path(a.out)
     sel = pd.read_parquet(out / "selection.parquet")
-    src_build = (
-        pathlib.Path(
-            json.loads((out / "selection.parquet").with_name("source_build.json").read_text())[
-                "build"
-            ]
-        )
-        if (out / "source_build.json").exists()
-        else None
-    )
     cfg_src = json.loads((pathlib.Path(a.build) / "build.json").read_text())
     sel = sel.copy()
     sel["shard"] = np.arange(len(sel)) // a.shard_size
@@ -282,7 +273,6 @@ def cmd_compare(a):
                         )
         for shard_name, sids in sorted(by_shard.items()):
             prod = _production_maps(a.tier, shard_name, cache, a.repo)
-            ip = None
             for sid in sids:
                 if sid not in aux_maps or sid not in prod:
                     continue
@@ -346,8 +336,6 @@ def cmd_compare(a):
         "ns_top5_iou",
         "max_diff_over_max",
     ]
-    summ = df.groupby("split")[keys].agg(["mean", "median", "max"]).round(4)
-    times = df.groupby("split")[["prod_solve_s", "aux_solve_s"]].median().round(1)
     lines = [
         f"# {out.name}: production T4 (block {df.prod_block.iloc[0] if len(df) else '?'}) vs aux block {cfg['aux']['block_size']} "
         f"(correct_artifacts={cfg['aux']['correct_artifacts']}) — tier {a.tier}, {len(df)} samples",

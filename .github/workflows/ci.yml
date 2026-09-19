@@ -1,6 +1,8 @@
 name: ci
 on:
-  push: {branches: [main]}
+  push:
+    branches: [main]
+    paths-ignore: ['docs/status/**', 'docs/tables/**', 'docs/figures/**', 'DECISIONS.md', 'CHANGELOG.md']
   pull_request:
 jobs:
   python:

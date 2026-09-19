@@ -421,7 +421,10 @@ def markdown_table(result: dict) -> str:
             "|---|---|---|---|---|---|---|---|---|",
         ]
         for r in result["t4_blocks"]:
-            f = lambda v: "–" if v is None else f"{v:.4f}"
+
+            def f(v):
+                return "–" if v is None else f"{v:.4f}"
+
             lines.append(
                 f"| {r['split']} | {r['method']} | {r['n']} | {r['cost_s']:.3g} | "
                 + " | ".join(
