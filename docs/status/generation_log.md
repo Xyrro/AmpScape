@@ -154,3 +154,10 @@ studies) and `ampscape-L_bs1` counted as tier work: several M waves and L wave 3
 (exact name match, commit 08:53Z); wave 3 of L went out ten seconds after the restart. Also widened the driver's sync
 liveness window to 60 min: a sync cycle is a 15-min sleep plus up to ~15 min of uploads, and the lease is refreshed
 once per cycle.
+
+## Incident 2026-09-19 (e) — finals validated while still being written (root cause of M 434 and L 189)
+
+`finalize` wrote the final shard directly under its final name while the sync loop lists `shards/*.h5` every 15 min:
+a final caught mid-write failed to open ("bad object header"), was marked `.invalid`, and the driver alerted; both
+shards were re-finalized from their intact outputs (no solve lost). Fix: finalize writes `<shard>.h5.part` and
+renames atomically on completion; the sync skips `.part` files and any final younger than three minutes.

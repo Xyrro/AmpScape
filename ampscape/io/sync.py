@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import pathlib
+import time
 
 from ampscape.io.schema import validate_shard
 
@@ -269,6 +270,8 @@ def sync_live(
     expected = expected_samples(build)
     planned = planned_configs(build)
     for sh in sorted((build / "shards").glob("shard-*.h5")):
+        if sh.name.endswith(".part") or time.time() - sh.stat().st_mtime < 180:
+            continue  # being written (finalize renames the .part atomically; never validate a file younger than 3 min)
         rec: dict = {"shard": sh.name, "bytes": sh.stat().st_size}
         if sh.with_suffix(".uploaded").exists():
             rec["status"] = "already"

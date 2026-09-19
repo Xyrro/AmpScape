@@ -393,12 +393,19 @@ def cmd_finalize(a) -> None:
         if p["final"].exists() and not a.force:
             print(f"shard {sh}: final exists")
             continue
+        part = p["final"].with_suffix(
+            ".h5.part"
+        )  # written under a temporary name, renamed atomically when complete:
+        # the sync loop lists shards/*.h5 and validated half-written finals as unreadable (M 434, L 189)
         idx = finalize_shard(
-            str(p["inputs"]), str(p["outputs"]), str(p["final"]), cfg["dataset_version"], preset
+            str(p["inputs"]), str(p["outputs"]), str(part), cfg["dataset_version"], preset
         )
         p["index"].parent.mkdir(parents=True, exist_ok=True)
         idx.to_parquet(p["index"], index=False)
         n_fail = int((~idx.qc_pass).sum())
+        import os
+
+        os.replace(part, p["final"])
         from ampscape.io.sync import validate as validate_and_mark
 
         valid = validate_and_mark(p["final"])
