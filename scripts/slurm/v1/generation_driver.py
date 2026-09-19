@@ -398,7 +398,10 @@ def run_tier(
                 for d, suf in (
                     ("shards", ".h5"),
                     ("shards", ".uploaded"),
-                    ("outputs", ".outputs.h5"),
+                    (
+                        "outputs",
+                        ".outputs.h5.done",
+                    ),  # a partial outputs file (walltime) does not count
                 )
             )
         ]

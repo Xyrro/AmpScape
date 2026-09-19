@@ -277,8 +277,14 @@ def cmd_submit(a) -> None:
         else shards
     )
     todo = (
-        [s for s in todo if not shard_paths(build, s)["outputs"].exists()] if not a.force else todo
-    )  # solved, awaiting finalize
+        [
+            s
+            for s in todo
+            if not pathlib.Path(str(shard_paths(build, s)["outputs"]) + ".done").exists()
+        ]
+        if not a.force
+        else todo
+    )  # solved = completion marker; a partial outputs file (walltime) is resumed by the solver
     todo = [
         s for s in todo if not shard_paths(build, s)["final"].with_suffix(".uploaded").exists()
     ]  # streamed already
