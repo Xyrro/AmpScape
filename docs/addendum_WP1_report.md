@@ -60,3 +60,13 @@ samples but only 1.4 % of the real tiles** (the tail is the fragmented high-cont
 no deviation above 8 %. Block 1 costs 7.2× the production solve. The per-sample index (`index.parquet`, keyed by
 `sample_id`, with `tail_gt5pct`) and `summary.md` are the published artefacts; the harness uses the reference with
 `--t4-reference aux/t4_bs1_reference/M_bs1`.
+
+## 6. Tier L reference (interim, 2026-09-19): first 13 of 20 synthetic samples
+
+Production block 5 (radius 64 px, b/r 0.078, `correct_artifacts`) vs block 1: test_id (n = 9) rel-L2 **0.036** / median
+0.032 / max 0.058, non-source 0.048, top-5 % IoU 0.95, pinch recall 0.94, max Δ/max 0.105; test_ood contrast-10⁶ (n = 4)
+rel-L2 0.023, non-source 0.047, top-5 % IoU 0.97. Block 1 at L costs **21× the production solve** (median 12 080 s vs
+564 s, i.e. ≈ 3.4 CPU-h per landscape), which is why the L reference is a 45–60-sample sanity set. The remaining 7
+samples of the first batch are re-solved with a 16-h walltime (the solver resumes completed samples); the real-tile
+and ood_region parts are topped up hourly as L real shards reach the Hub. Interim reading: the M-level approximation
+(≈ 3 %) holds at L with the same b/r rule.
