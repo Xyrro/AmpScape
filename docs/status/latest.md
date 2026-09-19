@@ -17,6 +17,10 @@
   driver also no longer counts aux arrays as tier work (that had stalled waves behind the block-size studies).
 - **L block-1 reference**: first 20 samples solving (block 1 at L ≈ 4–5 h per sample; resumable resubmission chained); the
   block-3 / block-11 / block-5-without-correction rows at L are queued on the same samples.
+- **L walltime incident (generation log (f))**: 62 shards of L waves 1–4 had silently timed out at 4 h and were never
+  re-queued; recovered (solver resumed 1 165 of their 1 240 landscapes; ≈ 20 core-h of solve lost, plus an idle second core on
+  every L task so far); walltimes now from the measured tail (L 8 h, XL/XXL 10 h), "solved" = completion marker, the driver
+  re-queues at every cycle. Waves 1–4 fully on the Hub; wave 5 of 10 running.
 - **Generation**: S and M complete and audited; L wave 2 of 10 running (87 of 1 000 shards on the Hub), scratch 180 GB,
   ≈ 5 100 core-hours. Incident (d): a session restart on another login node started duplicate supervisors; caught in
   10 min, no double submission, cross-host leases added (`logs/lease_*.json`); the driver is being restarted under the
