@@ -171,3 +171,13 @@ renames atomically on completion; the sync skips `.part` files and any final you
 
 Core-hours used since 2026-09-15 (ampscape-* jobs): **6381**. Stop rule: not triggered.
 
+## 2026-09-19T17:11+00:00
+
+| tier | shards | solved | finalized | uploaded | upload failed | invalid | QC fail | GB on Hub | GB local |
+|---|---|---|---|---|---|---|---|---|---|
+| S | 500 | 500 | 500 | 500 | 0 | 0 | 0.000% | 142.2 | 0.0 |
+| M | 500 | 500 | 500 | 500 | 0 | 0 | 0.002% | 251.5 | 0.0 |
+| L | 1000 | 400 | 338 | 329 | 0 | 0 | 0.029% | 80.9 | 2.0 |
+
+Core-hours used since 2026-09-15 (ampscape-* jobs): **7254**. Stop rule: not triggered.
+
