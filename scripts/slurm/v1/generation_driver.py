@@ -103,6 +103,15 @@ def qc_fail_rate(tier: str) -> float:
 
 
 def sync_alive(tier: str) -> bool:
+    """A sync loop for the tier is alive if its cross-host lease (written by every sync cycle) is fresh — on any login
+    node — or, failing that, if the local pid file points to a live process (2026-09-19: pid files are host-local)."""
+    lf = LOGS / f"lease_sync_{tier}.json"
+    try:
+        d = json.loads(lf.read_text())
+        if time.time() - float(d.get("ts", 0)) < 1800:
+            return True
+    except Exception:  # noqa: BLE001
+        pass
     pf = LOGS / f"sync_{tier}.pid"
     if not pf.exists():
         return False
