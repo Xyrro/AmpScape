@@ -217,3 +217,10 @@ Core-hours used since 2026-09-15 (ampscape-* jobs): **7939**. Stop rule: not tri
 
 Core-hours used since 2026-09-15 (ampscape-* jobs): **8670**. Stop rule: not triggered.
 
+
+## Note 2026-09-20 — false "sync supervisor not running" alerts
+
+The L sync loop's upload cycles grew beyond an hour once real L shards (≈ 0.3 GB each, 75 per cycle) started landing,
+and the loop wrote its lease only at the start of a cycle, so the driver's 1-h liveness window fired twice (09:07Z,
+09:15Z) while the loop was busy uploading; no data affected, generation paused ≈ 10 min. Fix: the sync refreshes its
+lease after every uploaded shard and the driver's window is 2 h.
