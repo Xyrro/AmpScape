@@ -333,6 +333,9 @@ def sync_live(
         )
         attempts_f.unlink(missing_ok=True)
         rec["status"] = "uploaded"
+        acquire_lease(
+            f"sync_{tier}", pathlib.Path(__file__).resolve().parents[2]
+        )  # refresh: a cycle can run > 1 h
         if delete:
             sh.unlink()
             for f in (
