@@ -242,3 +242,13 @@ task log shows the error.
 
 Core-hours used since 2026-09-15 (ampscape-* jobs): **9283**. Stop rule: not triggered.
 
+## 2026-09-20T22:00+00:00
+
+| tier | shards | solved | finalized | uploaded | upload failed | invalid | QC fail | GB on Hub | GB local |
+|---|---|---|---|---|---|---|---|---|---|
+| S | 500 | 500 | 500 | 500 | 0 | 0 | 0.000% | 142.2 | 0.0 |
+| M | 500 | 500 | 500 | 500 | 0 | 0 | 0.002% | 251.5 | 0.0 |
+| L | 1000 | 1000 | 900 | 900 | 0 | 0 | 0.015% | 322.6 | 0.0 |
+
+Core-hours used since 2026-09-15 (ampscape-* jobs): **10144**. Stop rule: not triggered.
+

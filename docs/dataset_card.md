@@ -66,7 +66,7 @@ contrast (10⁶), held-out scale (XL/XXL for models trained ≤ L), and a synthe
 
 Omniscape targets at M–XXL use `block_size = largest odd ≤ radius/10` (block 1, i.e. exact, at S). Against the exact
 block-1 map the production M target deviates by 3.1 % relative L2 on average (tail to 25 % on fragmented high-contrast
-landscapes; top-5 % IoU 0.95, pinch-point recall 0.95). Block-1 reference subsets at M (≈ 1 000 samples) and L (45–60)
+landscapes; top-5 % IoU 0.95, pinch-point recall 0.95). Against the exact map the production L target (block 5) deviates by 2.8 % on average (60-sample reference, 2 samples above 5 %). Block-1 reference subsets at M (1 000 samples) and L (60)
 are published under `aux/t4_bs1_reference/` with per-sample deviations and a > 5 % tail flag; T4 leaderboard metrics at M
 and L are reported against these exact targets (`docs/t4_fidelity.md`).
 

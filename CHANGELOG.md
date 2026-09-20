@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Addendum WP1/WP2 at L — 2026-09-20
+- L block-1 reference complete (60 samples: mean rel-L2 0.028, 2 of 60 flagged; index + summary on the Hub under
+  `aux/t4_bs1_reference/L/`), L block-size Pareto rows (blocks 3/5/11, correction on/off; `docs/tables/t4_pareto_L.md`,
+  `aux/t4_blocksize_baselines/L/` on the Hub). `aux_t4_blocks.py compare`: cross-file inputs lookup after a top-up,
+  `tail_gt5pct` column written by the script, unreadable Hub samples skipped with a warning.
+
 ### v1.0 generation + Phase 11 — 2026-09-15/16
 - v1.0 freeze (`v1.0-pipeline` = 8491bbe): frozen cell assignment, tile-level hold-out, `test_ood_scale_strict`, decimated
   tile reader with resampling provenance, per-tier tile manifests, live streaming sync + scratch guard, runbook.

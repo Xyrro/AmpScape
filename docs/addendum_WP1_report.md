@@ -61,12 +61,30 @@ no deviation above 8 %. Block 1 costs 7.2× the production solve. The per-sample
 `sample_id`, with `tail_gt5pct`) and `summary.md` are the published artefacts; the harness uses the reference with
 `--t4-reference aux/t4_bs1_reference/M_bs1`.
 
-## 6. Tier L reference (2026-09-20): first 20 synthetic samples complete (real tiles / ood_region topped up as L real shards land)
+## 6. Tier L reference complete (2026-09-20): 60 samples, production block 5 vs block 1
 
-Production block 5 (radius 64 px, b/r 0.078, `correct_artifacts`) vs block 1: test_id (n = 12) rel-L2 **0.035** / median
-0.031 / max 0.058, non-source 0.045, top-5 % IoU 0.94, pinch recall 0.95; test_ood contrast-10⁶ (n = 8) rel-L2 0.020,
-non-source 0.042, top-5 % IoU 0.97; 2 of 20 above 5 %. Block 1 at L costs **22× the production solve** (median
-11 900 s vs 570 s, ≈ 3.3 CPU-h per landscape), which is why the L reference is a 45–60-sample sanity set; the first
-batch needed a 16-h walltime (4 landscapes per task). The real-tile and ood_region parts are topped up hourly as L real
-shards reach the Hub (they are generated after the synthetic shards). Interim reading: the M-level approximation
-(≈ 3 %) holds at L with the same b/r rule.
+Selection (`aux/t4_bs1_reference/L_bs1/`, index and summary on the Hub under `aux/t4_bs1_reference/L/`): 60 samples,
+test_id 24 (12 synthetic + 12 real tiles), test_ood contrast-10⁶ 16 (8 + 8), ood_region 20 (real tiles). Production
+block 5 (radius 64 px, b/r 0.078, `correct_artifacts`) vs the exact block-1 map:
+
+| split | n | rel-L2 mean / median / max | non-source rel-L2 | log-MAE | top-5 % IoU | pinch recall | max \|Δ\| / max | > 5 % |
+|---|---|---|---|---|---|---|---|---|
+| test_id | 24 | **0.032** / 0.028 / 0.058 | 0.036 | 0.014 | 0.934 | 0.932 | 0.108 | 2 |
+| test_ood | 16 | 0.020 / 0.022 / 0.031 | 0.035 | 0.032 | 0.932 | 0.954 | 0.076 | 0 |
+| ood_region | 20 | 0.028 / 0.032 / 0.040 | 0.026 | 0.011 | 0.931 | 0.927 | 0.095 | 0 |
+| real tiles (40) | | 0.027 / 0.025 / 0.049 | 0.027 | | 0.924 | 0.926 | 0.098 | 0 |
+| synthetic (20) | | 0.029 / 0.027 / 0.058 | 0.044 | | 0.950 | 0.958 | 0.089 | 2 |
+
+Mean rel-L2 over the 60 samples **0.028**; the flagged tail (`tail_gt5pct`) is 2 of 60 (both synthetic test_id: a
+`random_cluster` at contrast 10 with 0.051 and a `fractal` at contrast 100 with 0.058); no real tile exceeds 5 %.
+This is the same picture as the 1 000-sample M reference (0.029 mean, 4.7 % tail) one tier up and with a slightly
+smaller b/r, so the ≈ 3 % approximation of the production block rule holds at L. Block 1 at L costs **22× the
+production solve** (median 13 300 s vs 680 s, ≈ 3.7 CPU-h per landscape; 60 samples ≈ 225 CPU-h including the
+re-solves of the first batch after the 10-h walltime), which is why the L reference stays a sanity set. The
+per-sample index carries the same columns as the M index (`rel_l2`, `ns_rel_l2`, `top5_iou`, `pinch_recall`,
+`max_diff_over_max`, solve times, `tail_gt5pct`) and is the L T4 evaluation surface for
+`scripts/evaluate.py --t4-reference aux/t4_bs1_reference/L_bs1`.
+
+Tooling note: the top-up `prepare` re-chunks the aux manifest, so `compare` now looks a sample's inputs up across all
+inputs files of the build instead of assuming the manifest's shard (this was the `KeyError` that stopped the first
+full-reference run), and it skips a sample that is unreadable in the Hub T4 file with a warning instead of aborting.

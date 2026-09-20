@@ -46,23 +46,35 @@ learned model on every split (no M-trained model exists yet — the learned rows
 - Spearman is ≥ 0.92 for every row including the worst — rank correlation cannot separate these baselines, which is why
   the harness reports rel-L2, non-source rel-L2 and top-q IoU as primary (WP3).
 
-## Tier L rows (2026-09-20: the first 20 synthetic samples of the L reference; `docs/tables/t4_pareto_L.md`, `docs/figures/t4_pareto_L.png`)
+## Tier L rows (2026-09-20: the full 60-sample L reference; `docs/tables/t4_pareto_L.md`, `docs/figures/t4_pareto_L.png`)
+
+Errors against the exact block-1 map; cost = median single-core solve time per landscape.
 
 | split | method | cost s | rel-L2 | ns rel-L2 | log-MAE | top-5 % IoU | pinch recall |
 |---|---|---|---|---|---|---|---|
-| test_id (12) | block 1 (exact) | 11 400 | 0 | 0 | 0 | 1 | 1 |
-| test_id | block 3, ca on | 1 483 | 0.029 | 0.035 | 0.010 | 0.944 | 0.936 |
-| test_id | **production block 5, ca on** | 545 | **0.035** | 0.045 | 0.018 | 0.937 | 0.947 |
-| test_id | block 5, ca off | 561 | 0.098 | 0.108 | 0.026 | 0.800 | 0.978 |
-| test_id | block 11, ca on | 137 | 0.092 | 0.122 | 0.054 | 0.840 | 0.811 |
-| test_ood (8) | production block 5, ca on | 580 | 0.020 | 0.042 | 0.057 | 0.970 | 0.973 |
-| test_ood | block 3 / block 11, ca on | 1 553 / 145 | 0.016 / 0.062 | 0.030 / 0.146 | 0.007 / 0.166 | 0.976 / 0.909 | 0.957 / 0.886 |
-| test_ood | block 5, ca off | 602 | 0.105 | 0.175 | 0.063 | 0.899 | 0.988 |
+| test_id (24) | block 1 (exact) | 12 300 | 0 | 0 | 0 | 1 | 1 |
+| test_id | block 3, ca on | 1 650 | 0.028 | 0.029 | 0.008 | 0.941 | 0.935 |
+| test_id | **production block 5, ca on** | 566 | **0.032** | 0.036 | 0.014 | 0.934 | 0.932 |
+| test_id | block 5, ca off | 638 | 0.101 | 0.114 | 0.022 | 0.771 | 0.977 |
+| test_id | block 11, ca on | 164 | 0.085 | 0.095 | 0.041 | 0.832 | 0.818 |
+| test_ood (16) | block 1 (exact) | 14 000 | 0 | 0 | 0 | 1 | 1 |
+| test_ood | block 3, ca on | 2 020 | 0.018 | 0.027 | 0.007 | 0.939 | 0.950 |
+| test_ood | **production block 5, ca on** | 706 | **0.020** | 0.035 | 0.032 | 0.932 | 0.954 |
+| test_ood | block 5, ca off | 764 | 0.100 | 0.148 | 0.041 | 0.714 | 0.980 |
+| test_ood | block 11, ca on | 201 | 0.061 | 0.109 | 0.094 | 0.823 | 0.856 |
+| ood_region (20) | block 1 (exact) | 13 200 | 0 | 0 | 0 | 1 | 1 |
+| ood_region | block 3, ca on | 1 820 | 0.026 | 0.021 | 0.007 | 0.934 | 0.936 |
+| ood_region | **production block 5, ca on** | 725 | **0.028** | 0.026 | 0.011 | 0.931 | 0.927 |
+| ood_region | block 5, ca off | 729 | 0.100 | 0.101 | 0.019 | 0.752 | 0.965 |
+| ood_region | block 11, ca on | 191 | 0.079 | 0.066 | 0.034 | 0.832 | 0.819 |
 
-Same picture as M one tier up: the production rule (b/r 0.078 here) sits at 3.5 % for a 21× saving over the exact map;
-halving the block (3) buys 0.6 points of rel-L2 for 2.7× the cost; doubling it (11) loses 6 points for a 4× saving;
-the artefact correction is again worth ≈ 2.8× in rel-L2 at zero cost. Re-scored once more when the reference reaches
-45–60 samples (real tiles and ood_region are topped up as L real shards land).
+Same picture as M one tier up, now on real tiles as well as synthetic landscapes: the production rule (b/r 0.078)
+sits at 2–3 % for a 17–22× saving over the exact map; halving the block (3) buys 0.2–0.4 points of rel-L2 for 2.5–2.9×
+the cost, i.e. block 3 and block 5 are within noise of each other on every split while block 3 costs three times
+more; doubling it (11) loses 4–6 points for a 3.5–3.8× saving and drops top-5 % IoU from 0.93 to 0.83; the artefact
+correction is worth 3.2–5× in rel-L2 at zero cost (0.10 → 0.02–0.03) and, without it, top-5 % IoU falls to 0.71–0.77
+while pinch recall rises (uncorrected seams inflate the current on the whole map). The knee of the Pareto front at L
+is the production block, as at M.
 
 ## Pending
-Learned-model rows (three-seed baselines after the GPU allocation); the L reference completion.
+Learned-model rows (three-seed baselines after the GPU allocation).

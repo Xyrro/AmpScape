@@ -9,7 +9,7 @@ difference against the exact block-1 Omniscape, not by correlation alone. This p
 |---|---|---|---|---|---|---|---|
 | S | 100 m | 128² | 16 / 1.6 | **1 (exact)** | true (no effect at block 1) | CHOLMOD | 52 (measured: v1.0 median 50.5) |
 | M | 100 m | 256² | 32 / 3.2 | 3 (0.094) | true | CHOLMOD | 134 (measured: v1.0 median 103) |
-| L | 200 m | 512² | 64 / 12.8 | 5 (0.078) | true | CHOLMOD | 577 (scaled) |
+| L | 200 m | 512² | 64 / 12.8 | 5 (0.078) | true | CHOLMOD | 577 (scaled; v1.0 median on the L reference 680) |
 | XL | 500 m | 1024² | 128 / 64 | 11 (0.086) | true | CHOLMOD | 1 896 (scaled) |
 | XXL | 1 km | 2048² | 256 / 256 | 25 (0.098) | true | CHOLMOD | 9 613 (scaled; published XXL tile measured 10 435) |
 
@@ -55,7 +55,7 @@ log-MAE and the non-source rel-L2 (WP3); WP2 adds the block-size Pareto rows. Re
 So the ≈ 1 % extrapolation was optimistic: the production M block deviates from the exact map by **3.1 % relative L2 on
 average (median 2.8 %)**, 4–5 % on non-source pixels, with a tail (9 % of landscapes above 5 %, 2 % above 10 %,
 worst 25 %) concentrated on `random_cluster` landscapes at contrast ≥ 10⁴; the domain quantities are much more stable
-(top-5 % IoU 0.95, pinch-point recall 0.95). The full 1 000-sample reference (real and synthetic, every split) gives mean rel-L2 0.029 (median 0.027), 4.7 % of samples above 5 % (11 % of synthetic, 1.4 % of real tiles; real tiles never above 8 %) — `docs/addendum_WP1_report.md` §5. L (block 5, first 20 synthetic samples): rel-L2 0.035 test_id / 0.020 test_ood, top-5 % IoU 0.94–0.97, 2 of 20 above 5 %, block 1 = 22× the production cost — `docs/addendum_WP1_report.md` §6 (real-tile part pending).
+(top-5 % IoU 0.95, pinch-point recall 0.95). The full 1 000-sample reference (real and synthetic, every split) gives mean rel-L2 0.029 (median 0.027), 4.7 % of samples above 5 % (11 % of synthetic, 1.4 % of real tiles; real tiles never above 8 %) — `docs/addendum_WP1_report.md` §5. L (block 5, 60 samples: 20 synthetic + 40 real tiles over test_id / test_ood / ood_region): mean rel-L2 0.028 (test_id 0.032, test_ood 0.020, ood_region 0.028; median 0.027, max 0.058), non-source 0.033, top-5 % IoU 0.93, pinch recall 0.94, 2 of 60 above 5 % (both synthetic; no real tile above 5 %), block 1 = 22× the production cost — `docs/addendum_WP1_report.md` §6. Block-size Pareto rows at M and L: `docs/addendum_WP2_report.md`.
 
 ## How `block_size` enters the target
 Omniscape solves one window per block centre (a block of block_size² source pixels is treated as one source), so
@@ -71,5 +71,5 @@ block 1, solve times, and `tail_gt5pct` = rel-L2 > 0.05) are the **official T4 e
 T4 metrics at those tiers are computed against the exact block-1 map on the reference subset
 (`scripts/evaluate.py --t4-reference aux/t4_bs1_reference/<tier>`), with the same metrics against the block-centred
 production target reported as secondary (`bc_*`). Sizes: M ≈ 1 000 samples over test_id and every OOD split (synthetic
-and real), L 45–60 as a sanity set. S needs no reference (block 1 in production). XL/XXL T4 metrics are against the
+and real), L 60 as a sanity set (both complete, 2026-09-20). S needs no reference (block 1 in production). XL/XXL T4 metrics are against the
 production targets only, with the M/L measurements as the stated fidelity bound.

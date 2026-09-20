@@ -137,7 +137,16 @@ def _production_maps(
     out = {}
     with h5py.File(p, "r") as f:
         for sid in f:
-            g = f[sid]["configs"]["omniscape"]
+            try:
+                g = f[sid]["configs"]["omniscape"]
+            except (
+                KeyError
+            ) as e:  # sample without a T4 config (skipped) or unreadable group: record and continue
+                print(
+                    f"  [warn] {shard_name}: {sid} unreadable in Hub T4 file ({e}); skipped",
+                    file=sys.stderr,
+                )
+                continue
             st = json.loads(g["outputs"].attrs["solver_stats"])
             sp = st.get("solver_params", {})
             out[sid] = (
@@ -162,12 +171,22 @@ def _aux_maps(build: pathlib.Path) -> dict[str, tuple[np.ndarray, float]]:
 
 
 def _inputs_for(build: pathlib.Path, sel: pd.DataFrame, sid: str) -> tuple[np.ndarray, np.ndarray]:
-    sh = int(sel[sel.sample_id == sid].shard.iloc[0])
-    with h5py.File(build / "inputs" / f"shard-{sh:05d}.inputs.h5", "r") as fi:
+    """(nodata, source_strength) of a sample from the build's inputs; searched across files because a top-up
+    `prepare` may re-chunk the manifest while earlier inputs keep their original shard layout."""
+    cache = _INPUT_INDEX.setdefault(str(build), {})
+    if not cache:
+        for i in sorted((build / "inputs").glob("shard-*.inputs.h5")):
+            with h5py.File(i, "r") as fi:
+                for k in fi["samples"]:
+                    cache[k] = i
+    with h5py.File(cache[sid], "r") as fi:
         g = fi["samples"][sid]
         return g["inputs"]["nodata_mask"][...] > 0, g["configs"]["omniscape"]["source_strength"][
             ...
         ]
+
+
+_INPUT_INDEX: dict[str, dict[str, pathlib.Path]] = {}
 
 
 def cmd_compare_ref(a):
@@ -278,12 +297,7 @@ def cmd_compare(a):
                     continue
                 t_prod, tp, bp, rp = prod[sid]
                 t_aux, ta = aux_maps[sid]
-                # inputs (nodata + source strength) from the aux inputs file
-                sh = int(sel[sel.sample_id == sid].shard.iloc[0])
-                with h5py.File(out / "inputs" / f"shard-{sh:05d}.inputs.h5", "r") as fi:
-                    g = fi["samples"][sid]
-                    nd = g["inputs"]["nodata_mask"][...] > 0
-                    S = g["configs"]["omniscape"]["source_strength"][...]
+                nd, S = _inputs_for(out, sel, sid)
                 m = ~nd
                 # reference = the aux map (block 1 when this is the bs1 reference); "prediction" = the production map
                 pix = pixel.all_pixel(t_prod, t_aux, m)
@@ -323,6 +337,7 @@ def cmd_compare(a):
     finally:
         shutil.rmtree(cache, ignore_errors=True)
     df = pd.DataFrame(rows)
+    df["tail_gt5pct"] = df.rel_l2 > 0.05  # flagged tail: production target > 5 % rel-L2 from the exact map
     df.to_parquet(out / "index.parquet", index=False)
     keys = [
         "rel_l2",
