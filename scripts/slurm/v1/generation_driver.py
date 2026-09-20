@@ -109,7 +109,7 @@ def sync_alive(tier: str) -> bool:
     try:
         d = json.loads(lf.read_text())
         if (
-            time.time() - float(d.get("ts", 0)) < 3600
+            time.time() - float(d.get("ts", 0)) < 7200
         ):  # a sync cycle = 15 min sleep + up to ~15 min of uploads
             return True
     except Exception:  # noqa: BLE001
