@@ -207,3 +207,13 @@ shard_size × p99 × 1.15 + 20 min: L 08:00 (20 landscapes), XL 10:00 (6), XXL 1
 
 Core-hours used since 2026-09-15 (ampscape-* jobs): **7939**. Stop rule: not triggered.
 
+## 2026-09-20T08:35+00:00
+
+| tier | shards | solved | finalized | uploaded | upload failed | invalid | QC fail | GB on Hub | GB local |
+|---|---|---|---|---|---|---|---|---|---|
+| S | 500 | 500 | 500 | 500 | 0 | 0 | 0.000% | 142.2 | 0.0 |
+| M | 500 | 500 | 500 | 500 | 0 | 0 | 0.002% | 251.5 | 0.0 |
+| L | 1000 | 800 | 700 | 657 | 0 | 0 | 0.019% | 181.0 | 14.2 |
+
+Core-hours used since 2026-09-15 (ampscape-* jobs): **8670**. Stop rule: not triggered.
+
