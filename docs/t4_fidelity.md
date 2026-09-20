@@ -55,7 +55,7 @@ log-MAE and the non-source rel-L2 (WP3); WP2 adds the block-size Pareto rows. Re
 So the ≈ 1 % extrapolation was optimistic: the production M block deviates from the exact map by **3.1 % relative L2 on
 average (median 2.8 %)**, 4–5 % on non-source pixels, with a tail (9 % of landscapes above 5 %, 2 % above 10 %,
 worst 25 %) concentrated on `random_cluster` landscapes at contrast ≥ 10⁴; the domain quantities are much more stable
-(top-5 % IoU 0.95, pinch-point recall 0.95). The full 1 000-sample reference (real and synthetic, every split) gives mean rel-L2 0.029 (median 0.027), 4.7 % of samples above 5 % (11 % of synthetic, 1.4 % of real tiles; real tiles never above 8 %) — `docs/addendum_WP1_report.md` §5. L (block 5, first 13 synthetic samples): rel-L2 0.036 test_id / 0.023 test_ood, top-5 % IoU 0.95–0.97, block 1 = 21× the production cost — `docs/addendum_WP1_report.md` §6 (completion pending).
+(top-5 % IoU 0.95, pinch-point recall 0.95). The full 1 000-sample reference (real and synthetic, every split) gives mean rel-L2 0.029 (median 0.027), 4.7 % of samples above 5 % (11 % of synthetic, 1.4 % of real tiles; real tiles never above 8 %) — `docs/addendum_WP1_report.md` §5. L (block 5, first 20 synthetic samples): rel-L2 0.035 test_id / 0.020 test_ood, top-5 % IoU 0.94–0.97, 2 of 20 above 5 %, block 1 = 22× the production cost — `docs/addendum_WP1_report.md` §6 (real-tile part pending).
 
 ## How `block_size` enters the target
 Omniscape solves one window per block centre (a block of block_size² source pixels is treated as one source), so

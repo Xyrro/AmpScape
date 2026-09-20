@@ -197,3 +197,13 @@ only) on every L task since the tier started (≈ 40 % of L core-hours). S and M
 the driver re-queues every submitted shard without a marker at each 10-min cycle regardless of running arrays (the
 submit guard skips queued/running shards; alert after three rounds); walltimes from the measured tail —
 shard_size × p99 × 1.15 + 20 min: L 08:00 (20 landscapes), XL 10:00 (6), XXL 10:00 (1); L now 1 core.
+## 2026-09-20T00:27+00:00
+
+| tier | shards | solved | finalized | uploaded | upload failed | invalid | QC fail | GB on Hub | GB local |
+|---|---|---|---|---|---|---|---|---|---|
+| S | 500 | 500 | 500 | 500 | 0 | 0 | 0.000% | 142.2 | 0.0 |
+| M | 500 | 500 | 500 | 500 | 0 | 0 | 0.002% | 251.5 | 0.0 |
+| L | 1000 | 600 | 500 | 500 | 0 | 0 | 0.023% | 123.6 | 0.0 |
+
+Core-hours used since 2026-09-15 (ampscape-* jobs): **7939**. Stop rule: not triggered.
+
