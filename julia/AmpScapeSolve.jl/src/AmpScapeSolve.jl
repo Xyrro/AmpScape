@@ -338,7 +338,10 @@ function refine_voltage!(L::SparseMatrixCSC, idx::AbstractMatrix{<:Integer}, vol
             out["error"] = "cholesky failed: " * sprint(showerror, err)
             nothing
         end
-        F === nothing && return out
+        if F === nothing                                       # refinement skipped: report the unrefined residual
+            out["residual_after"] = before
+            return out
+        end
         d = F \ r
         xf .+= d
         r2 = bf .- Af * xf
