@@ -232,3 +232,13 @@ whose reduced system is not positive definite (an ungrounded component) took the
 2026-09-16, which returned without the `residual_after` field the caller reads. Fixed (the branch reports the
 unrefined residual), precompiled, shard re-queued; the driver's three-round rule caught it as designed. No other S/M/L
 task log shows the error.
+## 2026-09-20T13:35+00:00
+
+| tier | shards | solved | finalized | uploaded | upload failed | invalid | QC fail | GB on Hub | GB local |
+|---|---|---|---|---|---|---|---|---|---|
+| S | 500 | 500 | 500 | 500 | 0 | 0 | 0.000% | 142.2 | 0.0 |
+| M | 500 | 500 | 500 | 500 | 0 | 0 | 0.002% | 251.5 | 0.0 |
+| L | 1000 | 800 | 799 | 754 | 0 | 0 | 0.017% | 237.1 | 15.4 |
+
+Core-hours used since 2026-09-15 (ampscape-* jobs): **9283**. Stop rule: not triggered.
+
