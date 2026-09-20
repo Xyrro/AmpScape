@@ -363,7 +363,11 @@ def run_tier(
     if sub_lo < n_shards and ts["prepared_upto"] >= sub_lo:
         sub_hi = min(sub_lo + wave - 1, ts["prepared_upto"], n_shards - 1)
         backlog = (ts["submitted_upto"] + 1) - c["uploaded"]
-        if backlog < wave and data_gb() < SCRATCH_SUBMIT_GB and jobs_named(f"ampscape-{tier}") == 0:
+        if (
+            backlog < wave
+            and data_gb() < SCRATCH_SUBMIT_GB
+            and jobs_named(f"ampscape-{tier}") <= wave // 4
+        ):  # stragglers of the previous wave may still run
             out = sh(
                 [
                     sys.executable,
