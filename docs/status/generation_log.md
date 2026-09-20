@@ -224,3 +224,11 @@ The L sync loop's upload cycles grew beyond an hour once real L shards (≈ 0.3 
 and the loop wrote its lease only at the start of a cycle, so the driver's 1-h liveness window fired twice (09:07Z,
 09:15Z) while the loop was busy uploading; no data affected, generation paused ≈ 10 min. Fix: the sync refreshes its
 lease after every uploaded shard and the driver's window is 2 h.
+
+## Incident 2026-09-20 (g) — one L shard failed on every resubmission (solver KeyError)
+
+Shard 737 (real L tiles) died in the first two minutes of each of three resubmissions: a pairwise configuration
+whose reduced system is not positive definite (an ungrounded component) took the "refinement skipped" branch added on
+2026-09-16, which returned without the `residual_after` field the caller reads. Fixed (the branch reports the
+unrefined residual), precompiled, shard re-queued; the driver's three-round rule caught it as designed. No other S/M/L
+task log shows the error.
