@@ -267,3 +267,11 @@ without a Hub file is an error only if some sample still wants a configuration o
 otherwise it is recorded as `absent_groups_all_skipped`. No data was changed; the driver exited on the alert as
 designed and is restarted after the re-audit (job 5879589) comes back clean. Cost: ≈ 9 core-h for the two audits.
 
+## 2026-09-21T03:33+00:00
+
+| tier | shards | solved | finalized | uploaded | upload failed | invalid | QC fail | GB on Hub | GB local |
+|---|---|---|---|---|---|---|---|---|---|
+| L | 1000 | 1000 | 1000 | 1000 | 0 | 0 | 0.013% | 380.5 | 0.0 |
+
+Core-hours used since 2026-09-15 (ampscape-* jobs): **10273**. Stop rule: not triggered.
+

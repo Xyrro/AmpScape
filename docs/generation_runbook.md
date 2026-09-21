@@ -28,6 +28,11 @@ Per-landscape wall time (dev measurements for S/M, Phase-5 scaling for L–XXL; 
 | XXL | 400 | 10 600 | 1 | ≈ 3 h | 8 (test: 20 GB) | 400 | 64 | 7 | ≈ 1 200 | 70 GB |
 | total | 174 400 | | | | | 3 067 | | | **≈ 9 800 (+15 % overhead ≈ 11 300)** | ≈ 840 GB |
 
+**Correction 2026-09-21:** the XL and XXL rows above are *single-core* hours; with the profile's 4 / 8 cpus per task
+(memory sizing) Slurm charges 4× / 8× that. Measured so far: S 2 061, M 1 692, L 5 713 core-hours (L: 806 s per
+landscape single-core, plus the timeout and idle-core losses of generation log (f)). See `docs/status/latest.md`
+(2026-09-21) for the XL/XXL options.
+
 Walltime 04:00:00 everywhere (shard sizes chosen for ≈ 3.2 h so that one Julia start-up per shard is amortised and
 a 4 h limit still holds). Submission order **S → M → L → XL → XXL**; the next tier starts when the previous tier's
 final wave is queued. The S tier alone (110 GB) fits under the 200 GB scratch guard; from M on, waves are sized so
