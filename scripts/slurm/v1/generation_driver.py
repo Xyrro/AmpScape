@@ -158,7 +158,7 @@ def start_sync(tier: str) -> None:
     time.sleep(5)
 
 
-OOM_MEM = {"XL": "32G", "XXL": "40G", "L": "16G", "M": "12G"}
+OOM_MEM = {"XL": "48G", "XXL": "120G", "L": "16G", "M": "12G"}  # 2026-09-21: the regions CG+AMG fallback needs up to 36 GB at XL (contrast 10⁶); XXL ≈ 4×
 
 
 def oom_shards(tier: str, shards: list[int]) -> set[int]:

@@ -324,3 +324,18 @@ would raise the rate further if ever needed. Incident: XL shard 83 OUT_OF_MEMORY
 landscape; p99 task peak of the tier 5.5 GB, one other task at 16.5 GB); resubmitted with 32 GB; the driver now
 resubmits OOM shards with double memory (`OOM_MEM`).
 
+## Incident 2026-09-21 (h) — XL OUT_OF_MEMORY on two shards: the `regions` CG+AMG fallback
+
+XL shards 83 and 321 died OUT_OF_MEMORY at 16 GB (83 again at 32 GB). A 64 GB diagnostic re-run of shard 83 with a
+memory sampler completed (2 h 48) and the per-config stats locate the spike: the `regions` (T1R) configuration of a
+contrast-10⁶ fractal landscape — the CHOLMOD attempt failed (`error: "reference solver (cholmod) failed: "`, empty
+message) and the CG+AMG fallback solved it in 3 421 s with a **36.2 GB** high-water mark (the 30-s sampler saw 16.6 GB,
+so the peak is a short transient inside the AMG set-up). In the XL index so far the fallback was used for 16 of 463
+`regions` rows (3.5 %; at L 110 of 6 133 = 1.8 %, max RSS 8.2 GB) with peaks of 15.4 GB at contrast 100 and 36.2 GB at
+10⁶; every other configuration stays under 6 GB. Actions: XL profile memory 16 → 20 GB for the remaining submissions,
+XXL 24/28 GB; the driver's OOM resubmission memory 48 GB at XL and 120 GB at XXL (nodes have 191 GB); shard 83 is
+finalized and uploaded from the diagnostic run; shard 321 re-queued by the driver. Open question for the solver
+(not blocking generation): why CHOLMOD fails on these `regions` problems while it solves the same landscape's other
+configurations — to be root-caused after the run (the fallback result is a converged CG solve at the same tolerance,
+recorded per row as `solver = cg+amg`). Cost of the incident ≈ 12 core-hours.
+
