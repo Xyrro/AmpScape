@@ -314,3 +314,13 @@ aux, environments) + XL inputs 31 GB (all 667 shards prepared; deleted as shards
 a growing backlog, so the 250 GB stop rule should not trigger; the 230 GB submit guard will admit wave 2 once wave 1's
 stragglers are ≤ 75. 250 tasks running, 51 shards solved at 13:10Z (4 h 45 after submission).
 
+## 2026-09-21T15:00+00:00 — parallel upload rate under load (owner item 3, "after")
+
+261 XL shards (72.2 GB) uploaded by the 4 workers in 5.9 h; in the busiest hour **125 shards, 35.2 GB/h** (single
+loop at L: 52 shards/h, 20 GB/h at best; wave landings at XL exceed what one loop could drain). Uploads were never the
+limit of the tier: the local backlog stayed at a handful of shards. The login node's network is not the limit either
+(bulk pushes reach 72 GB/h); the per-shard cost is split + sha256 + one commit + Hub-side verification, so more workers
+would raise the rate further if ever needed. Incident: XL shard 83 OUT_OF_MEMORY at 16 GB (contrast-10⁶ CG-baseline
+landscape; p99 task peak of the tier 5.5 GB, one other task at 16.5 GB); resubmitted with 32 GB; the driver now
+resubmits OOM shards with double memory (`OOM_MEM`).
+
