@@ -289,6 +289,14 @@ def run_tier(
         tier, {"submitted_upto": -1, "prepared_upto": -1, "prepare_job": None, "started": now()}
     )
     b = build(tier)
+    if ts.get("prepared_upto", -1) < 0 and (b / "inputs").exists():
+        # 2026-09-21: inputs prepared ahead of the boundary (by hand or a previous driver) are recognised, not redone
+        k = 0
+        while (b / "inputs" / f"shard-{k:05d}.inputs.h5").exists():
+            k += 1
+        if k:
+            ts["prepared_upto"] = k - 1
+            log(f"{tier}: found {k} prepared shards (prepared_upto={k - 1})")
     if not (b / "manifest.parquet").exists():
         # planning is a 20–40 min single-core job (tens of thousands of landscapes are sampled): run it under Slurm,
         # not on the shared login node, and come back next cycle
