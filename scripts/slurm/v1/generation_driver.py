@@ -25,6 +25,7 @@ LOGS = ROOT / "logs"
 STATE = LOGS / "driver_state.json"
 CYCLE = 600
 SCRATCH_ALERT_GB = 250.0
+MAX_QUEUED = 450  # of the 500-job MaxSubmitPU, leaving room for prepare/audit/resubmission jobs
 SCRATCH_SUBMIT_GB = 230.0  # total scratch quota (300 GB) minus the 41 GB of S/M/L quicklooks, 12 GB logs, tiles, sources, envs (2026-09-21)
 # tier, landscapes, shard size, wave (shards), max concurrent jobs, extra plan args
 TIERS = [
@@ -158,7 +159,12 @@ def start_sync(tier: str) -> None:
     time.sleep(5)
 
 
-OOM_MEM = {"XL": "48G", "XXL": "120G", "L": "16G", "M": "12G"}  # 2026-09-21: the regions CG+AMG fallback needs up to 36 GB at XL (contrast 10⁶); XXL ≈ 4×
+OOM_MEM = {
+    "XL": "48G",
+    "XXL": "120G",
+    "L": "16G",
+    "M": "12G",
+}  # 2026-09-21: the regions CG+AMG fallback needs up to 36 GB at XL (contrast 10⁶); XXL ≈ 4×
 
 
 def oom_shards(tier: str, shards: list[int]) -> set[int]:
@@ -418,11 +424,12 @@ def run_tier(
     if sub_lo < n_shards and ts["prepared_upto"] >= sub_lo:
         sub_hi = min(sub_lo + wave - 1, ts["prepared_upto"], n_shards - 1)
         backlog = (ts["submitted_upto"] + 1) - c["uploaded"]
+        n_wave = sub_hi - sub_lo + 1
         if (
             backlog < wave
             and data_gb() < SCRATCH_SUBMIT_GB
-            and jobs_named(f"ampscape-{tier}") <= wave // 4
-        ):  # stragglers of the previous wave may still run
+            and jobs_named(f"ampscape-{tier}") + n_wave <= MAX_QUEUED
+        ):  # 2026-09-21 (owner: wall-clock): the only cap is Slurm's queue limit; scratch is guarded above
             out = sh(
                 [
                     sys.executable,
