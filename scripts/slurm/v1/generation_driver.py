@@ -30,8 +30,10 @@ SCRATCH_SUBMIT_GB = 230.0  # total scratch quota (300 GB) minus the 41 GB of S/M
 TIERS = [
     ("M", 50000, 100, 80, 80, []),
     ("L", 20000, 20, 100, 100, []),
-    ("XL", 4000, 6, 100, 100, []),
-    ("XXL", 400, 1, 64, 64, ["--n-tiles", "38"]),
+    # 2026-09-21 (owner: optimise wall-clock; ≤ 500 queued jobs): waves bounded by scratch headroom — ≈ 66 GB free under
+    # the 230 GB guard while the S/M/L quicklooks and logs (53 GB) stay; XL final ≈ 0.46 GB/shard, XXL ≈ 0.31 GB
+    ("XL", 4000, 6, 150, 150, []),
+    ("XXL", 400, 1, 150, 150, ["--n-tiles", "38"]),
 ]
 SB = ["sbatch", "--parsable", "-A", "coc", "-q", "coc-ice", "-p", "coc-cpu", "-N1", "-n1"]
 
