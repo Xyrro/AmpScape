@@ -25,7 +25,7 @@ LOGS = ROOT / "logs"
 STATE = LOGS / "driver_state.json"
 CYCLE = 600
 SCRATCH_ALERT_GB = 250.0
-SCRATCH_SUBMIT_GB = 200.0
+SCRATCH_SUBMIT_GB = 230.0  # total scratch quota (300 GB) minus the 41 GB of S/M/L quicklooks, 12 GB logs, tiles, sources, envs (2026-09-21)
 # tier, landscapes, shard size, wave (shards), max concurrent jobs, extra plan args
 TIERS = [
     ("M", 50000, 100, 80, 80, []),

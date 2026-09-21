@@ -20,7 +20,7 @@ limits:
   max_array_concurrent: 20   # %N on the array (be a good citizen on a shared teaching cluster)
   max_submit_per_user: 500
   cpu_hours_gate: 500        # ask the owner before launching more than this (lifted for the v1.0 run: 13 000 core-hour budget)
-  scratch_pause_gb: 200      # `generate.py submit` refuses while data/ holds more than this (owner checklist e)
+  scratch_pause_gb: 220      # `generate.py submit` refuses while data/ holds more than this (owner checklist e; 2026-09-21: data/ carries 100 GB of tiles, sources, dev, quicklooks; the driver guards the 300 GB quota at 230)
   concurrent_cores_cap: 512  # design cap for the v1.0 arrays (owner runbook item f)
 defaults:                    # per-tier resources for solve shards (measured Phase 5: peak RSS S 1.4 GB ... XXL 9.5 GB)
   S:   {cpus: 1, mem: "6G",  time: "04:00:00", shard_size: 200}
