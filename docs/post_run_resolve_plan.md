@@ -75,3 +75,51 @@ components, `rmax_saturated`) or where the residual is unmeasured by design (T4 
 `regions` rows without pair maps). Bringing every measured row under 1e-9 would extend the same pass to ≈ 19 000
 rows (≈ 600 CPU-h at the same per-pair cost); rows without pair maps cannot be checked without keeping per-pair
 voltages. Not part of this plan unless the owner asks.
+
+## 6. Owner decision 2026-09-21 — approved in two parts, both before the v1.0 tag
+
+1. Part 1 as planned (§1–4): all ≈ 180 `solver = cg+amg` T1R rows.
+2. **Part 2:** every reference row with residual above 1e-9 or unmeasured. Target ≤ 1e-9; where double precision
+   floors above that, record the achieved residual. Any row that cannot reach 1e-6 gets the QC flag and is excluded
+   from the splits, never silently kept. Tier by tier, full audit after each tier, index republished once at the
+   end; report counts, achieved-residual distribution and cost per tier. Store the per-pair residual for every T1R
+   row. Start after XXL finishes; do not slow generation.
+
+### 6.1 Measured scope of part 2 (non-T4 rows; T4/Omniscape has no single-system residual and is out of scope)
+
+| tier | rows above 1e-9 (mostly `advanced`) | unmeasured `regions` (T1R) | unmeasured `points` (T1, K = 5–8, pair maps not kept) | shards touched | pair solves |
+|---|---|---|---|---|---|
+| S | 4 907 | 5 677 | 57 420 | 500 of 500 | 1 135 367 |
+| M | 6 198 | 2 766 | 28 668 | 500 of 500 | 569 689 |
+| L | 6 028 | 1 127 | 11 470 | 1 000 of 1 000 | 233 517 |
+| XL (3 600 of 4 000 samples) | 2 043 | 190 | 2 075 | 601 of 667 | 43 192 |
+| XXL | — (≈ 100 expected) | ≈ 60 | ≈ 200 | ≈ 400 | ≈ 3 000 |
+
+The ≈ 19 000 figure in the owner's instruction is the "above 1e-9" column. The unmeasured T1 `points` rows (K ≥ 5,
+whose pair maps are not stored) are ≈ 100 000 more rows; measuring them means solving all their pairs (that is the
+measurement). Two readings, both implementable with the same tool:
+
+- **(a) full:** above-1e-9 + unmeasured T1R + unmeasured T1 points ≈ 128 000 rows, ≈ 2.0 M pair solves
+  (S ≈ 0.05 s, M ≈ 0.3 s, L ≈ 1.5 s, XL ≈ 3 s, XXL ≈ 15 s per pair incl. refactorisation) ≈ 250 CPU-h; every T1/T1R
+  file of every shard rewritten and re-uploaded (≈ 300 GB, ≈ 9 h at the measured 35 GB/h); audits ≈ 25 core-h;
+  ≈ 2–3 days of wall-clock after XXL.
+- **(b) as literally scoped:** above-1e-9 rows + all T1R rows (≈ 29 000 rows, ≈ 60 000 pair solves, ≈ 15 CPU-h;
+  ≈ 2 000 shards' files still touched because `advanced` rows are spread over every shard → ≈ 200 GB re-upload).
+
+The tool selects rows by a rule (`solver == cg+amg` or `residual_rel > 1e-9` or `residual_rel` unmeasured, per
+config list), so the choice between (a) and (b) is one flag. **Default: (a)** — it is the only reading under which
+no reference row stays unmeasured, matches "never silently kept", and cost is not a constraint (owner 2026-09-21);
+the owner is asked to confirm or restrict to (b) in the status report.
+
+### 6.2 Row treatment (all parts)
+
+Per pair: reduced system (ground node/region removed, source region collapsed) → CHOLMOD → one refinement step →
+true residual; a second step if > 1e-9; LDLᵀ / PCG-refined as last resorts. Node currents by `node_current_map`,
+`reff` from the source voltage, `cum_current` = Σ pairs; `advanced` = one solve with the source/ground strengths.
+Written in place in the Hub task-group file: outputs, `solver_stats.residual_per_pair` (every T1R and T1 row gets
+one), `resolved_post_run = {date, method, residual_before, residual_after}`, `solver_original` if the solver
+changed; index columns `residual_rel` (max over pairs), `solve_time_s`, `qc_flags` (`resolved_post_run`, and
+`residual_high` with `qc_pass = false` when > 1e-6 after all attempts → dropped from the split lists), new column
+`solver_original`. Consistency check against the replaced result reported per row (rel-L2 of `cum_current`,
+max rel diff of `reff`).
+
