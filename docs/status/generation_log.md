@@ -275,3 +275,19 @@ designed and is restarted after the re-audit (job 5879589) comes back clean. Cos
 
 Core-hours used since 2026-09-15 (ampscape-* jobs): **10273**. Stop rule: not triggered.
 
+## 2026-09-21 — scratch clean-up (owner-approved) and one slip
+
+Owner approval (2026-09-21): delete the S/M/L quicklook PNGs (41 GB, reproducible from the Hub data); compress the
+S/M/L task logs (12 GB, mostly Omniscape progress bars) into `data/v1/logs_archive/<tier>_task_logs.tar.gz` and delete
+the originals (Slurm job 5880862); delete the superseded pilot builds under `data/builds/` unless referenced.
+Done: quicklooks removed; probe_* / mini_phase5blocks / block_study / smoke5 builds removed (10 GB); `data/builds/mini`
+kept (example build referenced by the scripts). **Slip:** `data/builds/published` (431 MB, the 46-sample
+`test_ood_published` evaluation set of Phase 9, not on the Hub) was removed in the same command before its
+reference check was read — `scripts/train.py --published-root` and the dev tuning scripts use it. It is fully
+reproducible: re-planned from `data/tiles/published/published_tiles.parquet` with the original dataset id
+(`published`; all 46 sample UUIDs verified identical to the ids recorded in the coarsen×4 predictions), re-prepared and
+re-solved under Slurm (3 S shards + 1 XXL shard, ≈ 4 CPU-h, CHOLMOD). The lesson is recorded: a deletion command
+must be gated on the reference check's result, not merely preceded by it.
+Scratch after clean-up: 145 GB (quota figure, still settling) → ≈ 85 GB of in-flight headroom under the 230 GB guard;
+XL/XXL waves raised to 300 as approved. Future solver task logs no longer carry progress bars (`solve_shard.sbatch`).
+
