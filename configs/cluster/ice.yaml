@@ -26,9 +26,9 @@ defaults:                    # per-tier resources for solve shards (measured Pha
   S:   {cpus: 1, mem: "6G",  time: "04:00:00", shard_size: 200}
   M:   {cpus: 1, mem: "6G",  time: "04:00:00", shard_size: 100}
   L:   {cpus: 1, mem: "8G",  time: "09:00:00", shard_size: 20}   # measured L real tiles: p99 1177 s/landscape -> 20 x 1177 x 1.15 + 20 min = 7.9 h
-  XL:  {cpus: 1, mem: "16G", time: "10:00:00", shard_size: 6}    # 2026-09-21 probe: 1 cpu = 4 cpus (no BLAS gain; Omniscape/CHOLMOD 95 % of the time); 1 500-4 000 s per landscape -> 6 x 4 000 x 1.15 + 20 min
-  XXL: {cpus: 1, mem: "16G", time: "10:00:00", shard_size: 1}    # published tile 10 435 s; x 1.8 tail x 1.15 + start-up        # train/val shards: 9.5 GB peak (no CG baseline)
-  XXL_test: {cpus: 1, mem: "20G", time: "10:00:00", shard_size: 1}   # test/OOD shards: ~14.5 GB peak (AMG-CG baseline)
+  XL:  {cpus: 1, mem: "20G", time: "10:00:00", shard_size: 6}    # 2026-09-21 probe: 1 cpu = 4 cpus (no BLAS gain; Omniscape/CHOLMOD 95 % of the time); 1 500-4 000 s per landscape -> 6 x 4 000 x 1.15 + 20 min
+  XXL: {cpus: 1, mem: "24G", time: "10:00:00", shard_size: 1}    # published tile 10 435 s; x 1.8 tail x 1.15 + start-up        # train/val shards: 9.5 GB peak (no CG baseline)
+  XXL_test: {cpus: 1, mem: "28G", time: "10:00:00", shard_size: 1}   # test/OOD shards: ~14.5 GB peak (AMG-CG baseline)
 network:
   compute_nodes_have_internet: true      # verified 2026-09-05 but never relied upon
   installs_on: login
