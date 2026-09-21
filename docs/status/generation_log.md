@@ -338,4 +338,14 @@ finalized and uploaded from the diagnostic run; shard 321 re-queued by the drive
 (not blocking generation): why CHOLMOD fails on these `regions` problems while it solves the same landscape's other
 configurations — to be root-caused after the run (the fallback result is a converged CG solve at the same tolerance,
 recorded per row as `solver = cg+amg`). Cost of the incident ≈ 12 core-hours.
+**Root cause (diagnostic job 5885708, `julia/AmpScapeSolve.jl/scripts/diag_regions_cholmod.jl`):** on the contrast-10⁶
+fractal landscape's `regions` problem (5 regions of 15–119 k pixels) Circuitscape's CHOLMOD path throws
+`LinearAlgebra.PosDefException: matrix is not positive definite; Factorization failed.` after 43 s — the reduced
+Laplacian with region-merged nodes and a 10⁶ conductance range is numerically indefinite for the Cholesky
+factorisation — and the CG+AMG fallback converges in 3 439 s with a 42.5 GB high-water mark (Circuitscape's AMG
+hierarchy on 1 M nodes). The fallback result is a converged solve at the reference tolerance and is what the dataset
+records (`solver = cg+amg` per row; 3.5 % of XL regions rows, 1.8 % at L). Operational consequence: XL OOM
+resubmissions at 48 GB, XXL at 176 GB (a 4× problem; nodes have 191 GB). Solver follow-up after the run: try a
+diagonal shift / scaled factorisation for the regions path so that CHOLMOD stays the reference on these cases.
+Shard 574 was the third XL OOM (resubmitted at 48 GB automatically).
 
