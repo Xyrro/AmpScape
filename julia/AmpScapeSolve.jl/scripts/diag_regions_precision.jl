@@ -41,7 +41,7 @@ function try_direct(name, Af, bf, factor, unscale)
         x = unscale(F, bf)
         (true, resid(Af, x, bf), "")
     catch err
-        (false, NaN, sprint(showerror, err)[1:min(end, 80)])
+        (false, NaN, first(sprint(showerror, err), 80))
     end
     ok, res, msg = r
     println(@sprintf("    %-22s %s residual %.2e  %.1f s  maxrss %d MB %s", name, ok ? "OK  " : "FAIL", res, t, rss(), msg))
@@ -56,7 +56,7 @@ for a in 1:length(labels), bidx in (a + 1):length(labels)
     ok, res, t = try_direct("cholmod", Af, bf, cholesky, (F, b) -> F \ b)
     push!(get!(summary, "cholmod", Float64[]), ok ? res : NaN)
     d = 1 ./ sqrt.(diag(Af)); D = Diagonal(d)
-    ok, res, t = try_direct("cholmod jacobi-scaled", Af, bf, A -> cholesky(Symmetric(sparse(D * A * D))), (F, b) -> d .* (F \ (d .* b)))
+    ok, res, t = try_direct("cholmod jacobi-scaled", Af, bf, A -> cholesky(Symmetric(spdiagm(d) * A * spdiagm(d))), (F, b) -> d .* (F \ (d .* b)))
     push!(get!(summary, "jacobi", Float64[]), ok ? res : NaN)
     ok, res, t = try_direct("cholmod ldlt", Af, bf, A -> ldlt(Symmetric(A)), (F, b) -> F \ b)
     push!(get!(summary, "ldlt", Float64[]), ok ? res : NaN)
@@ -85,5 +85,5 @@ for a in 1:length(labels), bidx in (a + 1):length(labels)
 end
 println("SUMMARY")
 for (k, v) in sort(collect(summary))
-    println(@sprintf("  %-18s n=%d  median %.3g  max %.3g  nan %d", k, length(v), median(filter(!isnan, v)), maximum(filter(!isnan, v); init = NaN), count(isnan, v)))
+    println(@sprintf("  %-18s n=%d  median %.3g  max %.3g  nan %d", k, length(v), (isempty(filter(!isnan, v)) ? NaN : median(filter(!isnan, v))), (isempty(filter(!isnan, v)) ? NaN : maximum(filter(!isnan, v))), count(isnan, v)))
 end

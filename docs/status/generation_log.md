@@ -348,4 +348,5 @@ records (`solver = cg+amg` per row; 3.5 % of XL regions rows, 1.8 % at L). Opera
 resubmissions at 48 GB, XXL at 176 GB (a 4× problem; nodes have 191 GB). Solver follow-up after the run: try a
 diagonal shift / scaled factorisation for the regions path so that CHOLMOD stays the reference on these cases.
 Shard 574 was the third XL OOM (resubmitted at 48 GB automatically).
+**Precision test (job 5887428):** on the same sample our reduced-system CHOLMOD solves all 10 region pairs (3 s each, ≤ 5.8 GB, unrefined residual 2.6e-10–7.6e-8), LDLᵀ likewise, AMG-PCG needs 180–375 s per pair and its true residual floors at 1.9e-10–9.1e-8. Plan for the post-run pass: `docs/post_run_resolve_plan.md`.
 
