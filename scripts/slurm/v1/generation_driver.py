@@ -158,6 +158,38 @@ def start_sync(tier: str) -> None:
     time.sleep(5)
 
 
+OOM_MEM = {"XL": "32G", "XXL": "40G", "L": "16G", "M": "12G"}
+
+
+def oom_shards(tier: str, shards: list[int]) -> set[int]:
+    """Shards whose most recent Slurm task (job name ampscape-<tier>) ended OUT_OF_MEMORY, from sacct."""
+    out = sh(
+        [
+            "sacct",
+            "-u",
+            os.environ.get("USER", "yxiao413"),
+            "-S",
+            "now-3days",
+            "-X",
+            "--name",
+            f"ampscape-{tier}",
+            "-o",
+            "JobID,State",
+            "-P",
+        ]
+    )
+    last: dict[int, str] = {}
+    for line in out.splitlines()[1:]:
+        jid, _, state = line.partition("|")
+        if "_" not in jid:
+            continue
+        task = jid.split("_", 1)[1]
+        if not task.isdigit():
+            continue
+        last[int(task)] = state  # sacct lists in submission order; the last entry wins
+    return {s for s in shards if last.get(s, "").startswith("OUT_OF_MEMORY")}
+
+
 def jobs_named(name: str) -> int:
     """Queued/running jobs whose name is exactly `name` (2026-09-19: a prefix match counted the aux array
     `ampscape-L_bs1` as tier-L work and stalled the L waves)."""
@@ -462,24 +494,35 @@ def run_tier(
             if n_prev >= 3:
                 alert(f"{tier}: shards {missing[:10]} still missing after 3 resubmissions", st)
             ts.setdefault("resubmit_rounds", {})[str(key)] = n_prev + 1
-            out = sh(
-                [
+            # 2026-09-21: a shard whose last task died OUT_OF_MEMORY (XL shard 83: a contrast-10⁶ CG-baseline landscape
+            # needed > 16 GB; p99 of the tier is 5.5 GB) is resubmitted with double memory, the rest with the profile
+            oom = oom_shards(tier, missing)
+            for group, mem in (
+                (sorted(set(missing) - oom), None),
+                (sorted(oom), OOM_MEM.get(tier)),
+            ):
+                if not group:
+                    continue
+                cmd = [
                     sys.executable,
                     "scripts/generate.py",
                     "submit",
                     "--build",
                     f"data/v1/{tier}",
                     "--shards",
-                    f"{min(missing)}-{max(missing)}",
+                    f"{min(group)}-{max(group)}",
                     "--max-concurrent",
                     str(maxc),
                     "--skip-precompile",
                 ]
-            )
+                if mem:
+                    cmd += ["--mem", mem]
+                out = sh(cmd)
+                log(
+                    f"{tier}: resubmitted missing shards {group[:10]}…{' with --mem ' + mem if mem else ''}: "
+                    f"{out.splitlines()[-1] if out else ''}"
+                )
             ts["resubmitted"] = list(key)
-            log(
-                f"{tier}: resubmitted missing shards {missing[:10]}…: {out.splitlines()[-1] if out else ''}"
-            )
     if c["uploaded"] and not ts.get("first_upload_at"):
         ts["first_upload_at"] = now()
     if ts["submitted_upto"] >= 0 and not sync_alive(tier):
