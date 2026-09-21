@@ -301,4 +301,5 @@ XL walltime 10 h holds (6 × 4 000 s × 1.15 + 20 min ≈ 8 h). Estimated XL cos
 XXL ≈ 400 × 10 300 s ≈ 1 150 (published XXL tile re-solve: 10 303 s at 8 cpus). Launch: waves of 300 shards, 300
 concurrent tasks, 4 parallel uploaders per tier, scratch guard 230 GB of quota. Regenerated `data/builds/published`
 (46 samples, QC pass 100 %, sample ids identical) — 4 CPU-h.
+Final probe totals (6 landscapes per shard): 1 cpu 14 391 s and 16 662 s (4.0 h, 4.6 h); 4 cpus 18 195 s and 15 039 s (5.1 h, 4.2 h) — confirms 1 cpu. XL finals are 210–226 MB per shard (estimate was 460 MB).
 
