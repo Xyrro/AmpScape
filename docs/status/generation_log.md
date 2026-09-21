@@ -303,3 +303,14 @@ concurrent tasks, 4 parallel uploaders per tier, scratch guard 230 GB of quota. 
 (46 samples, QC pass 100 %, sample ids identical) — 4 CPU-h.
 Final probe totals (6 landscapes per shard): 1 cpu 14 391 s and 16 662 s (4.0 h, 4.6 h); 4 cpus 18 195 s and 15 039 s (5.1 h, 4.2 h) — confirms 1 cpu. XL finals are 210–226 MB per shard (estimate was 460 MB).
 
+## 2026-09-21T13:10+00:00 — XL wave 1 landing; first parallel-upload measurement
+
+44 shards uploaded (11.6 GB) between 09:03Z and 13:09Z by the 4 workers; within busy stretches the mean gap between
+uploads is 87 s → 41 shards/h, 10.9 GB/h — but arrivals were the limit (≈ 11 shards/h finishing), not the uploaders:
+the bulk push of the aux assets moved 20.5 GB in 17 min (72 GB/h) over the same login node, so the network is not the
+bottleneck. XL finals are 210–290 MB per shard (mean 264 MB). Scratch at 215 GB: base ≈ 114 GB (tiles, sources, dev,
+aux, environments) + XL inputs 31 GB (all 667 shards prepared; deleted as shards upload) + in-flight raw outputs 74 GB
+(249 running tasks, mean 297 MB, freed by finalize) + finals awaiting upload. The in-flight raw is a steady state, not
+a growing backlog, so the 250 GB stop rule should not trigger; the 230 GB submit guard will admit wave 2 once wave 1's
+stragglers are ≤ 75. 250 tasks running, 51 shards solved at 13:10Z (4 h 45 after submission).
+
