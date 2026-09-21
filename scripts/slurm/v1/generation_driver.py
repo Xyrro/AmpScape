@@ -31,9 +31,9 @@ TIERS = [
     ("M", 50000, 100, 80, 80, []),
     ("L", 20000, 20, 100, 100, []),
     # 2026-09-21 (owner: optimise wall-clock; ≤ 500 queued jobs): waves bounded by scratch headroom — ≈ 66 GB free under
-    # the 230 GB guard while the S/M/L quicklooks and logs (53 GB) stay; XL final ≈ 0.46 GB/shard, XXL ≈ 0.31 GB
-    ("XL", 4000, 6, 150, 150, []),
-    ("XXL", 400, 1, 150, 150, ["--n-tiles", "38"]),
+    # the 230 GB guard; owner 2026-09-21 approved deleting the S/M/L quicklooks + archiving logs (53 GB) -> waves 300; XL final ≈ 0.46 GB/shard, XXL ≈ 0.31 GB
+    ("XL", 4000, 6, 300, 300, []),
+    ("XXL", 400, 1, 300, 300, ["--n-tiles", "38"]),
 ]
 SB = ["sbatch", "--parsable", "-A", "coc", "-q", "coc-ice", "-p", "coc-cpu", "-N1", "-n1"]
 
