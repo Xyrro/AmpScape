@@ -70,6 +70,10 @@ landscapes; top-5 % IoU 0.95, pinch-point recall 0.95). Against the exact map th
 are published under `aux/t4_bs1_reference/` with per-sample deviations and a > 5 % tail flag; T4 leaderboard metrics at M
 and L are reported against these exact targets (`docs/t4_fidelity.md`).
 
+Every auxiliary evaluation set and result the benchmark depends on is on the Hub under `aux/` (dev subset, mini build,
+`test_ood_published`, the WP5 scale-probe set, the block-1 reference and block-size builds, dev baseline results):
+`docs/aux_layout.md`.
+
 ## Scale split caveat
 
 Pixel size, raster size and (for T4) the physical window radius co-vary across tiers (only S → M changes the raster
