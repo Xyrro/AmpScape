@@ -225,12 +225,23 @@ def upload_parts_one_commit(
         rel = str(part.relative_to(staging))
         rels[grp], shas[grp] = rel, sha256(part)
         ops.append(CommitOperationAdd(path_in_repo=rel, path_or_fileobj=str(part)))
-    res = api.create_commit(
-        repo_id=repo_id,
-        repo_type="dataset",
-        operations=ops,
-        commit_message=f"add {pathlib.Path(rels[next(iter(rels))]).name} ({len(ops)} task groups)",
-    )
+    res = None
+    for attempt in range(
+        4
+    ):  # 2026-09-21: parallel uploaders — a transient Hub/commit error is retried with backoff
+        try:
+            res = api.create_commit(
+                repo_id=repo_id,
+                repo_type="dataset",
+                operations=ops,
+                commit_message=f"add {pathlib.Path(rels[next(iter(rels))]).name} ({len(ops)} task groups)",
+            )
+            break
+        except Exception as e:  # noqa: BLE001
+            if attempt == 3:
+                raise
+            time.sleep(30 * (attempt + 1))
+            print(json.dumps({"retry": attempt + 1, "error": str(e)[:200]}), flush=True)
     out = {}
     for grp, rel in rels.items():
         remote = remote_sha256(api, repo_id, rel)
@@ -255,6 +266,7 @@ def sync_live(
     push: bool = True,
     delete: bool = True,
     max_failures: int = 2,
+    worker: tuple[int, int] = (0, 1),
 ) -> list[dict]:
     """v1.0 streaming mode (owner checklist e, revised 2026-09-16): one shard at a time —
     validate (schema) → split into the task-group files in a per-shard temporary staging dir → upload all parts in
@@ -269,9 +281,15 @@ def sync_live(
     out = []
     expected = expected_samples(build)
     planned = planned_configs(build)
+    k, n_workers = (
+        worker  # 2026-09-21: N parallel uploaders; worker k owns the shards with index ≡ k (mod N)
+    )
+    lease_name = f"sync_{tier}" if n_workers == 1 else f"sync_{tier}_w{k}"
     for sh in sorted((build / "shards").glob("shard-*.h5")):
         if sh.name.endswith(".part") or time.time() - sh.stat().st_mtime < 180:
             continue  # being written (finalize renames the .part atomically; never validate a file younger than 3 min)
+        if n_workers > 1 and int(sh.stem.split("-")[1]) % n_workers != k:
+            continue
         rec: dict = {"shard": sh.name, "bytes": sh.stat().st_size}
         if sh.with_suffix(".uploaded").exists():
             rec["status"] = "already"
@@ -290,7 +308,7 @@ def sync_live(
             rec["status"] = "invalid"
             out.append(rec)
             continue
-        tmp = staging / "tmp" / sh.stem
+        tmp = staging / ("tmp" if n_workers == 1 else f"tmp_w{k}") / sh.stem
         attempts_f = sh.with_suffix(".upload_attempts")
         attempts = (
             json.loads(attempts_f.read_text())
@@ -334,7 +352,7 @@ def sync_live(
         attempts_f.unlink(missing_ok=True)
         rec["status"] = "uploaded"
         acquire_lease(
-            f"sync_{tier}", pathlib.Path(__file__).resolve().parents[2]
+            lease_name, pathlib.Path(__file__).resolve().parents[2]
         )  # refresh: a cycle can run > 1 h
         if delete:
             sh.unlink()
@@ -562,11 +580,17 @@ def main(argv=None) -> int:
         action="store_true",
         help="also upload the current index/<tier>.parquet and split lists",
     )
+    ap.add_argument(
+        "--worker",
+        default="0/1",
+        help="k/N: this process uploads the shards with index ≡ k (mod N); lease sync_<tier>_w<k>; only worker 0 publishes the index",
+    )
     a = ap.parse_args(argv)
     build = pathlib.Path(a.build)
+    k, n_workers = (int(x) for x in a.worker.split("/"))
     if a.live:
         root = pathlib.Path(__file__).resolve().parents[2]
-        if not acquire_lease(f"sync_{a.tier}", root):
+        if not acquire_lease(f"sync_{a.tier}" if n_workers == 1 else f"sync_{a.tier}_w{k}", root):
             print(
                 json.dumps(
                     {
@@ -577,8 +601,10 @@ def main(argv=None) -> int:
             )
             return 0
         staging = pathlib.Path(a.staging) if a.staging else build / "hf"
-        recs = sync_live(build, a.repo, a.tier, staging, push=True, delete=True)
-        if a.publish_index:
+        recs = sync_live(
+            build, a.repo, a.tier, staging, push=True, delete=True, worker=(k, n_workers)
+        )
+        if a.publish_index and k == 0:
             recs.append(publish_index(build, a.repo, a.tier, staging, push=True))
         for rec in recs:
             print(json.dumps(rec))

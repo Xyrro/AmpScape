@@ -105,33 +105,45 @@ def qc_fail_rate(tier: str) -> float:
 def sync_alive(tier: str) -> bool:
     """A sync loop for the tier is alive if its cross-host lease (written by every sync cycle) is fresh — on any login
     node — or, failing that, if the local pid file points to a live process (2026-09-19: pid files are host-local)."""
-    lf = LOGS / f"lease_sync_{tier}.json"
-    try:
-        d = json.loads(lf.read_text())
-        if (
-            time.time() - float(d.get("ts", 0)) < 7200
-        ):  # a sync cycle = 15 min sleep + up to ~15 min of uploads
+    for lf in [LOGS / f"lease_sync_{tier}.json"] + sorted(LOGS.glob(f"lease_sync_{tier}_w*.json")):
+        try:
+            d = json.loads(lf.read_text())
+            if (
+                time.time() - float(d.get("ts", 0)) < 7200
+            ):  # a sync cycle = sleep + up to ~1 h of uploads
+                return True
+        except Exception:  # noqa: BLE001
+            pass
+    for pf in [LOGS / f"sync_{tier}.pid"] + sorted(LOGS.glob(f"sync_{tier}_w*.pid")):
+        try:
+            os.kill(int(pf.read_text().strip()), 0)
             return True
-    except Exception:  # noqa: BLE001
-        pass
-    pf = LOGS / f"sync_{tier}.pid"
-    if not pf.exists():
-        return False
-    try:
-        os.kill(int(pf.read_text().strip()), 0)
-        return True
-    except (OSError, ValueError):
-        return False
+        except (OSError, ValueError):
+            continue
+    return False
+
+
+SYNC_WORKERS = 4  # parallel uploaders per tier (owner 2026-09-21); each owns shards ≡ k (mod N), lease sync_<tier>_w<k>
+SYNC_INTERVAL_S = 120
 
 
 def start_sync(tier: str) -> None:
-    subprocess.Popen(
-        ["setsid", "nohup", str(ROOT / "scripts/slurm/v1/sync_loop.sh"), f"data/v1/{tier}", tier],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        stdin=subprocess.DEVNULL,
-        start_new_session=True,
-    )
+    for k in range(SYNC_WORKERS):
+        subprocess.Popen(
+            [
+                "setsid",
+                "nohup",
+                str(ROOT / "scripts/slurm/v1/sync_loop.sh"),
+                f"data/v1/{tier}",
+                tier,
+                str(SYNC_INTERVAL_S),
+                f"{k}/{SYNC_WORKERS}",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            start_new_session=True,
+        )
     time.sleep(5)
 
 
