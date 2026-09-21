@@ -23,8 +23,10 @@ EXTRA=()
 # config list is '+'-separated in --export (sbatch splits --export on commas)
 [ -n "${AMPSCAPE_CONFIGS:-}" ] && EXTRA+=(--configs "${AMPSCAPE_CONFIGS//+/,}")
 [ "${AMPSCAPE_FORCE:-0}" = "1" ] && EXTRA+=(--force)
+# 2026-09-21: Omniscape's progress bars (\r-updated) made each L task log 3-4 MB (12 GB of logs over S-L); keep only real lines
 python scripts/generate.py solve --build "$AMPSCAPE_BUILD" --shard "$SHARD" \
-    --solver "${AMPSCAPE_SOLVER:-cholmod}" --fallback "${AMPSCAPE_FALLBACK:-cg+amg}" --omniscape-solver "${AMPSCAPE_OSOLVER:-cholmod}" "${EXTRA[@]}"
+    --solver "${AMPSCAPE_SOLVER:-cholmod}" --fallback "${AMPSCAPE_FALLBACK:-cg+amg}" --omniscape-solver "${AMPSCAPE_OSOLVER:-cholmod}" "${EXTRA[@]}" 2>&1 \
+    | tr '\r' '\n' | grep --line-buffered -v '^Progress' || true
 # v1.0: finalize + validate + quicklooks on the compute node right after the solve (idempotent; skips if final exists)
 python scripts/generate.py finalize --build "$AMPSCAPE_BUILD" --shard "$SHARD" --quicklooks 2>&1 | grep -v Warning | tail -2
 echo "end=$(date -u +%FT%TZ)"
