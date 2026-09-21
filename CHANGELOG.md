@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### XL launch, parallel uploads, aux publication — 2026-09-21
+- Tier L complete and audited (1 000 shards, QC fail 0.013 %, 380.5 GB); audit rule fixed for all-skipped task groups.
+- XL: 667 shards planned and prepared; cpu probe (1 vs 4 cpus: no speed-up) → 1 cpu per task for XL/XXL; waves of 300.
+- `sync_shards.py --worker k/N`: N parallel uploaders per tier with per-worker leases/staging and commit retry.
+- `scripts/push_aux.py`: scratch-only evaluation assets published under `aux/` (dev subset, mini, WP5 probe set,
+  WP1/WP2 block builds, `test_ood_published`, dev baseline results); `data/builds/published` regenerated.
+- Scratch clean-up (owner-approved): S/M/L quicklooks deleted, task logs archived, superseded pilot builds removed;
+  solver task logs no longer carry progress bars.
+
 ### Addendum WP1/WP2 at L — 2026-09-20
 - `audit_tier.py`: a task-group file absent from the Hub is a discrepancy only when some sample of the shard still
   wants a configuration of that group after its skipped configurations are removed (L false positive on 41 shards

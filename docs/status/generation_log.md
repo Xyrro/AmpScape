@@ -291,3 +291,14 @@ must be gated on the reference check's result, not merely preceded by it.
 Scratch after clean-up: 145 GB (quota figure, still settling) → ≈ 85 GB of in-flight headroom under the 230 GB guard;
 XL/XXL waves raised to 300 as approved. Future solver task logs no longer carry progress bars (`solve_shard.sbatch`).
 
+## 2026-09-21 — XL cpu probe and XL launch
+
+Probe (shards 0-1 at 1 cpu, 2-3 at 4 cpus, 16 GB, jobs 5880731/5880732), read at 17 of 24 landscapes: per landscape
+1 500–4 030 s at both cpu counts (1 cpu: 2 699, 1 693, 1 623, 2 270, 2 200, 2 485, 4 027, 2 116 s; 4 cpus: 2 152, 3 418,
+2 155, 3 357, 1 495, 1 508, 4 010, 2 609, 1 508 s); Omniscape is ≈ 95 % of the time (2 000–2 800 s of it), T1/T1W/T3
+together < 60 s. No speed-up from BLAS threads → **1 cpu per task for XL and XXL** (owner rule: 4 only if ≥ 1.5×).
+XL walltime 10 h holds (6 × 4 000 s × 1.15 + 20 min ≈ 8 h). Estimated XL cost ≈ 4 000 × 2 500 s ≈ 2 800 core-hours;
+XXL ≈ 400 × 10 300 s ≈ 1 150 (published XXL tile re-solve: 10 303 s at 8 cpus). Launch: waves of 300 shards, 300
+concurrent tasks, 4 parallel uploaders per tier, scratch guard 230 GB of quota. Regenerated `data/builds/published`
+(46 samples, QC pass 100 %, sample ids identical) — 4 CPU-h.
+
