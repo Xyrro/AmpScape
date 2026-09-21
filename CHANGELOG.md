@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Addendum WP1/WP2 at L — 2026-09-20
+- `audit_tier.py`: a task-group file absent from the Hub is a discrepancy only when some sample of the shard still
+  wants a configuration of that group after its skipped configurations are removed (L false positive on 41 shards
+  whose every `regions` sample was skipped; generation log (g2)).
 - L block-1 reference complete (60 samples: mean rel-L2 0.028, 2 of 60 flagged; index + summary on the Hub under
   `aux/t4_bs1_reference/L/`), L block-size Pareto rows (blocks 3/5/11, correction on/off; `docs/tables/t4_pareto_L.md`,
   `aux/t4_blocksize_baselines/L/` on the Hub). `aux_t4_blocks.py compare`: cross-file inputs lookup after a top-up,

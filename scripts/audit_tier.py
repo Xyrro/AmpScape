@@ -80,10 +80,14 @@ def audit_shard(
     local = json.loads(marker.read_text()).get("parts", {}) if marker.exists() else {}
     present: dict[str, set[str]] = {}
     metas: dict[str, dict] = {}
+    absent_groups: list[
+        str
+    ] = []  # judged after the skipped configs are known (a group whose every planned
+    # config in this shard was legitimately skipped has no file — e.g. T1R when no sample has ≥ 2 habitat patches)
     for grp in sorted(groups_needed):
         rel = f"data/{tier}/{grp}/{name}.h5"
         if rel not in hub:
-            rep["errors"].append(f"missing on Hub: {rel}")
+            absent_groups.append(grp)
             continue
         h = hub[rel]
         loc = local.get(grp, {}).get("sha256")
@@ -107,6 +111,7 @@ def audit_shard(
             f"sample ids: {len(ids_hub - ids_plan)} unexpected, {len(ids_plan - ids_hub)} missing"
         )
     n_regen = 0
+    wanted_groups: set[str] = set()
     for sid in sorted(ids_hub & ids_plan):
         meta = metas[sid]
         if "skipped_configs" in meta:
@@ -122,7 +127,13 @@ def audit_shard(
         want = planned[sid] - skipped
         if present[sid] != want:
             rep["errors"].append(f"{sid}: configs {sorted(present[sid])} != planned {sorted(want)}")
+        wanted_groups.update(CONFIG_TO_GROUP[c] for c in want if c in CONFIG_TO_GROUP)
     rep["n_regenerated_checks"] = n_regen
+    for grp in absent_groups:
+        if grp in wanted_groups or not (ids_hub & ids_plan):
+            rep["errors"].append(f"missing on Hub: data/{tier}/{grp}/{name}.h5")
+        else:
+            rep.setdefault("absent_groups_all_skipped", []).append(grp)
     ip = build / "index" / f"{name}.parquet"
     if ip.exists():
         idx = pd.read_parquet(ip, columns=["sample_id", "config"])

@@ -252,3 +252,18 @@ Core-hours used since 2026-09-15 (ampscape-* jobs): **9283**. Stop rule: not tri
 
 Core-hours used since 2026-09-15 (ampscape-* jobs): **10144**. Stop rule: not triggered.
 
+## Incident 2026-09-21 (g2) — L audit false positive: "missing on Hub: T1R" on 41 shards
+
+The L audit (job 5879007, 1 h 07) reported 41 shards with discrepancies, all of one kind: `missing on Hub:
+data/L/T1R/shard-XXXXX.h5`. In each of these shards every sample with a planned `regions` configuration had it
+legitimately skipped (`regions (T1R: no eligible habitat patches …)`, recorded in `skipped_configs`), so finalize
+wrote no T1R part and the sync uploaded none; the sample-level checks (ids, configs minus skipped, index rows) all
+passed. The audit derived the expected task-group files from the *planned* configurations before it knew the
+skipped ones, so it demanded a file that could not exist. M never hit this because its shards hold 100 samples
+(no M shard had every `regions` sample skipped); L shards hold 20. The `regions` skip rate is the same at both tiers
+(M 50.3 % of the 28 960 planned, L 47.1 % of 11 603 — mostly real tiles whose largest component has < 2 habitat
+patches), a labelled property of the data (`skipped_configs`), not a defect. Fix (`scripts/audit_tier.py`): a group
+without a Hub file is an error only if some sample still wants a configuration of that group after skipping;
+otherwise it is recorded as `absent_groups_all_skipped`. No data was changed; the driver exited on the alert as
+designed and is restarted after the re-audit (job 5879589) comes back clean. Cost: ≈ 9 core-h for the two audits.
+
