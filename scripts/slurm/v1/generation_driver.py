@@ -65,6 +65,15 @@ def scratch_gb() -> float:
 
 
 def data_gb() -> float:
+    """Scratch usage for the guards: the whole scratch quota (pace-quota, instant), not only data/ — the 300 GB quota
+    is what fills up (2026-09-21: ≈ 120 GB of sources, tiles, environments and aux builds live outside data/v1)."""
+    out = sh(["pace-quota"])
+    for line in out.splitlines():
+        if line.startswith("Scratch:"):
+            try:
+                return float(line.split()[1])
+            except (IndexError, ValueError):
+                break
     return int(sh(["du", "-sb", str(ROOT / "data")]).split()[0]) / 1e9
 
 

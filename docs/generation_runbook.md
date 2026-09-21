@@ -68,6 +68,18 @@ finals, sync skips `.uploaded` shards, uploads are verified by checksum before a
 `$AMPSCAPE_SCRATCH/logs/sync.log` (one block per 15-min cycle: finalize, sync records, counts). Stop with
 `kill $(cat $AMPSCAPE_SCRATCH/logs/sync_S.pid)`. Replace `S` by the tier for later tiers (one loop per tier).
 
+**Parallel uploaders (owner 2026-09-21, XL/XXL):** N loops per tier, worker k owning the shards with index ≡ k (mod N),
+each under its own lease `logs/lease_sync_<tier>_w<k>.json` and pid lock `sync_<tier>_w<k>.pid`, same
+validate → one-commit upload → sha256 verify → delete rule, staging `hf/tmp_w<k>/`; only worker 0 publishes the index.
+The driver starts them (`SYNC_WORKERS = 4`, 120-s interval); manual restart of the set:
+
+```bash
+for k in 0 1 2 3; do setsid nohup /storage/ice1/1/8/yxiao413/EcoFlowBench/scripts/slurm/v1/sync_loop.sh data/v1/XL XL 120 $k/4 >/dev/null 2>&1 < /dev/null & done
+```
+
+Stop one with `kill $(cat $AMPSCAPE_SCRATCH/logs/sync_XL_w<k>.pid)`. Measured single-loop rate at L: 52 shards/h
+(20 GB/h) while shards were available, 21 shards/h averaged over the tier (the loop was solver-limited most of the time).
+
 ### 2.2 Autonomous tier driver (owner instruction 2026-09-16)
 
 ```bash
