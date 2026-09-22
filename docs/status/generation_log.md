@@ -397,4 +397,15 @@ opens an existing outputs file before launching Julia and, if unreadable, moves 
 not deleted) and starts the shard afresh; the driver keeps the raised memory for any shard that ever ended
 OUT_OF_MEMORY (not only when the very last attempt did). The corrupt file of 243 was moved to
 `data/v1/XXL/outputs/corrupt/shard-00243.outputs.h5.oom-20260922T0347` (kept); the driver re-runs 243 at 176 GB.
+**Resolution of (i) — 2026-09-22 11:15Z.** Omniscape's own `cg+amg` fallback fails the same landscape too (`CG solver
+did not converge: relative residual 2.2e-4 exceeds tolerance 1e-4`), because Circuitscape 5.17.1's
+`solve_linear_system` throws whenever a solve's relative residual is ≥ 1e-4 — a CHOLMOD solve that is *unrefined*
+(1.28e-4 here) or a CG run capped at rtol 1e-6 / 100 000 iterations. AmpScapeSolve now replaces those two methods:
+results are bit-identical whenever Circuitscape's check passes, and only where it would have thrown the solve is
+rescued (CHOLMOD: iterative refinement with the same factorisation to 1e-8; CG: CHOLMOD factorisation of the window
++ refinement), counted per solve and recorded as `solver_params.rescued_solves`. Test on the failing landscape
+(job 5898647): the full Omniscape map solved with CHOLMOD in 8 047 s (2.5 GB) with exactly one rescued window solve;
+map valid (69 % non-zero pixels, finite). Repair of the wave-1 T4 rows that failed before the change: the precision
+pass at XXL re-runs QC-failed T4 rows whole (`resolve_rows.jl` kind `omniscape`) and QC-failed T3/T1R rows on the
+reduced system, then replaces the files and re-audits — no separate repair flow.
 
