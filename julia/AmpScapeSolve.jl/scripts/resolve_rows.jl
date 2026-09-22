@@ -145,6 +145,28 @@ function resolve_advanced!(og, gin, gc, L, idx, R, nodata, stats)
     return [r], [method], [nref]
 end
 
+"""T4 row: re-run Omniscape for the sample (CHOLMOD, same radius / block / correction / threshold as recorded in the
+row's solver_params) with the Circuitscape solve rescue active; rewrites cum_current / flow_potential / normalized
+and returns the Omniscape stats to merge (used for QC-failed T4 rows of incident (i))."""
+function resolve_omniscape!(og, gin, gc, R, nodata, stats)
+    sp = get(stats, "solver_params", Dict{String,Any}())
+    S = hw(gc["inputs"], "source_strength")
+    radius = parse(Int, string(sp["radius"])); bs = parse(Int, string(sp["block_size"]))
+    ca = lowercase(string(get(sp, "correct_artifacts", "true"))) == "true"
+    thr = parse(Float64, string(get(sp, "source_threshold", "0.0")))
+    wd = mktempdir()
+    res = try
+        solve_omniscape(R, nodata, S; radius, block_size = bs, solver = "cholmod", source_threshold = thr, workdir = wd, correct_artifacts = ca)
+    finally
+        rm(wd; recursive = true, force = true)
+    end
+    res.stats.converged || error("omniscape re-solve failed: " * res.stats.error)
+    og["cum_current"][:, :] = permutedims(res.cum_current)
+    og["flow_potential"][:, :] = permutedims(res.flow_potential)
+    og["normalized"][:, :] = permutedims(res.normalized)
+    return res.stats
+end
+
 function set_attr!(g, k, v)
     haskey(attrs(g), k) && delete_attribute(g, k)
     attrs(g)[k] = v
@@ -181,7 +203,23 @@ function main()
                 old_cum = haskey(og, "cum_current") ? permutedims(read(og["cum_current"])) : (haskey(og, "current") ? permutedims(read(og["current"])) : nothing)
                 old_reff = haskey(og, "reff") ? permutedims(read(og["reff"])) : nothing
                 kind = String(attrs(gc)["kind"])
-                if kind in ("points", "wall_to_wall", "regions")
+                if kind == "omniscape"
+                    # T4 repair (incident (i)): full Omniscape re-run with the Circuitscape solve rescue; no pairwise residual
+                    ost = resolve_omniscape!(og, gs, gc, R, nodata, stats)
+                    osp = ost.solver_params
+                    stats["solver"] = ost.solver; stats["converged"] = true; stats["fallback_used"] = ost.fallback_used
+                    stats["error"] = ost.error == "" ? nothing : ost.error; stats["wall_s"] = ost.wall_s; stats["maxrss_mb"] = ost.maxrss_mb
+                    for (k, v) in osp
+                        sp[k] = v
+                    end
+                    stats["resolved_post_run"] = Dict{String,Any}(
+                        "date" => Dates.format(now(UTC), "yyyy-mm-ddTHH:MM:SS"), "method" => "omniscape re-run (solve rescue)",
+                        "rescued_solves" => get(osp, "rescued_solves", 0), "time_s" => time() - t0)
+                    set_attr!(og, "solver_stats", JSON.json(sanitize(stats)))
+                    merge!(rec, Dict("status" => "ok", "residual_after" => NaN, "n_pairs" => 0, "methods" => ["omniscape"],
+                                     "rescued_solves" => get(osp, "rescued_solves", 0), "time_s" => time() - t0, "reached_target" => true))
+                    push!(report, rec); println(JSON.json(sanitize(rec))); flush(stdout); continue
+                elseif kind in ("points", "wall_to_wall", "regions")
                     res_pairs, methods, nrefs = resolve_pairwise!(og, gs, gc, L, idx, R, nodata, stats)
                 elseif kind == "advanced"
                     res_pairs, methods, nrefs = resolve_advanced!(og, gs, gc, L, idx, R, nodata, stats)

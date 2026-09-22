@@ -59,7 +59,11 @@ def tier_index(tier: str) -> pd.DataFrame:
 
 def cmd_select(a):
     idx = tier_index(a.tier)
-    idx = idx[idx.config.isin(PAIR_CONFIGS)]
+    # T4 rows are re-run whole (Omniscape with the solve rescue) only when QC failed (incident (i)); pairwise/advanced
+    # rows follow the residual rules below
+    idx = idx[
+        idx.config.isin(PAIR_CONFIGS) | ((idx.config == "omniscape") & ~idx.qc_pass.astype(bool))
+    ]
     unmeasured = idx.residual_rel.isna() & (
         idx.config.isin(["points", "regions"]) if a.mode == "a" else (idx.config == "regions")
     )
