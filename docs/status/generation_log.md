@@ -409,3 +409,11 @@ map valid (69 % non-zero pixels, finite). Repair of the wave-1 T4 rows that fail
 pass at XXL re-runs QC-failed T4 rows whole (`resolve_rows.jl` kind `omniscape`) and QC-failed T3/T1R rows on the
 reduced system, then replaces the files and re-audits — no separate repair flow.
 
+## 2026-09-22T15:24+00:00
+
+| tier | shards | solved | finalized | uploaded | upload failed | invalid | QC fail | GB on Hub | GB local |
+|---|---|---|---|---|---|---|---|---|---|
+| XXL | 400 | 400 | 400 | 400 | 0 | 0 | 0.448% | 100.4 | 0.0 |
+
+Core-hours used since 2026-09-15 (ampscape-* jobs): **15218**. Stop rule: not triggered.
+

@@ -1,27 +1,22 @@
-# Status — 2026-09-22 05:20Z (tier XL complete and audited; XXL starting; precision pass ready)
+# Status — 2026-09-22 15:30Z (v1.0 generation complete: all five tiers audited; precision pass started)
 
-## Tier XL boundary
+## Tier XXL boundary and whole-run totals
 
-| item | value |
-|---|---|
-| shards validated, uploaded, audited | 667 of 667 (4 000 landscapes, 21 006 index rows) |
-| full Hub-vs-plan audit | clean (0 discrepancies, 3 132 files) |
-| QC fail rate | 0.033 % |
-| GB on Hub | XL 281.3 (S 142.2, M 251.5, L 380.5; total 1 056) |
-| upload window | 09-21 09:03Z → 09-22 04:08Z (19.1 h), 4 workers, peak hour 125 shards / 35 GB |
-| XL core-hours (1 cpu per task) | 3 684 (estimate 2 800; 4 OOM re-runs and the probe included) |
-| core-hours since 09-15, all ampscape-* jobs | 13 986 of the 30 000 gate |
-| wall-clock XL | 20 h 51 from first submission (08:24Z) to audited complete (05:15Z) |
-| scratch | 128 GB |
+| item | XXL | whole run |
+|---|---|---|
+| shards validated, uploaded, audited | 400 of 400 (400 landscapes, 2 008 rows) | 3 067 shards, 174 400 landscapes |
+| audit | clean (1 708 files) | S, M, L, XL, XXL all clean |
+| QC fail rate | 0.45 % (9 rows: 7 `regions` residual_high, 1 T4, 1 T3 — all repaired by the precision pass) | S 0.000 %, M 0.002 %, L 0.013 %, XL 0.033 %, XXL 0.45 % |
+| GB on Hub (data/) | ≈ 100 | 1 155.8 |
+| core-hours | 1 228 (1 cpu; 7 OOM re-runs at 176 GB) | 15 218 of the 30 000 gate |
+| wall-clock | 06:18Z first upload → 15:24Z audited (10 h from submission) | S start 09-16 → 09-22 15:24Z |
+| scratch | — | 117 GB |
 
-Incidents: (h) four shards OUT_OF_MEMORY on the `regions` CG+AMG fallback (root cause `PosDefException` in
-Circuitscape's CHOLMOD path; profile 20 GB, automatic 48 GB re-runs) — no data lost; the fallback rows (47 at XL)
-are re-solved by the post-run precision pass. Rows for that pass at XL: 2 225 above 1e-9, 2 526 unmeasured (non-T4).
+Incident (i) resolved: Circuitscape's hard 1e-4 residual check aborted Omniscape maps and advanced solves on contrast-10⁶
+2048² landscapes in both solvers; AmpScapeSolve now rescues exactly those solves by refinement (bit-identical
+otherwise), validated on the failing landscape; the rows that failed before the change are repaired by the precision
+pass at XXL. Index defect fixed (shard names carried the `.part` staging suffix); all published indexes clean.
 
-## XXL
-400 shards (1 landscape each; all test splits; 240 regions configs) planned and prepared ahead; the driver picked them
-up at the boundary (`prepared_upto = 399`) and submits wave 0–299 at 1 cpu / 24 GB (test shards 28 GB), 10-h walltime,
-4 uploaders; ≈ 3–5 h per shard → XXL audited ≈ 2026-09-22 16–20Z.
-
-## Precision pass (owner 2026-09-21, two parts)
-Tooling validated end-to-end (`docs/post_run_resolve_plan.md` §7, runbook §8); starts after XXL, tier by tier.
+## Precision pass (owner 2026-09-21) — started
+Tier S selected and submitted (rows above 1e-9, unmeasured T1/T1R rows, `cg+amg` rows, QC-failed rows; 125 Slurm
+tasks of 4 shards); then upload → full audit → M → L → XL → XXL; index republished once at the end.
