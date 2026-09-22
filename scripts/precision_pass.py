@@ -206,6 +206,9 @@ def cmd_run(a):
 
 
 def cmd_submit(a):
+    """Work-queue submission (2026-09-22: the QoS allows 50 queued jobs per user): --workers long-lived tasks each claim
+    shards from the list atomically (mkdir of work/claims/<shard>) and stop when less than --reserve-h of walltime is
+    left; stale claims (no done marker) are cleared at every submission so interrupted shards are redone whole."""
     work = pathlib.Path(a.work)
     shards = sorted(int(p.stem.split("-")[1]) for p in (work / "rows").glob("shard-*.json"))
     if a.shards:
@@ -215,16 +218,30 @@ def cmd_submit(a):
     if not shards:
         print("nothing to submit")
         return
+    claims = work / "claims"
+    claims.mkdir(exist_ok=True)
+    for s in (
+        shards
+    ):  # clear stale claims of shards without a done marker (a previous worker hit the walltime)
+        c = claims / f"shard-{s:05d}"
+        if c.exists():
+            shutil.rmtree(c, ignore_errors=True)
     (work / "lists").mkdir(exist_ok=True)
     lst = work / "lists" / f"submit_{dt.datetime.now(dt.UTC):%Y%m%dT%H%M%S}.txt"
     lst.write_text("\n".join(str(s) for s in shards) + "\n")
-    n_tasks = (len(shards) + a.per_task - 1) // a.per_task
+    n_tasks = min(a.workers, len(shards))
     (work / "logs").mkdir(exist_ok=True)
+    hh, mm, ss = (int(x) for x in a.time.split(":"))
+    budget_s = hh * 3600 + mm * 60 + ss - int(a.reserve_h * 3600)
     wrap = (
         f"source scripts/env.sh; export JULIA_DEPOT_PATH=$AMPSCAPE_SCRATCH/julia_depot JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1; "
-        f"module load julia/1.11.3 2>/dev/null; "
-        f'for s in $(sed -n "$((SLURM_ARRAY_TASK_ID*{a.per_task}+1)),$((SLURM_ARRAY_TASK_ID*{a.per_task}+{a.per_task}))p" {lst}); do '
-        f"python scripts/precision_pass.py run --tier {a.tier} --work {work} --shard $s --target {a.target} --qc-tol {a.qc_tol} 2>&1 | grep -v Warning | tail -3; done"
+        f"module load julia/1.11.3 2>/dev/null; t0=$(date +%s); "
+        f"for s in $(cat {lst}); do "
+        f'  [ $(( $(date +%s) - t0 )) -gt {budget_s} ] && {{ echo "worker stops: walltime reserve reached"; break; }}; '
+        f"  n=$(printf shard-%05d $s); [ -f {work}/done/$n.json ] && continue; "
+        f"  mkdir {claims}/$n 2>/dev/null || continue; "
+        f"  python scripts/precision_pass.py run --tier {a.tier} --work {work} --shard $s --target {a.target} --qc-tol {a.qc_tol} 2>&1 | grep -v Warning | tail -3; "
+        f'done; echo "worker done $(date -u +%FT%TZ)"'
     )
     cmd = SB + [
         "-c1",
@@ -235,12 +252,13 @@ def cmd_submit(a):
         f"precision-{a.tier}",
         "-o",
         f"{work}/logs/%A_%a.out",
-        f"--array=0-{n_tasks - 1}%{a.max_concurrent}",
+        f"--array=0-{n_tasks - 1}",
         "--wrap",
         wrap,
     ]
-    out = subprocess.run(cmd, capture_output=True, text=True).stdout.strip()
-    print(f"submitted {len(shards)} shards in {n_tasks} tasks: job {out}")
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    out = r.stdout.strip() or ("ERROR " + r.stderr.strip()[:200])
+    print(f"submitted {len(shards)} shards to {n_tasks} worker tasks: job {out}")
 
 
 def cmd_upload(a):
@@ -408,11 +426,16 @@ def main():
         if name == "upload":
             p.add_argument("--batch-shards", type=int, default=20)
         if name == "submit":
-            p.add_argument("--per-task", type=int, default=4)
+            p.add_argument("--workers", type=int, default=45)
             p.add_argument("--mem", default="8G")
-            p.add_argument("--time", default="04:00:00")
+            p.add_argument("--time", default="18:00:00")
+            p.add_argument(
+                "--reserve-h",
+                type=float,
+                default=5.0,
+                help="stop claiming when less walltime than this is left",
+            )
             p.add_argument("--shards", default=None)
-            p.add_argument("--max-concurrent", type=int, default=100)
         p.set_defaults(func=fn)
     a = ap.parse_args()
     if a.work is None:
