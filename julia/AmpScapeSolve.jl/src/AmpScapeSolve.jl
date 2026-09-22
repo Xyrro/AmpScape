@@ -139,6 +139,58 @@ end
 using SparseArrays
 using AlgebraicMultigrid
 
+# ---------------------------------------------------------------------------
+# Rescue of Circuitscape's linear solves (2026-09-22, incident (i)): Circuitscape 5.17.1 `solve_linear_system` raises
+# an error whenever the relative residual of a solve is ≥ 1e-4 (CHOLMOD: `factor \ rhs` unrefined; CG: Krylov.cg with
+# rtol 1e-6 / 100 000 iterations). On contrast-10⁶ 2048² landscapes this aborted whole Omniscape maps and advanced
+# solves although one step of iterative refinement (or a direct factorisation of the window) solves them to 1e-8.
+# These method replacements keep Circuitscape's results bit-identical whenever its check passes and only act where it
+# would have thrown: CHOLMOD → iterative refinement with the same factorisation; CG → CHOLMOD factorisation of the
+# same matrix + refinement. Every rescue is counted (`RESCUED_SOLVES`) and recorded in the solve's stats.
+# ---------------------------------------------------------------------------
+const RESCUED_SOLVES = Ref(0)
+const RESCUE_TARGET = 1e-8
+
+function _refine_cholmod!(lhs::AbstractVector, factor, matrix, rhs::AbstractVector)
+    nb = norm(rhs)
+    r = norm(matrix * lhs .- rhs) / nb
+    for _ in 1:4
+        r < RESCUE_TARGET && break
+        d = factor \ (rhs .- matrix * lhs)
+        lhs2 = lhs .+ d
+        r2 = norm(matrix * lhs2 .- rhs) / nb
+        r2 < r || break
+        lhs .= lhs2; r = r2
+    end
+    return r
+end
+
+function Circuitscape.solve_linear_system(factor::SparseArrays.CHOLMOD.Factor, matrix, rhs)
+    lhs = factor \ rhs
+    for col = 1:size(rhs, 2)
+        residual = norm(matrix * lhs[:, col] .- rhs[:, col]) / norm(rhs[:, col])
+        if residual >= 1e-4                                   # Circuitscape would have thrown here
+            x = Vector(lhs[:, col]); r2 = _refine_cholmod!(x, factor, matrix, Vector(rhs[:, col]))
+            r2 < 1e-4 || error("CHOLMOD solver residual $r2 (after refinement; $residual before) exceeds tolerance 1e-4 for column $col")
+            lhs[:, col] = x; RESCUED_SOLVES[] += 1
+        end
+    end
+    lhs
+end
+
+function Circuitscape.solve_linear_system(G::SparseMatrixCSC{T,V}, curr::Vector{T}, M)::Vector{T} where {T,V}
+    v, stats = Circuitscape.Krylov.cg(G, curr, M = M, ldiv = true, rtol = T(1e-6), itmax = 100_000)
+    residual = norm(G * v .- curr) / norm(curr)
+    if residual >= 1e-4                                       # Circuitscape would have thrown here
+        F = cholesky(Symmetric(G))
+        x = Vector{T}(F \ curr); r2 = _refine_cholmod!(x, F, G, curr)
+        r2 < 1e-4 || error("CG solver did not converge: relative residual $r2 (after CHOLMOD rescue; $residual by CG) exceeds tolerance 1e-4")
+        RESCUED_SOLVES[] += 1
+        return x
+    end
+    v
+end
+
 """Laplacian of the Circuitscape graph (8-neighbour, NoData removed, average conductance) and node index map."""
 function graph_laplacian(R::AbstractMatrix, nodata::AbstractMatrix{Bool})
     H, W = size(R)
@@ -378,6 +430,7 @@ function _run_cs(cfg::Dict{String,String}, st::SolveStats)
     st.started_utc = Dates.format(now(UTC), "yyyy-mm-ddTHH:MM:SS")
     GC.gc()
     rss0 = Sys.maxrss()
+    n0 = RESCUED_SOLVES[]
     t = @elapsed r = try
         with_logger(NullLogger()) do
             Circuitscape.compute(cfg)
@@ -386,6 +439,7 @@ function _run_cs(cfg::Dict{String,String}, st::SolveStats)
         st.error = sprint(showerror, err)
         nothing
     end
+    RESCUED_SOLVES[] > n0 && (st.solver_params["rescued_solves"] = RESCUED_SOLVES[] - n0)
     st.wall_s = t
     st.maxrss_mb = Sys.maxrss() / 2^20
     st.converged = r !== nothing
@@ -597,6 +651,7 @@ function solve_omniscape(R::AbstractMatrix, nodata::AbstractMatrix{Bool}, S::Abs
         "precision", "connect_four_neighbors_only", "correct_artifacts", "calc_flow_potential", "calc_normalized_current"])
     st.started_utc = Dates.format(now(UTC), "yyyy-mm-ddTHH:MM:SS")
     GC.gc()
+    n0 = RESCUED_SOLVES[]
     t = @elapsed res = try
         with_logger(NullLogger()) do
             run_omniscape(cfg, Rm; source_strength = Sm, write_outputs = false)
@@ -626,6 +681,7 @@ function solve_omniscape(R::AbstractMatrix, nodata::AbstractMatrix{Bool}, S::Abs
             st.error = "reference solver ($solver) failed: " * err1
         end
     end
+    RESCUED_SOLVES[] > n0 && (st.solver_params["rescued_solves"] = RESCUED_SOLVES[] - n0)
     st.wall_s = t
     st.maxrss_mb = Sys.maxrss() / 2^20
     st.converged = res !== nothing
