@@ -244,64 +244,87 @@ def cmd_submit(a):
 
 
 def cmd_upload(a):
+    """Upload finished shards in batches of --batch-shards per commit (the Hub allows 128 commits per hour; 2026-09-22
+    the one-commit-per-shard version hit that limit), verify every file's sha256, then update the per-shard records."""
+    import time
+
     from huggingface_hub import CommitOperationAdd, HfApi
 
     work = pathlib.Path(a.work)
     api = HfApi()
     done = sorted((work / "done").glob("shard-*.json"))
+    pending = [d for d in done if not (work / "uploaded" / f"{d.stem}.json").exists()]
     n = 0
-    for d in done:
-        shard = d.stem
-        mark = work / "uploaded" / f"{shard}.json"
-        if mark.exists():
-            continue
-        res = json.loads(d.read_text())
-        ops, expect = [], {}
-        for grp, g in res["groups"].items():
-            local = pathlib.Path(g["local"])
-            if not local.exists():
-                raise SystemExit(f"{shard}/{grp}: local file missing; re-run")
-            if sha256(local) != g["sha256"]:
-                raise SystemExit(f"{shard}/{grp}: local file changed since the run; re-run")
-            ops.append(CommitOperationAdd(path_in_repo=g["path"], path_or_fileobj=str(local)))
-            expect[grp] = g
-        commit = api.create_commit(
-            REPO,
-            operations=ops,
-            repo_type="dataset",
-            commit_message=f"precision pass: {a.tier} {shard} ({len(ops)} task groups re-solved)",
+    for i in range(0, len(pending), a.batch_shards):
+        batch = pending[i : i + a.batch_shards]
+        ops, expect = [], {}  # expect[shard] = {grp: g}
+        for d in batch:
+            shard = d.stem
+            res = json.loads(d.read_text())
+            expect[shard] = {}
+            for grp, g in res["groups"].items():
+                local = pathlib.Path(g["local"])
+                if not local.exists():
+                    raise SystemExit(f"{shard}/{grp}: local file missing; re-run")
+                if sha256(local) != g["sha256"]:
+                    raise SystemExit(f"{shard}/{grp}: local file changed since the run; re-run")
+                ops.append(CommitOperationAdd(path_in_repo=g["path"], path_or_fileobj=str(local)))
+                expect[shard][grp] = g
+        commit = None
+        for attempt in range(6):
+            try:
+                commit = api.create_commit(
+                    REPO,
+                    operations=ops,
+                    repo_type="dataset",
+                    commit_message=f"precision pass: {a.tier} {batch[0].stem}..{batch[-1].stem} ({len(ops)} files re-solved)",
+                )
+                break
+            except Exception as e:  # noqa: BLE001
+                msg = str(e)
+                wait = 900 if "429" in msg or "rate limit" in msg.lower() else 60 * (attempt + 1)
+                print(
+                    f"commit failed (attempt {attempt + 1}): {msg[:160]} — waiting {wait} s",
+                    flush=True,
+                )
+                time.sleep(wait)
+        if commit is None:
+            raise SystemExit("commit failed six times — stop")
+        for shard, groups in expect.items():
+            for grp, g in groups.items():
+                remote = remote_sha256(api, REPO, g["path"])
+                if remote != g["sha256"]:
+                    raise SystemExit(
+                        f"{shard}/{grp}: sha256 mismatch on the Hub after upload — stop"
+                    )
+        for shard, groups in expect.items():
+            # local upload record (audit_tier compares the Hub sha256 with it) and the scratch index rows
+            rec_f = pathlib.Path(f"data/v1/{a.tier}/shards/{shard}.uploaded")
+            rec = json.loads(rec_f.read_text()) if rec_f.exists() else {"parts": {}}
+            for grp, g in groups.items():
+                rec["parts"][grp] = {
+                    "repo": REPO,
+                    "path": g["path"],
+                    "sha256": g["sha256"],
+                    "bytes": g["bytes"],
+                    "commit": getattr(commit, "oid", None),
+                    "uploaded_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+                    "precision_pass": True,
+                }
+            rec_f.write_text(json.dumps(rec))
+            shutil.copyfile(
+                work / "index" / f"{shard}.parquet", f"data/v1/{a.tier}/index/{shard}.parquet"
+            )
+            (work / "uploaded").mkdir(exist_ok=True)
+            (work / "uploaded" / f"{shard}.json").write_text(
+                json.dumps({"commit": getattr(commit, "oid", None), "groups": list(groups)})
+            )
+            shutil.rmtree(work / "files" / shard, ignore_errors=True)
+            n += 1
+        print(
+            f"batch of {len(batch)} shard(s) ({len(ops)} files) uploaded and verified", flush=True
         )
-        for grp, g in expect.items():
-            remote = remote_sha256(api, REPO, g["path"])
-            if remote != g["sha256"]:
-                raise SystemExit(f"{shard}/{grp}: sha256 mismatch on the Hub after upload — stop")
-        # local upload record (audit_tier compares the Hub sha256 with it) and the scratch index rows
-        rec_f = pathlib.Path(f"data/v1/{a.tier}/shards/{shard}.uploaded")
-        rec = json.loads(rec_f.read_text()) if rec_f.exists() else {"parts": {}}
-        for grp, g in expect.items():
-            rec["parts"][grp] = {
-                "repo": REPO,
-                "path": g["path"],
-                "sha256": g["sha256"],
-                "bytes": g["bytes"],
-                "commit": getattr(commit, "oid", None),
-                "uploaded_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
-                "precision_pass": True,
-            }
-        rec_f.write_text(json.dumps(rec))
-        shutil.copyfile(
-            work / "index" / f"{shard}.parquet", f"data/v1/{a.tier}/index/{shard}.parquet"
-        )
-        (work / "uploaded").mkdir(exist_ok=True)
-        (work / "uploaded" / f"{shard}.json").write_text(
-            json.dumps({"commit": getattr(commit, "oid", None), "groups": list(expect)})
-        )
-        shutil.rmtree(work / "files" / shard, ignore_errors=True)
-        n += 1
-        print(f"{shard}: uploaded {len(ops)} file(s), verified, local copies removed")
-    print(
-        f"uploaded {n} shard(s); pending {len(done) - len(list((work / 'uploaded').glob('*.json')))}"
-    )
+    print(f"uploaded {n} shard(s); pending {len(pending) - n}")
 
 
 def cmd_status(a):
@@ -375,6 +398,8 @@ def main():
             p.add_argument("--mode", choices=["a", "b"], default="a")
         if name == "run":
             p.add_argument("--shard", type=int, required=True)
+        if name == "upload":
+            p.add_argument("--batch-shards", type=int, default=20)
         if name == "submit":
             p.add_argument("--per-task", type=int, default=4)
             p.add_argument("--mem", default="8G")
