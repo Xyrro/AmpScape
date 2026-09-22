@@ -358,3 +358,18 @@ Shard 574 was the third XL OOM (resubmitted at 48 GB automatically).
 
 Core-hours used since 2026-09-15 (ampscape-* jobs): **13986**. Stop rule: not triggered.
 
+## Incident 2026-09-22 (i) — XXL: Omniscape CHOLMOD abort on a contrast-10⁶ mosaic; false QC-rate alert
+
+The first finalized XXL shard (66, one landscape: synthetic mosaic, contrast 10⁶, test_ood) had its T4 row fail:
+Omniscape 0.6.2 with the CHOLMOD solver aborted the map after 2 197 s with `CHOLMOD solver residual 1.28e-4 exceeds
+tolerance 1e-4 for column 1` (Omniscape's own per-window residual check), leaving `not_converged, all_zero_output`;
+the four other configurations of the landscape passed. With 1 failed row of 5 the driver's QC stop rule read "20 %
+> 1 %" and exited (06:16Z). Fixes: (1) the rule now needs ≥ 20 shards and ≥ 200 rows before it can fire; driver
+restarted 06:18Z (the 300 running tasks were never affected); (2) `solve_omniscape` retries the whole map with
+Omniscape's `cg+amg` solver when the CHOLMOD attempt fails, recording `fallback_used` and the original error, as the
+pairwise solver already did — package precompiled on the login node so that wave 2 and every re-run use it. Exposure:
+14 of the 400 XXL landscapes have contrast ≥ 10⁵ (7 at 10⁶); the corresponding rows of wave 1 that fail are
+QC-flagged (`qc_pass = false`) in the index and will be re-solved with the fallback and replaced on the Hub after the
+wave (same repair flow as the tier-S re-solve: re-solve → re-finalize → verified replacement → audit), before the
+precision pass touches XXL. No such failure occurred at S–XL (T4 QC pass 100 %).
+

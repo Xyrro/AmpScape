@@ -25,6 +25,7 @@ LOGS = ROOT / "logs"
 STATE = LOGS / "driver_state.json"
 CYCLE = 600
 SCRATCH_ALERT_GB = 250.0
+QC_MIN_SHARDS, QC_MIN_ROWS = 20, 200  # the QC stop rule (> 1 %) needs a sample before it can fire
 MAX_QUEUED = 450  # of the 500-job MaxSubmitPU, leaving room for prepare/audit/resubmission jobs
 SCRATCH_SUBMIT_GB = 230.0  # total scratch quota (300 GB) minus the 41 GB of S/M/L quicklooks, 12 GB logs, tiles, sources, envs (2026-09-21)
 # tier, landscapes, shard size, wave (shards), max concurrent jobs, extra plan args
@@ -111,6 +112,8 @@ def qc_fail_rate(tier: str) -> float:
     if not rows:
         return 0.0
     idx = pd.concat([pd.read_parquet(p, columns=["qc_pass"]) for p in rows], ignore_index=True)
+    if len(rows) < QC_MIN_SHARDS or len(idx) < QC_MIN_ROWS:
+        return 0.0  # 2026-09-22: the first XXL shard (5 rows, one failed T4) read as "20 %" and stopped the driver
     return float(1 - idx.qc_pass.mean()) if len(idx) else 0.0
 
 

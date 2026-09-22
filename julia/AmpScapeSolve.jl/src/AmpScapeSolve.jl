@@ -573,7 +573,7 @@ end
 function solve_omniscape(R::AbstractMatrix, nodata::AbstractMatrix{Bool}, S::AbstractMatrix;
                          radius::Int, block_size::Int, solver = "cg+amg", precision = "double",
                          source_threshold = 0.0, four_neighbors = false, correct_artifacts = true,
-                         workdir = mktempdir())
+                         workdir = mktempdir(), fallback = "cg+amg")
     # Omniscape creates `project_name` in the CURRENT DIRECTORY even with write_outputs = false (and
     # suffixes _1, _2, ... when it exists). Point it at a per-solve temp dir and remove it afterwards.
     project = joinpath(workdir, "omniscape_project")
@@ -604,6 +604,27 @@ function solve_omniscape(R::AbstractMatrix, nodata::AbstractMatrix{Bool}, S::Abs
     catch err
         st.error = sprint(showerror, err)
         nothing
+    end
+    # 2026-09-22 (XXL shard 66): Omniscape's CHOLMOD path aborts a window solve whose residual exceeds its 1e-4 check
+    # ("CHOLMOD solver residual ... exceeds tolerance 1e-4") on a contrast-10⁶ 2048² mosaic; retry the whole map with
+    # the fallback solver (Omniscape's cg+amg) and record fallback_used, as solve_pairwise does
+    if res === nothing && fallback !== nothing && fallback != solver
+        err1 = st.error
+        cfg["solver"] = fallback
+        rm(project; recursive = true, force = true)
+        t2 = @elapsed res = try
+            with_logger(NullLogger()) do
+                run_omniscape(cfg, Rm; source_strength = Sm, write_outputs = false)
+            end
+        catch err
+            st.error = err1 * " | fallback failed: " * sprint(showerror, err)
+            nothing
+        end
+        t += t2
+        if res !== nothing
+            st.solver = fallback; st.solver_params["solver"] = fallback; st.fallback_used = true
+            st.error = "reference solver ($solver) failed: " * err1
+        end
     end
     st.wall_s = t
     st.maxrss_mb = Sys.maxrss() / 2^20
