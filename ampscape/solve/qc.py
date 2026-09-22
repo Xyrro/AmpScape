@@ -29,7 +29,10 @@ import numpy as np
 
 from ampscape.sources.graph import build_conductance_graph, laplacian
 
-INFO_FLAGS = {"fallback_solver"}
+INFO_FLAGS = {
+    "fallback_solver",
+    "resolved_post_run",
+}  # resolved_post_run: re-solved by the post-run precision pass (2026-09-21)
 
 
 def _f(x) -> float:

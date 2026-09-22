@@ -440,7 +440,10 @@ def publish_index(
             continue
         d = staging / "splits" / sub
         d.mkdir(parents=True, exist_ok=True)
-        for split, g in part.groupby("split"):
+        # owner 2026-09-21: a sample with any row failing QC (e.g. residual_high after the precision pass) is excluded
+        # from the split lists — never silently kept; its rows stay in the index with qc_pass = False
+        bad = set(part.loc[~part.qc_pass.astype(bool), "sample_id"]) if "qc_pass" in part else set()
+        for split, g in part[~part.sample_id.isin(bad)].groupby("split"):
             g[["sample_id"]].drop_duplicates().to_parquet(d / f"{split}.parquet", index=False)
     if push:
         from huggingface_hub import HfApi
