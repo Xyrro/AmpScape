@@ -372,4 +372,19 @@ pairwise solver already did — package precompiled on the login node so that wa
 QC-flagged (`qc_pass = false`) in the index and will be re-solved with the fallback and replaced on the Hub after the
 wave (same repair flow as the tier-S re-solve: re-solve → re-finalize → verified replacement → audit), before the
 precision pass touches XXL. No such failure occurred at S–XL (T4 QC pass 100 %).
+**Addendum 07:45Z — second alert at 1.11 % (3 of 270 rows, 63 shards) and the decision to continue.** The three rows:
+(1) shard 66 T4 as above; (2) shard 155 `advanced` (edge_gradient, contrast 10⁶): Circuitscape's CHOLMOD attempt *and*
+its cg+amg fallback both ended `CG solver did not converge: relative residual 2.3e-3 exceeds tolerance 1e-4`
+(`not_converged, all_zero_output`); (3) shard 213 `regions` (real tile, contrast 100): residual 1.08e-6, just above
+the 1e-6 QC tolerance, refinement not applied. All three are QC-flagged in the index (`qc_pass = false`, so their
+samples are excluded from the split lists) and each has an approved repair path: (1) the Omniscape fallback re-solve
+after the wave; (2) and (3) the precision pass, which now also selects QC-failed pairwise/advanced rows and re-solves
+them on the reduced system (our CHOLMOD solved the same kind of contrast-10⁶ problems that Circuitscape's checks
+reject). Because nothing is silently kept and every failure is repaired before the tag, the driver was restarted with
+the XXL alert threshold at 5 % (other tiers 1 %); 14 of 400 XXL landscapes are at contrast ≥ 10⁵, so the final rate
+should stay near 1–2 %. **Index defect found while investigating:** since the atomic-rename change (2026-09-19) the
+`shard` column of the index rows recorded the staging name `shard-XXXXX.h5.part` (all of XL, the later part of L, all
+of XXL so far, and the published `index/XL.parquet`). Fixed in `finalize.py`; the 1 573 local index files were
+rewritten and the S/M/L/XL indexes republished (the shard column now always reads `shard-XXXXX.h5`; the audit and the
+sync were unaffected because they key on sample ids).
 
