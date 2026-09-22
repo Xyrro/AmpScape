@@ -319,6 +319,11 @@ def cmd_upload(a):
             (work / "uploaded" / f"{shard}.json").write_text(
                 json.dumps({"commit": getattr(commit, "oid", None), "groups": list(groups)})
             )
+            (work / "reports" / shard).mkdir(
+                parents=True, exist_ok=True
+            )  # keep the per-row reports for the tier summary
+            for rep in (work / "files" / shard).glob("*.report.json"):
+                shutil.copyfile(rep, work / "reports" / shard / rep.name)
             shutil.rmtree(work / "files" / shard, ignore_errors=True)
             n += 1
         print(
@@ -343,7 +348,9 @@ def cmd_status(a):
             agg["errors"] += len(g.get("errors", []))
             agg["time_s"] += g.get("time_s", 0)
         for rep in (
-            (work / "files" / d.stem).glob("*.report.json")
+            list((work / "reports" / d.stem).glob("*.report.json"))
+            if (work / "reports" / d.stem).exists()
+            else (work / "files" / d.stem).glob("*.report.json")
             if (work / "files" / d.stem).exists()
             else []
         ):
