@@ -429,3 +429,20 @@ replaced and verified by 20:40Z, no mismatch. Residuals after (384 shards): p50 
 no row above 1e-6.
 **20:15Z — cluster policy change:** the coc-ice QoS `MaxSubmitPU` is now **50** jobs per user (it was 500 throughout generation; `sacctmgr show qos coc-ice`); the 116-task resubmission was rejected with `QOSMaxSubmitJobPerUserLimit`. Resubmitted as 39 tasks × 3 shards (12 h). The driver's queue cap is set to 45 for any future run.
 
+## 2026-09-22 22:20Z — precision pass, tier S complete and audited
+
+| item | value |
+|---|---|
+| rows re-solved | 68 008 (63 093 unmeasured T1/T1R, 4 905 above 1e-9, 9 `cg+amg`, 1 QC-failed T4), 500 of 500 shards |
+| residual after (true, max over pairs) | p50 2.9e-13, p90 3.4e-11, p99 1.6e-9, max 5.0e-7 (`advanced`) |
+| rows still above 1e-9 | 1 013 (double-precision floor after up to 3 refinement steps; residual recorded) — 0 above 1e-6 |
+| unmeasured non-T4 rows in S now | 0 (every T1/T1R row carries `residual_per_pair`) |
+| QC | 68 007 of 68 008 re-solved rows pass (the T4 row has no residual by design and passes); no `residual_high` |
+| provenance | `solver = cholmod` on every re-solved row, `solver_original = cg+amg` on 9, `resolved_post_run` flag on all |
+| cost | 19.0 CPU-h of solves (+ ≈ 4 h of Julia start-ups inside the same tasks), 2 500 T1/T1W/T1R/T3 files re-uploaded in 27 batched commits, 0 sha256 mismatches |
+| audit after the pass | clean (500 shards, 2 500 files; job 5905420, 54 min) |
+| wall-clock | 15:30Z → 22:19Z (incl. the 48 walltime hits and the commit-rate pause) |
+
+M started 22:20Z: 37 639 rows (31 427 unmeasured, 6 192 above 1e-9, 14 fallback, 6 QC-failed) on 500 shards, 45 worker
+tasks (work queue, 18 h walltime, 5 h reserve), uploader batching 20 shards per commit.
+

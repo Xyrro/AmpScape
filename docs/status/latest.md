@@ -17,6 +17,8 @@ Incident (i) resolved: Circuitscape's hard 1e-4 residual check aborted Omniscape
 otherwise), validated on the failing landscape; the rows that failed before the change are repaired by the precision
 pass at XXL. Index defect fixed (shard names carried the `.part` staging suffix); all published indexes clean.
 
-## Precision pass (owner 2026-09-21) — started
+## Precision pass (owner 2026-09-21) — S complete and audited, M running
+S: 68 008 rows re-solved, residual p50 2.9e-13 / p99 1.6e-9 / max 5e-7, 1 013 rows floor above 1e-9 (recorded), 0 above 1e-6, no unmeasured row left, audit clean, 19 CPU-h. M: 37 639 rows, 45 workers since 22:20Z. Cluster note: coc-ice `MaxSubmitPU` is now 50 jobs (was 500) → work-queue workers.
+
 Tier S selected and submitted (rows above 1e-9, unmeasured T1/T1R rows, `cg+amg` rows, QC-failed rows; 125 Slurm
 tasks of 4 shards); then upload → full audit → M → L → XL → XXL; index republished once at the end.
