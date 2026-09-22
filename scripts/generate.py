@@ -199,6 +199,24 @@ def cmd_solve(a) -> None:
         pathlib.Path(os.environ.get("AMPSCAPE_SCRATCH", ROOT)) / "cache" / job
     )
     pathlib.Path(tmp).mkdir(parents=True, exist_ok=True)
+    # 2026-09-22 (XXL shard 243): an OOM-killed task can leave an unreadable outputs file ("bad object header"), on
+    # which every resumable re-run dies within minutes; set it aside (kept, not deleted) and start the shard afresh
+    if p["outputs"].exists():
+        try:
+            import h5py
+
+            with h5py.File(p["outputs"], "r") as f:
+                _ = list(f.keys())
+        except Exception as e:  # noqa: BLE001
+            import datetime as dt
+
+            aside = p["outputs"].with_name(
+                p["outputs"].name + f".corrupt-{dt.datetime.now(dt.UTC):%Y%m%dT%H%M%S}"
+            )
+            p["outputs"].rename(aside)
+            print(
+                f"outputs file unreadable ({str(e)[:80]}); moved to {aside.name}; solving the shard from scratch"
+            )
     cmd = julia_cmd(
         p["inputs"],
         p["outputs"],

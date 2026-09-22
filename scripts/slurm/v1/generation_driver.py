@@ -198,7 +198,11 @@ def oom_shards(tier: str, shards: list[int]) -> set[int]:
         task = jid.split("_", 1)[1]
         if not task.isdigit():
             continue
-        last[int(task)] = state  # sacct lists in submission order; the last entry wins
+        if state.startswith("OUT_OF_MEMORY"):
+            last[int(task)] = (
+                state  # 2026-09-22: any OOM in the shard's history keeps the raised memory (a corrupt
+            )
+            # outputs file made the 176 GB re-run of XXL 243 die in 2 min, and the next round fell back to 28 GB)
     return {s for s in shards if last.get(s, "").startswith("OUT_OF_MEMORY")}
 
 

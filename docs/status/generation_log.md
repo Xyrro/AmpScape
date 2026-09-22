@@ -388,3 +388,13 @@ of XXL so far, and the published `index/XL.parquet`). Fixed in `finalize.py`; th
 rewritten and the S/M/L/XL indexes republished (the shard column now always reads `shard-XXXXX.h5`; the audit and the
 sync were unaffected because they key on sample ids).
 
+## Note 2026-09-22 (j) — OOM-killed task leaves an unreadable outputs file; re-runs looped
+
+XXL shard 243 (real tile, ood_region) was OOM-killed at 28 GB after 2 h 23 (regions fallback tail); its partially
+written `outputs/shard-00243.outputs.h5` had a bad HDF5 object header, so the 176 GB re-run and the following
+profile-memory re-run both died within 2 min (`H5Error ... Wrong version number`). Fixes: `generate.py solve` now
+opens an existing outputs file before launching Julia and, if unreadable, moves it aside as `<name>.corrupt-<ts>` (kept,
+not deleted) and starts the shard afresh; the driver keeps the raised memory for any shard that ever ended
+OUT_OF_MEMORY (not only when the very last attempt did). The corrupt file of 243 was moved to
+`data/v1/XXL/outputs/corrupt/shard-00243.outputs.h5.oom-20260922T0347` (kept); the driver re-runs 243 at 176 GB.
+
