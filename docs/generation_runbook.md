@@ -15,7 +15,7 @@ first after the freeze checklist is approved.
 | solver | CHOLMOD reference, CG baselines on test/OOD samples, QC threshold 1e-6 |
 | planner | `scripts/plan_v1.py --tier T --n N --out data/v1/T --shard-size S` (prefix streams; the dev subset is the first 3 000 S / 500 M) |
 
-## 1. Cost and array design (512 concurrent cores; ≤ 400 tasks per array under the 500-job submit limit)
+## 1. Cost and array design (512 concurrent cores; ≤ 400 tasks per array under the 500-job submit limit — **2026-09-22: the coc-ice QoS MaxSubmitPU is now 50 jobs per user**, so arrays must pack several shards per task and stay ≤ 50 tasks)
 
 Per-landscape wall time (dev measurements for S/M, Phase-5 scaling for L–XXL; single core except XL/XXL):
 

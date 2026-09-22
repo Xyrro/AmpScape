@@ -29,7 +29,7 @@ QC_ALERT_RATE = {
     "XXL": 0.05
 }  # 2026-09-22: XXL contrast-10⁶ solves fail Circuitscape's internal checks (1.1 % of rows), all QC-flagged and repaired by the fallback re-solve + precision pass
 QC_MIN_SHARDS, QC_MIN_ROWS = 20, 200  # the QC stop rule (> 1 %) needs a sample before it can fire
-MAX_QUEUED = 450  # of the 500-job MaxSubmitPU, leaving room for prepare/audit/resubmission jobs
+MAX_QUEUED = 45  # 2026-09-22: the coc-ice QoS MaxSubmitPU dropped from 500 to 50 jobs per user (was 450 of 500)
 SCRATCH_SUBMIT_GB = 230.0  # total scratch quota (300 GB) minus the 41 GB of S/M/L quicklooks, 12 GB logs, tiles, sources, envs (2026-09-21)
 # tier, landscapes, shard size, wave (shards), max concurrent jobs, extra plan args
 TIERS = [

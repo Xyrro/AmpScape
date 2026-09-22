@@ -427,4 +427,5 @@ nothing partial reaches the Hub). Uploads: the Hub's limit of 128 commits per ho
 uploader at 16:58Z (429); rewritten to batch 20 shards (≈ 60 files) per commit with a 15-min back-off — 378 shards
 replaced and verified by 20:40Z, no mismatch. Residuals after (384 shards): p50 2.4e-13, p90 2e-11, p99 1.4e-9;
 no row above 1e-6.
+**20:15Z — cluster policy change:** the coc-ice QoS `MaxSubmitPU` is now **50** jobs per user (it was 500 throughout generation; `sacctmgr show qos coc-ice`); the 116-task resubmission was rejected with `QOSMaxSubmitJobPerUserLimit`. Resubmitted as 39 tasks × 3 shards (12 h). The driver's queue cap is set to 45 for any future run.
 
