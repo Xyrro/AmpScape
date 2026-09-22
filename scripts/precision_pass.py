@@ -63,10 +63,13 @@ def cmd_select(a):
     unmeasured = idx.residual_rel.isna() & (
         idx.config.isin(["points", "regions"]) if a.mode == "a" else (idx.config == "regions")
     )
-    sel = idx[(idx.solver == "cg+amg") | (idx.residual_rel > a.target) | unmeasured].copy()
+    failed = ~idx.qc_pass.astype(
+        bool
+    )  # not_converged / all_zero / residual_high rows: re-solved directly
+    sel = idx[(idx.solver == "cg+amg") | (idx.residual_rel > a.target) | unmeasured | failed].copy()
     sel["reason"] = np.select(
-        [sel.solver == "cg+amg", sel.residual_rel > a.target],
-        ["fallback", "above_target"],
+        [~sel.qc_pass.astype(bool), sel.solver == "cg+amg", sel.residual_rel > a.target],
+        ["qc_failed", "fallback", "above_target"],
         "unmeasured",
     )
     work = pathlib.Path(a.work)

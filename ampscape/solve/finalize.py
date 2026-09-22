@@ -201,7 +201,9 @@ def finalize_shard(
                         "qc_pass": ok_all,
                         "qc_trainval": ok_trainval,
                         "skipped_configs": skipped_column(meta),
-                        "shard": pathlib.Path(final_h5).name,
+                        "shard": pathlib.Path(final_h5).name.replace(
+                            ".part", ""
+                        ),  # 2026-09-22: written while the final is still <name>.h5.part
                         "dataset_version": dataset_version,
                         "pipeline_git_sha": sha,
                         "pipeline_tag": tag,
@@ -237,7 +239,7 @@ def index_rows_from_final(final_h5: str, shard_name: str | None = None) -> pd.Da
     """
     rows = []
     with h5py.File(final_h5, "r") as ff:
-        shard = shard_name or pathlib.Path(final_h5).name
+        shard = (shard_name or pathlib.Path(final_h5).name).replace(".part", "")
         dv, sha, tag = (
             str(ff.attrs.get(k, ""))
             for k in ("dataset_version", "pipeline_git_sha", "pipeline_tag")
