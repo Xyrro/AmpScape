@@ -417,3 +417,14 @@ reduced system, then replaces the files and re-audits — no separate repair flo
 
 Core-hours used since 2026-09-15 (ampscape-* jobs): **15218**. Stop rule: not triggered.
 
+## 2026-09-22 — precision pass, tier S (in progress)
+
+Selected 68 008 rows in 500 shards (63 093 unmeasured T1/T1R, 4 905 above 1e-9, 9 `cg+amg`, 1 QC-failed T4). First
+array (125 tasks × 4 shards, 4 h): 384 shards finished, 48 tasks hit the walltime — per-shard wall p50 28 min but p90
+144 min and max 4 h (shards with many K = 8 `points` rows re-solve up to 5 600 pairs each). The 116 unfinished shards are
+resubmitted one per task with a 10-h walltime (the resumable `run` re-downloads the shard's files and redoes it whole;
+nothing partial reaches the Hub). Uploads: the Hub's limit of 128 commits per hour stopped the one-commit-per-shard
+uploader at 16:58Z (429); rewritten to batch 20 shards (≈ 60 files) per commit with a 15-min back-off — 378 shards
+replaced and verified by 20:40Z, no mismatch. Residuals after (384 shards): p50 2.4e-13, p90 2e-11, p99 1.4e-9;
+no row above 1e-6.
+
