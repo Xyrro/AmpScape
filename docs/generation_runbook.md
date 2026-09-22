@@ -159,3 +159,23 @@ loop retried it every 15 min without counting the failure. Fixed as above (owner
 
 Assemble the final per-tier indexes and split lists (`publish_index`), the Croissant file and the dataset card
 (remove the in-progress notice), push the tuned baseline results, mint the Zenodo DOI (Phase 12).
+
+## 8. Post-run precision pass (owner 2026-09-21; `docs/post_run_resolve_plan.md`)
+
+Runs after XXL, tier by tier, never alongside generation of the same tier:
+
+```bash
+source scripts/env.sh
+python scripts/precision_pass.py select --tier S --work work/precision/S --mode a          # rows: cg+amg, > 1e-9, unmeasured
+python scripts/precision_pass.py submit --tier S --work work/precision/S --per-task 4      # Slurm arrays of `run`
+python scripts/precision_pass.py status --tier S --work work/precision/S
+python scripts/precision_pass.py upload --tier S --work work/precision/S                   # login node; repeat until pending = 0
+sbatch ... scripts/audit_tier.py --build data/v1/S --tier S --workers 4                    # full audit, must be clean
+python scripts/precision_pass.py publish --tier S                                          # once, at the very end of the pass
+```
+
+`run` downloads the shard's touched task-group files, re-solves the rows in place (reduced-system CHOLMOD + refinement,
+true residual per pair, currents/Reff recomputed, `solver_original` / `resolved_post_run` / `residual_per_pair` in
+`solver_stats`), rebuilds the touched index rows with the production QC and writes everything under `work/`; nothing
+reaches the Hub until `upload` verifies the sha256 of each re-uploaded file and updates the shard's `.uploaded` record.
+

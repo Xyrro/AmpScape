@@ -123,3 +123,16 @@ changed; index columns `residual_rel` (max over pairs), `solve_time_s`, `qc_flag
 `solver_original`. Consistency check against the replaced result reported per row (rel-L2 of `cum_current`,
 max rel diff of `reff`).
 
+## 7. Tooling validated (2026-09-22 00:18Z) — ready to start after XXL
+
+`julia/AmpScapeSolve.jl/scripts/resolve_rows.jl` + `scripts/precision_pass.py` (`select` → `submit` (Slurm arrays of
+`run`) → `upload` (login node, one commit per shard, sha256-verified, local upload record + scratch index rows updated,
+local copies deleted) → `audit_tier.py` per tier → `publish` once at the end). Validated on a dev-subset S shard (9
+rows of every kind, in-place rewrite, consistency vs the production maps: cumulative current rel-L2 ≤ 1.1e-7,
+Reff ≤ 2e-7 after adopting Circuitscape's conventions — Reff diagonal 0, unreachable pairs −1, every pixel of a
+multi-pixel focal region (source and ground) carries the injected current) and end-to-end on Hub S shard 0
+(142 rows: T1 108, T1R 13, T1W 4, T3 17; 3 min 44 including four Julia start-ups; all 142 rows QC-pass with the
+`resolved_post_run` flag, residual p50 9.4e-13, p90 2.9e-10, max 1.1e-8 — 3 rows floor above 1e-9 in double precision
+and keep the achieved residual as required). Split lists now exclude any sample with a QC-failing row
+(`publish_index`). Projected: S 500 shards × ≈ 4 min ≈ 33 CPU-h; the full pass ≈ 250 CPU-h as estimated in §6.1.
+

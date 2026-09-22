@@ -72,17 +72,47 @@ function solve_pair(L, idx, focal, gl, sl)
     return V, r, method, nref
 end
 
+"""Connected-component label per pixel (0 on NoData), from the Laplacian's sparsity (BFS)."""
+function components(L::SparseMatrixCSC, idx::AbstractMatrix{<:Integer})
+    n = size(L, 1); lab = zeros(Int, n); rows = rowvals(L); c = 0
+    stack = Int[]
+    for s in 1:n
+        lab[s] == 0 || continue
+        c += 1; lab[s] = c; push!(stack, s)
+        while !isempty(stack)
+            u = pop!(stack)
+            for k in nzrange(L, u)
+                v = rows[k]
+                if lab[v] == 0
+                    lab[v] = c; push!(stack, v)
+                end
+            end
+        end
+    end
+    out = zeros(Int, size(idx)); valid = idx .> 0; out[valid] .= lab[vec(idx[valid])]
+    return out
+end
+
 function resolve_pairwise!(og, gin, gc, L, idx, R, nodata, stats)
     focal = Int32.(hw(gc["inputs"], "focal_mask"))
     labels = sort(unique(vec(focal[focal .> 0]))); K = length(labels); pos = Dict(l => i for (i, l) in enumerate(labels))
     pairs = [(labels[i], labels[j]) for i in 1:K for j in (i + 1):K]
     keep = haskey(og, "pairwise_current")
     H, W = size(R)
-    cum = zeros(Float32, H, W); reff = fill(NaN, K, K)
+    cum = zeros(Float32, H, W); reff = zeros(Float64, K, K)      # Circuitscape: diagonal 0, unreachable pairs -1
     res_pairs = Float64[]; methods = String[]; nrefs = Int[]
+    comp = components(L, idx)
     for (p, (i, j)) in enumerate(pairs)
-        V, r, method, nref = solve_pair(L, idx, focal, i, j)
         src = focal .== j; gnd = focal .== i
+        if comp[findfirst(src)] != comp[findfirst(gnd)]        # different connected components: no current flows
+            reff[pos[i], pos[j]] = -1.0; reff[pos[j], pos[i]] = -1.0
+            push!(res_pairs, 0.0); push!(methods, "disconnected"); push!(nrefs, 0)
+            if keep
+                og["pairwise_current"][:, :, p] = zeros(Float32, W, H); og["voltage"][:, :, p] = zeros(Float32, W, H)
+            end
+            continue
+        end
+        V, r, method, nref = solve_pair(L, idx, focal, i, j)
         # Circuitscape convention (verified on the dev subset 2026-09-21): every pixel of a multi-pixel focal region —
         # source AND ground of the pair — displays the merged node's current, i.e. the full injected 1 A
         regpix = (count(src) > 1 ? src : falses(size(src))) .| (count(gnd) > 1 ? gnd : falses(size(gnd)))
