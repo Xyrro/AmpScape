@@ -23,6 +23,7 @@ import glob
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -41,11 +42,19 @@ SB = ["sbatch", "--parsable", "-A", "coc", "-q", "coc-ice", "-p", "coc-cpu", "-N
 PAIR_CONFIGS = ("points", "wall_to_wall_NS", "wall_to_wall_EW", "regions", "advanced")
 
 
+def shard_no(x) -> int:
+    """'shard-00012.h5' / 'shard-00012' / 12 -> 12 (the per-shard index rows carry the file name)."""
+    m = re.search(r"(\d+)", str(x))
+    return int(m.group(1)) if m else int(x)
+
+
 def tier_index(tier: str) -> pd.DataFrame:
     files = sorted(glob.glob(f"data/v1/{tier}/index/shard-*.parquet"))
     if not files:
         raise SystemExit(f"no per-shard index rows under data/v1/{tier}/index")
-    return pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+    idx = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+    idx["shard_no"] = idx.shard.map(shard_no)
+    return idx
 
 
 def cmd_select(a):
@@ -62,7 +71,7 @@ def cmd_select(a):
     )
     work = pathlib.Path(a.work)
     (work / "rows").mkdir(parents=True, exist_ok=True)
-    for sh, g in sel.groupby("shard"):
+    for sh, g in sel.groupby("shard_no"):
         rows = [
             {"sample_id": r.sample_id, "config": r.config, "reason": r.reason}
             for r in g.itertuples()
@@ -74,7 +83,7 @@ def cmd_select(a):
         "target": a.target,
         "rows": int(len(sel)),
         "samples": int(sel.sample_id.nunique()),
-        "shards": int(sel.shard.nunique()),
+        "shards": int(sel.shard_no.nunique()),
         "by_reason": sel.reason.value_counts().to_dict(),
         "by_config": sel.config.value_counts().to_dict(),
         "selected_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
