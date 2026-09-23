@@ -121,11 +121,11 @@ function resolve_pairwise!(og, gin, gc, L, idx, R, nodata, stats)
         vj = V[findfirst(src)]
         reff[pos[i], pos[j]] = vj; reff[pos[j], pos[i]] = vj
         push!(res_pairs, r); push!(methods, method); push!(nrefs, nref)
-        V = nothing; cur = nothing; GC.gc()   # 2026-09-23: bound the per-row memory growth (XL real tiles reached 50 GB at 28 pairs)
         if keep
             og["pairwise_current"][:, :, p] = permutedims(cur)
             og["voltage"][:, :, p] = permutedims(Float32.(V))
         end
+        V = nothing; cur = nothing; GC.gc()   # 2026-09-23: bound the per-row memory growth (XL real tiles reached 50 GB at 28 pairs)
     end
     og["cum_current"][:, :] = permutedims(cum)
     og["reff"][:, :] = permutedims(reff)
