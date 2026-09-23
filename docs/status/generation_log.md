@@ -516,7 +516,7 @@ XXL started 17:03Z: 610 rows (259 unmeasured, 337 above 1e-9, 5 fallback, 9 QC-f
 | cost | 63.0 CPU-h (40 workers at 128 GB, no failure), 1 000+ files re-uploaded, 0 mismatches |
 | audit after the pass | clean (400 shards, 1 708 files) |
 
-**Pass total (S–XXL):** 129 722 rows re-solved, 180 former `cg+amg` rows now `cholmod`, 3 861 rows at the floor above
+**Pass total (S–XXL):** 129 722 rows re-solved, 189 former `cg+amg` rows now `cholmod`, 3 861 rows at the floor above
 1e-9 (recorded), 20 rows above 1e-6 flagged and their samples excluded from the split lists, 0 unmeasured T1/T1W/T1R/T3
 rows anywhere; ≈ 245 CPU-h of solves; five clean audits; indexes and split lists republished once at the end
 (`docs/tables/precision_pass.md`).
