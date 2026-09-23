@@ -462,3 +462,19 @@ tasks (work queue, 18 h walltime, 5 h reserve), uploader batching 20 shards per 
 L started 03:51Z: 18 691 rows (12 565 unmeasured, 6 002 above 1e-9, 110 fallback, 14 QC-failed) on 1 000 shards, 44
 workers; XL pre-selected (4 774 rows on 666 shards).
 
+## 2026-09-23 — precision pass, tier L complete and audited
+
+| item | value |
+|---|---|
+| rows re-solved | 18 691 on 1 000 of 1 000 shards (12 565 unmeasured, 6 002 above 1e-9, 110 `cg+amg`, 14 QC-failed) |
+| residual after | p50 6.8e-12, p90 4.9e-10, p99 1.4e-8, max 1.5e-5 |
+| rows still above 1e-9 | 1 014 (floor; recorded) |
+| rows above 1e-6 after all attempts | **9** (4 `advanced`, 5 `regions`; all synthetic at contrast 10⁶; 1.2e-6 – 1.5e-5) → `residual_high`, excluded from the split lists at the final publish; 2 more re-solved rows keep pre-existing flags (`omniscape_edge_artifact` on the re-run T4 row, `conservation_high` on one `points` row at contrast 10⁶) |
+| unmeasured non-T4 rows in L now | 0 |
+| provenance | `solver_original = cg+amg` on 110; `resolved_post_run` on all |
+| cost | 66.1 CPU-h of solves (44 workers, 03:51Z → 12:06Z), 4 000 files re-uploaded in batched commits, 0 mismatches |
+| audit after the pass | clean (1 000 shards, 4 958 files) |
+
+XL started 12:07Z: 4 774 rows (2 517 unmeasured, 2 205 above 1e-9, 45 fallback, 7 QC-failed) on 666 shards, 44
+workers (24 GB); XXL pre-selected (610 rows on 355 shards).
+
