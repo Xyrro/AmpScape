@@ -478,3 +478,12 @@ workers; XL pre-selected (4 774 rows on 666 shards).
 XL started 12:07Z: 4 774 rows (2 517 unmeasured, 2 205 above 1e-9, 45 fallback, 7 QC-failed) on 666 shards, 44
 workers (24 GB); XXL pre-selected (610 rows on 355 shards).
 
+## Note 2026-09-23 (k) — precision pass XL: memory-killed shards; package precompile
+
+Three XL shards (400, 409, 412) failed in the pass with the worker killed at 24 GB (T1 `points` rows with K = 8 on
+1024² landscapes: 28 pair factorisations); re-run with 48 GB via `precision_pass.py submit --only`. While reading the
+logs: the Circuitscape solve replacements (incident (i)) had made the package *fail to precompile* ("Method
+overwriting is not permitted during Module precompilation") — Julia then loaded AmpScapeSolve uncached in every task
+since 09-22 08:50Z (≈ 1–2 min of extra start-up per task, results unaffected); the replacements are now installed at
+load time in `__init__`, the package precompiles cleanly.
+
