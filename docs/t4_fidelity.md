@@ -73,3 +73,14 @@ T4 metrics at those tiers are computed against the exact block-1 map on the refe
 production target reported as secondary (`bc_*`). Sizes: M ≈ 1 000 samples over test_id and every OOD split (synthetic
 and real), L 60 as a sanity set (both complete, 2026-09-20). S needs no reference (block 1 in production). XL/XXL T4 metrics are against the
 production targets only, with the M/L measurements as the stated fidelity bound.
+
+## Solver note (2026-09-22, incident (i)): Circuitscape's internal residual check and the rescue
+
+Circuitscape 5.17.1 aborts any linear solve whose relative residual is ≥ 1e-4 (an unrefined CHOLMOD solve, or CG at
+rtol 1e-6 capped at 100 000 iterations). On contrast-10⁶ 2048² landscapes this aborted whole Omniscape maps (window
+solves) and T3 solves in both solvers. AmpScapeSolve installs replacements of those two methods at load time: results
+are bit-identical whenever Circuitscape's check passes; where it would have thrown, the CHOLMOD solve is refined
+iteratively (target 1e-8) or, for CG, the window is factorised with CHOLMOD and refined. Every rescued solve is counted
+in the row's `solver_params.rescued_solves`. Validated on the failing XXL landscape (one rescued window solve in a
+2 048² Omniscape map; 8 047 s). T4 rows that had failed before the change were re-run whole by the precision pass.
+

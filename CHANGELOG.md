@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Post-run precision pass — 2026-09-22/23
+- Every T1/T1W/T1R/T3 row above 1e-9, unmeasured, CG-fallback or QC-failed re-solved in place on the Hub with
+  reduced-system CHOLMOD + refinement, true residual per pair recorded, currents/Reff recomputed, provenance kept
+  (`resolved_post_run`, `solver_original`); QC-failed T4 rows re-run whole with the Circuitscape solve rescue; full
+  audit after each tier; split lists exclude samples with QC-failing rows. Per-tier table: `docs/tables/precision_pass.md`.
+- AmpScapeSolve: Circuitscape `solve_linear_system` rescue (incident (i)); Omniscape fallback solver; corrupt-outputs
+  guard in `generate.py solve`; OOM-aware resubmission and the 50-job queue cap in the driver.
+- Tooling: `scripts/precision_pass.py` (select / submit as a work queue / run / batched verified upload / status / publish),
+  `julia/AmpScapeSolve.jl/scripts/resolve_rows.jl`, `scripts/precision_summary.py`; index shard names without `.part`.
+
 ### XL launch, parallel uploads, aux publication — 2026-09-21
 - Tier L complete and audited (1 000 shards, QC fail 0.013 %, 380.5 GB); audit rule fixed for all-skipped task groups.
 - XL: 667 shards planned and prepared; cpu probe (1 vs 4 cpus: no speed-up) → 1 cpu per task for XL/XXL; waves of 300.
