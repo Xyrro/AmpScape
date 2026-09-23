@@ -377,6 +377,7 @@ def cmd_status(a):
                 for x in json.loads(rep.read_text())["rows"]
                 if "residual_after" in x
             ]
+    res_after = [x for x in res_after if isinstance(x, (int, float)) and x == x]
     q = np.quantile(res_after, [0.5, 0.9, 0.99, 1.0]) if res_after else []
     print(
         json.dumps(
