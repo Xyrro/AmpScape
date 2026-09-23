@@ -1,24 +1,13 @@
-# Status — 2026-09-22 15:30Z (v1.0 generation complete: all five tiers audited; precision pass started)
+# Status — 2026-09-23 20:45Z (precision pass complete on all tiers; v1.0 data ready for the tag)
 
-## Tier XXL boundary and whole-run totals
-
-| item | XXL | whole run |
-|---|---|---|
-| shards validated, uploaded, audited | 400 of 400 (400 landscapes, 2 008 rows) | 3 067 shards, 174 400 landscapes |
-| audit | clean (1 708 files) | S, M, L, XL, XXL all clean |
-| QC fail rate | 0.45 % (9 rows: 7 `regions` residual_high, 1 T4, 1 T3 — all repaired by the precision pass) | S 0.000 %, M 0.002 %, L 0.013 %, XL 0.033 %, XXL 0.45 % |
-| GB on Hub (data/) | ≈ 100 | 1 155.8 |
-| core-hours | 1 228 (1 cpu; 7 OOM re-runs at 176 GB) | 15 218 of the 30 000 gate |
-| wall-clock | 06:18Z first upload → 15:24Z audited (10 h from submission) | S start 09-16 → 09-22 15:24Z |
-| scratch | — | 117 GB |
-
-Incident (i) resolved: Circuitscape's hard 1e-4 residual check aborted Omniscape maps and advanced solves on contrast-10⁶
-2048² landscapes in both solvers; AmpScapeSolve now rescues exactly those solves by refinement (bit-identical
-otherwise), validated on the failing landscape; the rows that failed before the change are repaired by the precision
-pass at XXL. Index defect fixed (shard names carried the `.part` staging suffix); all published indexes clean.
-
-## Precision pass (owner 2026-09-21) — S complete and audited, M running
-S: 68 008 rows re-solved, residual p50 2.9e-13 / p99 1.6e-9 / max 5e-7, 1 013 rows floor above 1e-9 (recorded), 0 above 1e-6, no unmeasured row left, audit clean, 19 CPU-h. M: 37 639 rows, 45 workers since 22:20Z. Cluster note: coc-ice `MaxSubmitPU` is now 50 jobs (was 500) → work-queue workers.
-
-Tier S selected and submitted (rows above 1e-9, unmeasured T1/T1R rows, `cg+amg` rows, QC-failed rows; 125 Slurm
-tasks of 4 shards); then upload → full audit → M → L → XL → XXL; index republished once at the end.
+- **Precision pass done (owner 2026-09-21, parts 1 and 2):** 129 722 T1/T1W/T1R/T3 rows re-solved in place on the Hub
+  (S 68 008, M 37 639, L 18 691, XL 4 774, XXL 610) with reduced-system CHOLMOD + refinement; every such row now carries its
+  true residual (0 unmeasured rows left); 180 former `cg+amg` rows are now `cholmod` with `solver_original` kept; 3 861
+  rows sit at the double-precision floor above 1e-9 (recorded); **20 rows above 1e-6** (all synthetic at contrast
+  ≥ 10⁴) are flagged `residual_high`, `qc_pass = false`, and their samples are excluded from the split lists; the two
+  incident-(i) XXL rows are repaired. Per-tier table: `docs/tables/precision_pass.md`; datasheet section added.
+- **Audits:** S, M, L, XL, XXL all clean after the pass; indexes and split lists republished once (final).
+- **Cost:** ≈ 245 CPU-h of solves; generation + pass ≈ 15 500 core-hours of the 30 000 gate. Hub data ≈ 1.16 TB.
+- **Operational notes:** Hub commit limit (128/h) → batched uploads; cluster `MaxSubmitPU` now 50 → work-queue workers;
+  XL/XXL real-tile rows need 48–128 GB per worker; Circuitscape solve rescue installed at load time (precompile-safe).
+- **Next (owner):** v1.0 tag; WP4/WP6/WP7 and the learned baselines await the GPU allocation.

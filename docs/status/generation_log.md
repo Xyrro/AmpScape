@@ -503,3 +503,21 @@ load time in `__init__`, the package precompiles cleanly.
 XXL started 17:03Z: 610 rows (259 unmeasured, 337 above 1e-9, 5 fallback, 9 QC-failed incl. the T4/T3 rows of incident
 (i)) on 355 shards, 40 workers at 128 GB, 176 GB re-runs on failure.
 
+## 2026-09-23 20:40Z — precision pass, tier XXL complete and audited; pass complete
+
+| item | value |
+|---|---|
+| rows re-solved | 610 on 355 of 400 shards (259 unmeasured, 337 above 1e-9, 5 `cg+amg`, 9 QC-failed incl. the T4 and T3 rows of incident (i)) |
+| residual after | p50 2.7e-10, p90 4.3e-9, p99 2.0e-7, max 4.0e-5 |
+| rows still above 1e-9 | 147 (floor; recorded) |
+| rows above 1e-6 after all attempts | **2** (`regions` fractal at contrast 10⁵: 4.0e-5; `advanced` edge_gradient at 10⁶: 5e-6) → `residual_high`, excluded from the split lists |
+| incident (i) rows | the T4 row of shard 66 re-run whole with the solve rescue → passes; the T3 row of shard 155 solved on the reduced system → passes |
+| unmeasured non-T4 rows in XXL now | 0 |
+| cost | 63.0 CPU-h (40 workers at 128 GB, no failure), 1 000+ files re-uploaded, 0 mismatches |
+| audit after the pass | clean (400 shards, 1 708 files) |
+
+**Pass total (S–XXL):** 129 722 rows re-solved, 180 former `cg+amg` rows now `cholmod`, 3 861 rows at the floor above
+1e-9 (recorded), 20 rows above 1e-6 flagged and their samples excluded from the split lists, 0 unmeasured T1/T1W/T1R/T3
+rows anywhere; ≈ 245 CPU-h of solves; five clean audits; indexes and split lists republished once at the end
+(`docs/tables/precision_pass.md`).
+
