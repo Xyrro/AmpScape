@@ -487,3 +487,19 @@ overwriting is not permitted during Module precompilation") — Julia then loade
 since 09-22 08:50Z (≈ 1–2 min of extra start-up per task, results unaffected); the replacements are now installed at
 load time in `__init__`, the package precompiles cleanly.
 
+## 2026-09-23 — precision pass, tier XL complete and audited
+
+| item | value |
+|---|---|
+| rows re-solved | 4 774 on 666 of 666 shards (2 517 unmeasured, 2 205 above 1e-9, 45 `cg+amg`, 7 QC-failed) |
+| residual after | p50 6.9e-11, p90 1.3e-9, p99 4.3e-8, max 6.6e-6 |
+| rows still above 1e-9 | 551 (floor; recorded) |
+| rows above 1e-6 after all attempts | **5** (3 `advanced`, 2 `regions`; synthetic at contrast 10⁴–10⁶) → `residual_high`, excluded from the split lists at the final publish; 2 more keep pre-existing flags (`omniscape_edge_artifact`, `conservation_high`) |
+| unmeasured non-T4 rows in XL now | 0 |
+| provenance | `solver_original = cg+amg` on 47; `resolved_post_run` on all |
+| cost | 62.5 CPU-h of solves; real-tile shards (400–666) needed 48 GB workers (T1 `points` rows with K = 8: 28 factorisations of ≈ 1 M nodes, peaks of 50 GB before the per-pair GC) and 5 of them 96 GB; 2 000+ files re-uploaded in batched commits, 0 mismatches |
+| audit after the pass | clean (666 shards, 3 132 files) |
+
+XXL started 17:03Z: 610 rows (259 unmeasured, 337 above 1e-9, 5 fallback, 9 QC-failed incl. the T4/T3 rows of incident
+(i)) on 355 shards, 40 workers at 128 GB, 176 GB re-runs on failure.
+
