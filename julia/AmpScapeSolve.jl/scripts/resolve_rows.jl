@@ -121,6 +121,7 @@ function resolve_pairwise!(og, gin, gc, L, idx, R, nodata, stats)
         vj = V[findfirst(src)]
         reff[pos[i], pos[j]] = vj; reff[pos[j], pos[i]] = vj
         push!(res_pairs, r); push!(methods, method); push!(nrefs, nref)
+        V = nothing; cur = nothing; GC.gc()   # 2026-09-23: bound the per-row memory growth (XL real tiles reached 50 GB at 28 pairs)
         if keep
             og["pairwise_current"][:, :, p] = permutedims(cur)
             og["voltage"][:, :, p] = permutedims(Float32.(V))
@@ -258,6 +259,7 @@ function main()
                 rec["status"] = "error"; rec["error"] = first(sprint(showerror, err), 300)
             end
             push!(report, rec)
+            GC.gc()
             println(JSON.json(sanitize(rec))); flush(stdout)
         end
     end
