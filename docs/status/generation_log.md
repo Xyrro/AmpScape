@@ -446,3 +446,19 @@ no row above 1e-6.
 M started 22:20Z: 37 639 rows (31 427 unmeasured, 6 192 above 1e-9, 14 fallback, 6 QC-failed) on 500 shards, 45 worker
 tasks (work queue, 18 h walltime, 5 h reserve), uploader batching 20 shards per commit.
 
+## 2026-09-23 — precision pass, tier M complete and audited
+
+| item | value |
+|---|---|
+| rows re-solved | 37 639 on 500 of 500 shards (31 427 unmeasured T1/T1R, 6 192 above 1e-9, 14 `cg+amg`, 6 QC-failed) |
+| residual after | p50 9.1e-13, p90 1.9e-10, p99 5.2e-9, max 1.4e-6 |
+| rows still above 1e-9 | 1 136 (floor; recorded) |
+| rows above 1e-6 after all attempts | **4** (3 `advanced`, 1 `regions`; all synthetic at contrast 10⁶; residual 1.0–1.4e-6) → `residual_high`, `qc_pass = false`, their samples excluded from the split lists at the final publish |
+| unmeasured non-T4 rows in M now | 0 |
+| provenance | `solver_original = cg+amg` on 14; `resolved_post_run` on all |
+| cost | 34.1 CPU-h of solves (45 work-queue tasks, 22:20Z → 03:45Z), 2 500 files re-uploaded in batched commits, 0 mismatches |
+| audit after the pass | clean (500 shards, 2 500 files) |
+
+L started 03:51Z: 18 691 rows (12 565 unmeasured, 6 002 above 1e-9, 110 fallback, 14 QC-failed) on 1 000 shards, 44
+workers; XL pre-selected (4 774 rows on 666 shards).
+
