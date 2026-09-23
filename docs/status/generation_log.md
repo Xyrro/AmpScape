@@ -520,4 +520,5 @@ XXL started 17:03Z: 610 rows (259 unmeasured, 337 above 1e-9, 5 fallback, 9 QC-f
 1e-9 (recorded), 20 rows above 1e-6 flagged and their samples excluded from the split lists, 0 unmeasured T1/T1W/T1R/T3
 rows anywhere; ≈ 245 CPU-h of solves; five clean audits; indexes and split lists republished once at the end
 (`docs/tables/precision_pass.md`).
+**20:50Z — final publish redone:** the first end-of-pass publish (20:41Z) had read each tier's stale `index.parquet` (a derived copy written at the boundary) instead of the per-shard rows the pass updates, so the Hub indexes briefly carried pre-pass QC and no `solver_original` column. `publish_index` now always builds from the per-shard rows and refreshes the derived copy; all five tiers republished and verified (see the final report).
 
