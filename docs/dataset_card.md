@@ -80,6 +80,19 @@ Pixel size, raster size and (for T4) the physical window radius co-vary across t
 alone), so `test_ood_scale` measures combined scale transfer; a controlled probe set separating the axes is planned
 (`docs/addendum_WP5_report.md`).
 
+## Solver precision: every pairwise/advanced row carries its true residual (post-run precision pass)
+
+After generation, every T1/T1W/T1R/T3 row whose Kirchhoff residual was above 1e-9, unmeasured (T1 `points` rows with
+K ≥ 5 and T1R rows keep no per-pair voltages, so production never measured them), solved by the CG+AMG fallback, or
+QC-failed was re-solved pair by pair with CHOLMOD on the reduced system plus iterative refinement and its true relative
+residual recorded (`residual_rel` = max over pairs; per-pair values and methods in `solver_stats.resolved_post_run`;
+`qc_flags` contains `resolved_post_run`; `solver_original` keeps the production solver where it changed). Per-tier
+counts and the achieved-residual distribution: `docs/tables/precision_pass.md`. Rows that could not reach 1e-6 in
+double precision (a few dozen synthetic landscapes at contrast ≥ 10⁴) are flagged `residual_high` with `qc_pass =
+false` and their samples are excluded from the split lists — never silently kept. T4 (Omniscape) rows have no single
+linear system; their solver's per-window residual check is enforced by Circuitscape (≤ 1e-4) with the rescue described
+in `docs/t4_fidelity.md`.
+
 ## Absent configurations are labelled, not missing
 
 Some planned source configurations are undefined on a given landscape — a wall-to-wall strip that is entirely NoData,
