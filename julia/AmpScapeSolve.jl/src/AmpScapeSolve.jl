@@ -165,7 +165,7 @@ function _refine_cholmod!(lhs::AbstractVector, factor, matrix, rhs::AbstractVect
     return r
 end
 
-function Circuitscape.solve_linear_system(factor::SparseArrays.CHOLMOD.Factor, matrix, rhs)
+function _rescued_cholmod_solve(factor, matrix, rhs)
     lhs = factor \ rhs
     for col = 1:size(rhs, 2)
         residual = norm(matrix * lhs[:, col] .- rhs[:, col]) / norm(rhs[:, col])
@@ -178,7 +178,7 @@ function Circuitscape.solve_linear_system(factor::SparseArrays.CHOLMOD.Factor, m
     lhs
 end
 
-function Circuitscape.solve_linear_system(G::SparseMatrixCSC{T,V}, curr::Vector{T}, M)::Vector{T} where {T,V}
+function _rescued_cg_solve(G::SparseMatrixCSC{T,V}, curr::Vector{T}, M)::Vector{T} where {T,V}
     v, stats = Circuitscape.Krylov.cg(G, curr, M = M, ldiv = true, rtol = T(1e-6), itmax = 100_000)
     residual = norm(G * v .- curr) / norm(curr)
     if residual >= 1e-4                                       # Circuitscape would have thrown here
@@ -189,6 +189,14 @@ function Circuitscape.solve_linear_system(G::SparseMatrixCSC{T,V}, curr::Vector{
         return x
     end
     v
+end
+
+# The replacements are installed at load time (`__init__`), not at precompile time: Julia refuses method overwriting
+# of another module during precompilation (observed 2026-09-23: the package then loaded uncached in every task).
+function __init__()
+    @eval Circuitscape.solve_linear_system(factor::SparseArrays.CHOLMOD.Factor, matrix, rhs) = _rescued_cholmod_solve(factor, matrix, rhs)
+    @eval Circuitscape.solve_linear_system(G::SparseMatrixCSC{T,V}, curr::Vector{T}, M) where {T,V} = _rescued_cg_solve(G, curr, M)
+    return nothing
 end
 
 """Laplacian of the Circuitscape graph (8-neighbour, NoData removed, average conductance) and node index map."""

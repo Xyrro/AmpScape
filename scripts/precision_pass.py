@@ -214,6 +214,11 @@ def cmd_submit(a):
     if a.shards:
         lo, hi = (int(x) for x in a.shards.split("-"))
         shards = [s for s in shards if lo <= s <= hi]
+    if a.only:  # exactly these shards (e.g. failed ones); their failed markers are cleared, other claims untouched
+        want = {int(x) for x in a.only.split(",")}
+        shards = [s for s in shards if s in want]
+        for s in shards:
+            (work / "failed" / f"shard-{s:05d}.json").unlink(missing_ok=True)
     shards = [s for s in shards if not (work / "done" / f"shard-{s:05d}.json").exists()]
     if not shards:
         print("nothing to submit")
@@ -437,6 +442,11 @@ def main():
                 help="stop claiming when less walltime than this is left",
             )
             p.add_argument("--shards", default=None)
+            p.add_argument(
+                "--only",
+                default=None,
+                help="comma-separated shard numbers to (re)run, e.g. failed ones",
+            )
         p.set_defaults(func=fn)
     a = ap.parse_args()
     if a.work is None:
