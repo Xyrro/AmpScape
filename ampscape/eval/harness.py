@@ -267,11 +267,12 @@ def evaluate(
         import concurrent.futures as cf
         import multiprocessing as mp
 
-        # chunk by shard path so each worker opens few files; one chunk per worker (each loads its T4 reference once)
+        # chunk by shard path so each worker opens few files; one chunk per worker (each loads its T4 reference once);
+        # spawn, not fork: forking after torch/OpenMP initialisation hung the pool (2026-09-24 smoke test)
         by_path = sorted(all_rows, key=lambda r: (r["path"], r["sample_id"], r["config"]))
         chunks = [by_path[i::workers] for i in range(workers)]
         rows = []
-        with cf.ProcessPoolExecutor(max_workers=workers, mp_context=mp.get_context("fork")) as ex:
+        with cf.ProcessPoolExecutor(max_workers=workers, mp_context=mp.get_context("spawn")) as ex:
             for part in ex.map(
                 _evaluate_rows,
                 [str(pred_dir / "predictions.h5")] * workers,

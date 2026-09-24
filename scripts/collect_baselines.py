@@ -91,6 +91,36 @@ def main():
                     "gpu_h": (r["history"][-1]["cum_gpu_h"] if r["history"] else None),
                 }
             )
+    # scale transfer (Phase 10-full §5): L-trained runs evaluated at XL / XXL — one row per (run, tier, split)
+    for d in sorted(pathlib.Path(a.runs).glob("*_T*")):
+        p = d / "results_transfer.json"
+        if not p.exists() or not (d / "results.json").exists():
+            continue
+        rt = json.loads(p.read_text())
+        r = json.loads((d / "results.json").read_text())
+        cfg = r["config"]
+        for tag, e in rt.get("eval", {}).items():
+            parsed = parse_group(tag)
+            if not e or parsed is None:
+                continue
+            tier, name = parsed
+            t = cfg["task"]
+            m = e.get(t, {})
+            sp = (m.get("speedup") or {}).get("speedup_median")
+            rows.append(
+                {
+                    "model": f"{d.name} → {tier}",
+                    "task": t,
+                    "tier": tier,
+                    "split": name,
+                    "n": e.get("n_rows"),
+                    **{k: m.get(k) for k in KEYS},
+                    "speedup": sp,
+                    "params_M": cfg["n_params"] / 1e6,
+                    "epochs": len(r["history"]),
+                    "gpu_h": (r["history"][-1]["cum_gpu_h"] if r["history"] else None),
+                }
+            )
     cz = pathlib.Path(a.coarsen)
     for split in ("test_id", "test_ood", "ood_region") if cz.exists() else []:
         p = cz / f"eval_{split}" / "results.json"

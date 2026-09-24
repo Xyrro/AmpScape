@@ -49,6 +49,9 @@ GROUP_GB = {
     ("XL", "T1"): 61,
     ("XL", "T3"): 47,
     ("XL", "T4"): 61,
+    ("XXL", "T1"): 22,
+    ("XXL", "T3"): 18,
+    ("XXL", "T4"): 23,
 }
 GRES = "gpu:l40s:1"
 GRES_ALT = "gpu:a100:1"  # used when ≥ ALT_AFTER of our jobs are already pending on L40S
@@ -56,6 +59,10 @@ ALT_AFTER = 4
 PARTITION = "coc-gpu"
 WALL = "02:00:00"  # 2026-09-24: QoS MaxTRESRunMinsPU gres/gpu=1920 → short jobs + self re-queue give ≈ 16 concurrent GPUs
 TIERS = ["S", "M", "L", "XL"]
+# 2026-09-24 22:40Z: XL is a held-out-scale tier (card: "XL/XXL for models trained ≤ L"; its v1.0 split has 228 train
+# landscapes and no val split), so nothing is trained at XL — the XL/XXL rows come from the L-trained models
+# (scale-transfer evaluation, docs/phase10_full_schedule.md §5)
+TRAIN_TIERS = ["S", "M", "L"]
 GROUP = {"T1": "T1", "T3": "T3", "T4": "T4"}
 # per-tier resources: (batch, cpus, mem)
 RES = {
@@ -114,14 +121,14 @@ def plan() -> list[dict]:
 
     # tier-major inside a priority (docs/phase10_full_schedule.md §2): the small tiers report first and the staged
     # groups are used up tier by tier — model-major order made the driver wait for L/T1 while M/T4 was still pending
-    for tier in TIERS:  # P1: headline, seed 1
+    for tier in TRAIN_TIERS:  # P1: headline, seed 1
         for model in ("unet", "fno"):
             for task in ("T1", "T4"):
                 add(model, task, tier, 1, "P1")
-    for tier in TIERS:  # P2
+    for tier in TRAIN_TIERS:  # P2
         for model, task in (("unet", "T3"), ("fno", "T3"), ("vit", "T1"), ("vit", "T4")):
             add(model, task, tier, 1, "P2")
-    for tier in TIERS:  # P3: seeds 2 and 3, tier-major
+    for tier in TRAIN_TIERS:  # P3: seeds 2 and 3, tier-major
         for seed in (2, 3):
             for model, task in (
                 ("unet", "T1"),
@@ -134,6 +141,37 @@ def plan() -> list[dict]:
                 ("vit", "T4"),
             ):
                 add(model, task, tier, seed, "P3")
+
+    # scale transfer (§5): every L-trained run evaluated at XL and XXL (XXL only for the fully convolutional models);
+    # seed 1 first, XL before XXL; the GNN transfers follow the GNN training (last)
+    def add_xfer(model, task, seed, tier, tag):
+        src = f"{model}_{task}_L_s{seed}"
+        jobs.append(
+            {
+                "name": f"xfer_{src}_{tier}",
+                "model": model,
+                "task": task,
+                "tier": tier,
+                "seed": seed,
+                "tag": tag,
+                "kind": "transfer",
+                "src": src,
+            }
+        )
+
+    for seed in (1, 2, 3):
+        for tier in ("XL", "XXL"):
+            for model, task in (
+                ("unet", "T1"),
+                ("unet", "T4"),
+                ("fno", "T1"),
+                ("fno", "T4"),
+                ("vit", "T1"),
+                ("vit", "T4"),
+            ):
+                if tier == "XXL" and model == "vit":
+                    continue
+                add_xfer(model, task, seed, tier, "XF")
     # WP4: data-scaling ablation at S, U-Net and FNO on T1, seed 1, fixed-epoch (30) and fixed-step (30 epochs of the
     # full set ≈ 118k steps at batch 16) variants; the full-size run is the P1 job itself
     for model in ("unet", "fno"):
@@ -144,12 +182,21 @@ def plan() -> list[dict]:
             add(model, "T1", "S", 1, "WP4", suffix=f"n{n}_steps", maxtrain=n, epochs=ep)
     for seed in (1, 2, 3):  # P4: GNN last
         for task in ("T1", "T4"):
-            for tier in TIERS:
+            for tier in TRAIN_TIERS:
                 add("gnn", task, tier, seed, "P4")
+    for seed in (1, 2, 3):
+        for tier in ("XL", "XXL"):
+            for task in ("T1", "T4"):
+                add_xfer("gnn", task, seed, tier, "XF4")
     return jobs
 
 
+XFER_EST = {"XL": 1.0, "XXL": 1.5}  # predictions at batch 1 + parallel metrics, per L-trained run
+
+
 def est_hours(j: dict) -> float:
+    if j.get("kind") == "transfer":
+        return XFER_EST[j["tier"]] * (2.0 if j["model"] == "gnn" else 1.0)
     base = EST[(j["model"], j["task"])][j["tier"]]
     if j.get("maxtrain"):
         frac = j["maxtrain"] / 63303
@@ -257,10 +304,63 @@ def submit_stats(tier: str, group: str, st: dict) -> None:
         log(f"norm stats job for {tier}: {jid}")
 
 
+XFER_RES = {"XL": {"cpus": 8, "mem": "96G"}, "XXL": {"cpus": 8, "mem": "160G"}}
+XFER_WALL = "04:00:00"
+
+
+def submit_transfer(j: dict, st: dict, gres: str, exclude: list[str]) -> None:
+    src = RUNS / j["src"]
+    res = dict(XFER_RES[j["tier"]])
+    prev = st["submitted"].get(j["name"], {})
+    if prev.get("oom"):
+        res["mem"] = f"{min(int(res['mem'].rstrip('G')) * 2 ** prev['oom'], 180)}G"
+    jid = sh(
+        [
+            "sbatch",
+            "--parsable",
+            *exclude,
+            "-A",
+            "coc",
+            "-q",
+            "coc-ice",
+            "-p",
+            "coc-gpu",
+            "-N1",
+            "-n1",
+            f"-c{res['cpus']}",
+            f"--mem={res['mem']}",
+            f"--gres={gres}",
+            "-t",
+            XFER_WALL,
+            "-J",
+            f"phase10-{j['name']}",
+            "-o",
+            f"{src}/xfer_{j['tier']}_%j.out",
+            "--export",
+            f"ALL,RUN={src},TIER={j['tier']},SPLITS={','.join(XFER_SPLITS)},MEM={res['mem']},GRES={gres},WALL={XFER_WALL}",
+            "scripts/slurm/gpu/transfer_eval.sbatch",
+        ]
+    )
+    if jid.isdigit():
+        st["submitted"][j["name"]] = {
+            "job": jid,
+            "at": now(),
+            "tag": j["tag"],
+            "est_h": est_hours(j),
+            "mem": res["mem"],
+            "n": prev.get("n", 0) + 1,
+            "oom": prev.get("oom", 0),
+        }
+        log(f"submitted {j['tag']} {j['name']} (est {est_hours(j):.1f} GPU-h): job {jid}")
+    else:
+        log(f"submit failed for {j['name']}: {jid[-200:]}")
+
+
 def submit(j: dict, st: dict) -> None:
     out = RUNS / j["name"]
-    out.mkdir(parents=True, exist_ok=True)
-    res = dict(RES[j["tier"]])
+    if j.get("kind") != "transfer":
+        out.mkdir(parents=True, exist_ok=True)
+    res = dict(RES.get(j["tier"], RES["L"]))
     batch = GNN_BATCH[j["tier"]] if j["model"] == "gnn" else res["batch"]
     prev = st["submitted"].get(j["name"], {})
     if prev.get(
@@ -288,6 +388,9 @@ def submit(j: dict, st: dict) -> None:
         if bad.exists() and bad.read_text().split()
         else []
     )
+    if j.get("kind") == "transfer":
+        submit_transfer(j, st, gres, exclude)
+        return
     jid = sh(
         [
             "sbatch",
@@ -368,7 +471,20 @@ def note_bad_nodes(jobs: list[dict]) -> None:
         bad.write_text("\n".join(sorted(known)) + "\n")
 
 
+XFER_SPLITS = ("test_id", "test_ood", "ood_region")
+
+
+def xfer_done(j: dict) -> bool:
+    p = RUNS / j["src"] / "results_transfer.json"
+    if not p.exists():
+        return False
+    ev = json.loads(p.read_text()).get("eval", {})
+    return all(f"hfcache_{j['tier']}_{sp}" in ev for sp in XFER_SPLITS)
+
+
 def done(j: dict) -> bool:
+    if j.get("kind") == "transfer":
+        return xfer_done(j)
     return (RUNS / j["name"] / "done.json").exists() and (
         RUNS / j["name"] / "results.json"
     ).exists()
@@ -495,7 +611,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
 
     for tier, group in needed:
         if staged(tier, group):
-            if not stats_ready(tier):
+            if tier in TRAIN_TIERS and not stats_ready(tier):
                 submit_stats(tier, group, st)
             continue
         size = GROUP_GB.get((tier, group), 60.0)
@@ -523,7 +639,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
         stage(tier, group)
         if staged(tier, group):
             freed[0] -= size
-        if staged(tier, group) and not stats_ready(tier):
+        if staged(tier, group) and tier in TRAIN_TIERS and not stats_ready(tier):
             submit_stats(tier, group, st)
     # submission in priority order; none while scratch is within 10 GB of the quota (predictions of finishing runs
     # land before the offloader frees them)
@@ -536,10 +652,13 @@ def cycle(jobs: list[dict], st: dict) -> None:
             break
         key = (j["tier"], GROUP[j["task"]])
         if j["tag"] == "P4" and any(
-            jj["tag"] != "P4" for jj in pending if jj["name"] not in running
+            jj["tag"] not in ("P4", "XF4") for jj in pending if jj["name"] not in running
         ):
-            continue  # GNN strictly last: never ahead of a P1–P3/WP4 job that is only waiting for its data
-        if not (staged(*key) and stats_ready(j["tier"])):
+            continue  # GNN strictly last: never ahead of a P1–P3/WP4/XF job that is only waiting for its data
+        if j.get("kind") == "transfer":
+            if not done({"name": j["src"]}) or not staged(*key):
+                continue  # the L-trained source run is not finished, or its XL/XXL data is not staged
+        elif not (staged(*key) and stats_ready(j["tier"])):
             continue
         if key in draining and not (RUNS / j["name"] / "done.json").exists():
             continue  # its group is about to be evicted for a higher-priority group (evaluation-only legs still go)

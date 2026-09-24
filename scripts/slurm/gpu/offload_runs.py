@@ -77,6 +77,59 @@ def offload(run: pathlib.Path) -> None:
     )
 
 
+XFER_SPLITS = ("test_id", "test_ood", "ood_region")
+
+
+def offload_transfer(run: pathlib.Path) -> None:
+    """Scale-transfer outputs (transfer_eval.py) land in an already-offloaded run: push each completed tier's
+    predictions + metrics + results_transfer.json to the same Hub folder and free the predictions locally."""
+    p = run / "results_transfer.json"
+    if not p.exists():
+        return
+    ev = json.loads(p.read_text()).get("eval", {})
+    for tier in ("XL", "XXL"):
+        mark = run / f".offloaded_transfer_{tier}"
+        if mark.exists() or not all(f"hfcache_{tier}_{sp}" in ev for sp in XFER_SPLITS):
+            continue
+        include = ["results_transfer.json"] + [
+            f"{sub}/hfcache_{tier}_{sp}"
+            for sp in XFER_SPLITS
+            for sub in ("predictions", "eval_transfer")
+        ]
+        r = subprocess.run(
+            [
+                sys.executable,
+                "scripts/push_aux.py",
+                "--src",
+                str(run),
+                "--dest",
+                f"aux/results/runs_full/{run.name}",
+                "--include",
+                *include,
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(ROOT),
+        )
+        if r.returncode != 0 or "MISMATCH" in r.stdout:
+            print(
+                f"{run.name} transfer {tier}: push failed\n{r.stdout[-400:]}\n{r.stderr[-400:]}",
+                flush=True,
+            )
+            continue
+        rec = json.loads((run / ".hub_pushed.json").read_text())
+        freed = 0
+        for sp in XFER_SPLITS:
+            for h5 in (run / "predictions" / f"hfcache_{tier}_{sp}").glob("*.h5"):
+                if str(h5.relative_to(run)) in rec:
+                    freed += h5.stat().st_size
+                    h5.unlink()
+        mark.write_text(json.dumps({"freed_gb": round(freed / 1e9, 2)}))
+        print(
+            f"{run.name} transfer {tier}: offloaded, freed {freed / 1e9:.1f} GB locally", flush=True
+        )
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", default="runs/full")
@@ -87,6 +140,7 @@ def main():
             if finished(run):
                 try:
                     offload(run)
+                    offload_transfer(run)
                 except Exception as e:  # noqa: BLE001
                     print(f"{run.name}: {e!r}", flush=True)
         if not a.loop:
