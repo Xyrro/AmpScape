@@ -468,8 +468,8 @@ def cycle(jobs: list[dict], st: dict) -> None:
         key = (j["tier"], GROUP[j["task"]])
         if not (staged(*key) and stats_ready(j["tier"])):
             continue
-        if key in draining:
-            continue  # its group is about to be evicted for a higher-priority group
+        if key in draining and not (RUNS / j["name"] / "done.json").exists():
+            continue  # its group is about to be evicted for a higher-priority group (evaluation-only legs still go)
         if (RUNS / j["name"] / "paused.json").exists():
             continue  # the job re-queues itself with --resume
         submit(j, st)
