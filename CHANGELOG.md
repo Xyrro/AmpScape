@@ -1,7 +1,9 @@
 # Changelog
 
-## [1.0.1] — 2026-09-24 (metadata only; the v1.0 data revision is unchanged)
+## [Unreleased] — Phase 10-full (GPU baselines)
 - GPU driver: strict-priority staging with eviction by furthest next use, draining of pinned groups, tier-major priority order; `offload_loop.sh` starter (2026-09-24).
+
+## [1.0.1] — 2026-09-24 (metadata only; the v1.0 data revision is unchanged)
 
 - Nested download subset `lite` (S shards 0–39, M 0–23, L 0–39: 8 000 + 2 400 + 800 landscapes, all tasks, ≈ 26 GB;
   mini ⊂ lite ⊂ core ⊂ full) as index column `subset_lite`, split lists `splits/lite/`, Croissant FileSet
