@@ -26,7 +26,7 @@ python scripts/train.py "${ARGS[@]}" 2>&1 | grep -v Warning | tee -a "$OUT/train
 PJ=$(python -c "import json,sys; print(json.load(open('$OUT/paused.json')).get('job',''))" 2>/dev/null || echo "")
 NRQ=$(cat "$OUT/requeues.txt" 2>/dev/null || echo 0)
 EXCL=""; [ -s logs/gpu_bad_nodes.txt ] && EXCL="--exclude=$(tr '\n' ',' < logs/gpu_bad_nodes.txt | sed 's/,$//')"
-if [ -f "$OUT/paused.json" ] && [ ! -f "$OUT/done.json" ] && [ "$PJ" = "$SLURM_JOB_ID" ] && [ "$NRQ" -lt 120 ]; then
+if [ -f "$OUT/paused.json" ] && [ ! -f "$OUT/results.json" ] && [ "$PJ" = "$SLURM_JOB_ID" ] && [ "$NRQ" -lt 120 ]; then
   echo $((NRQ + 1)) > "$OUT/requeues.txt"
   echo "paused at $(cat "$OUT/paused.json"); re-queueing with --resume (re-queue $((NRQ + 1)), $EXCL)"
   sbatch --parsable $EXCL -A coc -q coc-ice -p "${SLURM_JOB_PARTITION}" -N1 -n1 -c "${SLURM_CPUS_PER_TASK:-6}" --mem="${MEM:-48G}" \

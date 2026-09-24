@@ -251,6 +251,12 @@ def main():
         "--resume", action="store_true", help="continue from <out>/last.pt if present (2026-09-24)"
     )
     ap.add_argument(
+        "--eval-reserve-min",
+        type=float,
+        default=60.0,
+        help="with --pause-exit: defer the evaluation to a fresh leg when fewer minutes than this remain",
+    )
+    ap.add_argument(
         "--pause-exit",
         action="store_true",
         help="if the time budget stops training before it finishes, write paused.json and exit without evaluating "
@@ -453,6 +459,26 @@ def main():
             (out / "done.json").write_text(
                 json.dumps({"epoch": ep, "best_val": best, "gpu_h": cum, "finished": finished})
             )
+            # 2026-09-24: the evaluation needs a full leg of its own when little budget is left (an FNO M leg was
+            # killed by the walltime mid-evaluation); the wrapper re-queues and the next leg evaluates immediately
+            left_min = a.time_budget_min - (time.time() - t_start) / 60
+            if a.pause_exit and left_min < a.eval_reserve_min:
+                (out / "paused.json").write_text(
+                    json.dumps(
+                        {
+                            "epoch": ep,
+                            "gpu_h": cum,
+                            "job": os.environ.get("SLURM_JOB_ID", ""),
+                            "reason": "evaluation deferred",
+                        }
+                    )
+                )
+                print(
+                    f"training finished; {left_min:.0f} min left < {a.eval_reserve_min} min — evaluation deferred to the next leg",
+                    flush=True,
+                )
+                print("PAUSED_FOR_RESUME", flush=True)
+                return
         model.load_state_dict(torch.load(out / "best.pt", map_location=device)["model"])
 
     # ---- evaluation through the harness ----
