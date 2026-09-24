@@ -401,6 +401,10 @@ def cycle(jobs: list[dict], st: dict) -> None:
     first_use = {}
     for k, jj in enumerate(pending):
         first_use.setdefault((jj["tier"], GROUP[jj["task"]]), k)
+    # draining: when the highest-priority unstaged group does not fit because RUNNING jobs pin the groups that would
+    # be evicted, those groups stop receiving new jobs (their later seeds wait) so the pin dissolves as the running
+    # legs finish; otherwise the P3 S seeds kept the S groups pinned indefinitely (2026-09-24 08:20Z).
+    draining: set[tuple[str, str]] = set()
 
     def evict_until(size: float) -> None:
         cands = []
@@ -437,8 +441,18 @@ def cycle(jobs: list[dict], st: dict) -> None:
         if quota_gb() + size > SCRATCH_LIMIT_GB:
             evict_until(size)
             if quota_gb() + size > SCRATCH_LIMIT_GB:
+                # mark the pinned groups (furthest next use first) that would free enough space as draining
+                need = quota_gb() + size - SCRATCH_LIMIT_GB
+                pinned = sorted(
+                    (first_use.get(g_, 10**6), g_) for g_ in running_groups if g_ != (tier, group)
+                )
+                for _, g_ in reversed(pinned):
+                    if need <= 0:
+                        break
+                    draining.add(g_)
+                    need -= GROUP_GB.get(g_, 60.0)
                 log(
-                    f"scratch {quota_gb():.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {SCRATCH_LIMIT_GB:.0f} GB even after evictions"
+                    f"scratch {quota_gb():.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {SCRATCH_LIMIT_GB:.0f} GB even after evictions; draining {sorted(draining)}"
                 )
                 break  # strict priority: do not stage a later group before this one
         stage(tier, group)
@@ -452,6 +466,8 @@ def cycle(jobs: list[dict], st: dict) -> None:
         key = (j["tier"], GROUP[j["task"]])
         if not (staged(*key) and stats_ready(j["tier"])):
             continue
+        if key in draining:
+            continue  # its group is about to be evicted for a higher-priority group
         if (RUNS / j["name"] / "paused.json").exists():
             continue  # the job re-queues itself with --resume
         submit(j, st)
