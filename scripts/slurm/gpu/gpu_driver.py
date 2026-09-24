@@ -249,10 +249,19 @@ def submit(j: dict, st: dict) -> None:
         f"EPOCHS={j.get('epochs', 30)},BATCH={batch},PATIENCE=8,WORKERS={res['cpus']},MAXTRAIN={j.get('maxtrain', '')},"
         f"EXTRA=,MEM={res['mem']},GRES={GRES},WALL={WALL}"
     )
+    bad = (
+        LOGS / "gpu_bad_nodes.txt"
+    )  # nodes that threw CUDA/ECC errors (smoke test 2026-09-24): never schedule there
+    exclude = (
+        ["--exclude=" + ",".join(bad.read_text().split())]
+        if bad.exists() and bad.read_text().split()
+        else []
+    )
     jid = sh(
         [
             "sbatch",
             "--parsable",
+            *exclude,
             "-A",
             "coc",
             "-q",
@@ -287,6 +296,26 @@ def submit(j: dict, st: dict) -> None:
         log(f"submit failed for {j['name']}: {jid[-200:]}")
 
 
+def note_bad_nodes(jobs: list[dict]) -> None:
+    """A run whose last Slurm log ends in a CUDA/ECC error marks its node as bad (the job is re-submitted elsewhere)."""
+    bad = LOGS / "gpu_bad_nodes.txt"
+    known = set(bad.read_text().split()) if bad.exists() else set()
+    for j in jobs:
+        outs = sorted((RUNS / j["name"]).glob("slurm_*.out"), key=lambda p: p.stat().st_mtime)
+        if not outs or (RUNS / j["name"] / "done.json").exists():
+            continue
+        txt = outs[-1].read_text()[-4000:]
+        if "ECC error" in txt or "CUDA error" in txt:
+            for line in outs[-1].read_text().splitlines():
+                if line.startswith("host="):
+                    node = line.split()[0].split("=")[1].split(".")[0]
+                    if node not in known:
+                        known.add(node)
+                        log(f"node {node} marked bad ({outs[-1].name}: CUDA/ECC error)")
+    if known:
+        bad.write_text("\n".join(sorted(known)) + "\n")
+
+
 def done(j: dict) -> bool:
     return (RUNS / j["name"] / "done.json").exists() and (
         RUNS / j["name"] / "results.json"
@@ -299,6 +328,7 @@ def alert(msg: str) -> None:
 
 
 def cycle(jobs: list[dict], st: dict) -> None:
+    note_bad_nodes(jobs)
     active = our_jobs()
     running = {n for n, s in active.items() if not n.startswith("stats-")}
     pending = [j for j in jobs if not done(j) and j["name"] not in running]
