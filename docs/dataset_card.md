@@ -9,11 +9,10 @@ configs: []   # filled by scripts/push_to_hub.py from the layout (one config per
 
 # AmpScape
 
-> **v1.0 generation in progress — shards are being added; index and card finalised on completion.**
-> Started 2026-09-15 on Georgia Tech PACE-ICE with streaming upload (each shard is validated, uploaded and
-> checksum-verified before it appears here). Tier order S → M → L → XL → XXL. Until completion, `index/<tier>.parquet`
-> and `splits/full/*.parquet` cover the shards uploaded so far and are re-published as tiers grow; the card, the
-> Croissant file and the baseline tables are updated at the end. Pipeline tag: `v1.0-pipeline`.
+**v1.0 (2026-09-23).** Generated 2026-09-16 → 09-22 on Georgia Tech PACE-ICE with streaming, checksum-verified
+upload; every tier passed a full Hub-vs-plan audit; the post-run precision pass (09-22/23) re-solved 129 722 rows so
+that every T1/T1W/T1R/T3 row carries its true Kirchhoff residual. Pipeline tag `v1.0-pipeline` (freeze) and release tag
+`v1.0` (GitHub and Hub revision). Cost: 16 552 core-hours. Full account: `docs/generation_postmortem.md`.
 
 AmpScape is a benchmark of **circuit-theoretic landscape connectivity** solved with the reference
 solvers Circuitscape.jl 5.17.1 and Omniscape.jl 0.6.2, for training and fairly comparing learned
@@ -31,6 +30,34 @@ species-calibrated and must not be read as ecological truth for any taxon. (3) S
 come from neutral landscape models and random fields with documented priors. (4) Omniscape is run
 with `block_size = largest odd ≤ radius/10`, a deliberate, documented approximation of the
 per-pixel (block 1) Omniscape whose fidelity was measured (≈ 2–5 % relative L2 at coarser blocks).
+
+## Final counts (v1.0)
+
+| tier | landscapes | configuration rows | synthetic / real | GB on the Hub | rows failing QC |
+|---|---|---|---|---|---|
+| S | 100,000 | 527,281 | 60,000 / 40,000 | 142.4 | 1 |
+| M | 50,000 | 264,128 | 30,000 / 20,000 | 251.7 | 4 |
+| L | 20,000 | 105,949 | 12,000 / 8,000 | 380.9 | 11 |
+| XL | 4,000 | 21,006 | 2,400 / 1,600 | 281.7 | 7 |
+| XXL | 400 | 2,008 | 210 / 190 | 100.7 | 2 |
+| **total** | **174,400** | **920,372** | | **1157.4** | 25 |
+
+Subsets: `mini` (0.61 GB, the first 3 S shards), `core` (115.49 GB, 3,705 files: 20 000 S + 10 000 M + 5 000 L landscapes),
+`full` (1157.4 GB); auxiliary evaluation sets and results under `aux/` (20.5 GB, `aux/README.md`).
+Every tier and every task group is a self-contained set of HDF5 shards (`data/<tier>/<group>/shard-XXXXX.h5`, inputs
+included), so any tier or task group can be downloaded alone (`snapshot_download(allow_patterns="data/L/T4/*")`).
+The 25 rows failing QC after the precision pass (24 landscapes, all synthetic at contrast ≥ 10⁴) stay in the index
+with their flags and are excluded from the split lists. Statistics figures: `docs/tables/dataset_statistics.md`.
+
+## Generation incidents (summary; details in `docs/status/generation_log.md` and `docs/generation_postmortem.md`)
+
+Eleven operational incidents occurred during the run, none of which left silently corrupted or missing data: scratch
+quota exhaustion (a), a partial-finalize race (b) and a double submission (c) on tier S — repaired and confirmed
+replaced shard by shard; duplicate supervisors after a login-node switch (d) and finals validated mid-write (e) —
+leases and atomic renames; an undersized L walltime (f) — 62 shards silently timed out, re-solved; out-of-memory
+kills on the `regions` CG+AMG fallback at XL/XXL (h); Circuitscape's hard 1e-4 residual check aborting T4/T3 solves
+on contrast-10⁶ 2048² landscapes (i) — rescued by refinement and re-solved; corrupt outputs after OOM kills (j); and an
+index column that briefly carried a staging file name. Every affected row was re-solved and every tier re-audited.
 
 ## Dataset structure
 

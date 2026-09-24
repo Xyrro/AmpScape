@@ -1,0 +1,175 @@
+{
+ "per_tier_group_gb": {
+  ".gitattributes": 0.0,
+  "L/T1": 84.3,
+  "L/T1R": 37.33,
+  "L/T1W": 113.48,
+  "L/T3": 63.96,
+  "L/T4": 81.78,
+  "M/T1": 56.66,
+  "M/T1R": 22.67,
+  "M/T1W": 75.53,
+  "M/T3": 42.94,
+  "M/T4": 53.92,
+  "README.md": 0.0,
+  "S/T1": 31.94,
+  "S/T1R": 12.33,
+  "S/T1W": 43.86,
+  "S/T3": 24.6,
+  "S/T4": 29.71,
+  "XL/T1": 61.44,
+  "XL/T1R": 30.22,
+  "XL/T1W": 81.93,
+  "XL/T3": 47.27,
+  "XL/T4": 60.88,
+  "XXL/T1": 21.41,
+  "XXL/T1R": 13.07,
+  "XXL/T1W": 26.59,
+  "XXL/T3": 17.38,
+  "XXL/T4": 22.22,
+  "aux": 20.52,
+  "index": 0.04,
+  "splits": 0.0
+ },
+ "n_files": {
+  "L/T1": 1000,
+  "L/T1R": 958,
+  "L/T1W": 1000,
+  "L/T3": 1000,
+  "L/T4": 1000,
+  "M/T1": 500,
+  "M/T1R": 500,
+  "M/T1W": 500,
+  "M/T3": 500,
+  "M/T4": 500,
+  "S/T1": 500,
+  "S/T1R": 500,
+  "S/T1W": 500,
+  "S/T3": 500,
+  "S/T4": 500,
+  "XL/T1": 667,
+  "XL/T1R": 464,
+  "XL/T1W": 667,
+  "XL/T3": 667,
+  "XL/T4": 667,
+  "XXL/T1": 400,
+  "XXL/T1R": 148,
+  "XXL/T1W": 360,
+  "XXL/T3": 400,
+  "XXL/T4": 400
+ },
+ "tiers": {
+  "S": {
+   "samples": 100000,
+   "rows": 527281,
+   "shards": 1000,
+   "gb": 142.4,
+   "qc_fail_rows": 1,
+   "qc_fail_samples": 1,
+   "resolved_rows": 68008,
+   "splits": {
+    "train": 63303,
+    "val": 10917,
+    "test_id": 9850,
+    "ood_region": 9470,
+    "test_ood": 6460
+   },
+   "family": {
+    "synthetic": 60000,
+    "real": 40000
+   },
+   "core_samples": 20000,
+   "mini_samples": 600
+  },
+  "M": {
+   "samples": 50000,
+   "rows": 264128,
+   "shards": 1000,
+   "gb": 251.7,
+   "qc_fail_rows": 4,
+   "qc_fail_samples": 4,
+   "resolved_rows": 37639,
+   "splits": {
+    "train": 31496,
+    "val": 5651,
+    "test_id": 4823,
+    "ood_region": 4805,
+    "test_ood": 3225
+   },
+   "family": {
+    "synthetic": 30000,
+    "real": 20000
+   },
+   "core_samples": 10000,
+   "mini_samples": 0
+  },
+  "L": {
+   "samples": 20000,
+   "rows": 105949,
+   "shards": 2000,
+   "gb": 380.9,
+   "qc_fail_rows": 11,
+   "qc_fail_samples": 10,
+   "resolved_rows": 18691,
+   "splits": {
+    "train": 12613,
+    "val": 2235,
+    "ood_region": 1945,
+    "test_id": 1928,
+    "test_ood": 1279
+   },
+   "family": {
+    "synthetic": 12000,
+    "real": 8000
+   },
+   "core_samples": 5000,
+   "mini_samples": 0
+  },
+  "XL": {
+   "samples": 4000,
+   "rows": 21006,
+   "shards": 1333,
+   "gb": 281.7,
+   "qc_fail_rows": 7,
+   "qc_fail_samples": 7,
+   "resolved_rows": 4774,
+   "splits": {
+    "test_id": 3118,
+    "ood_region": 400,
+    "test_ood": 254,
+    "train": 228
+   },
+   "family": {
+    "synthetic": 2400,
+    "real": 1600
+   },
+   "core_samples": 0,
+   "mini_samples": 0
+  },
+  "XXL": {
+   "samples": 400,
+   "rows": 2008,
+   "shards": 755,
+   "gb": 100.7,
+   "qc_fail_rows": 2,
+   "qc_fail_samples": 2,
+   "resolved_rows": 610,
+   "splits": {
+    "test_id": 275,
+    "ood_region": 100,
+    "test_ood": 25
+   },
+   "family": {
+    "synthetic": 210,
+    "real": 190
+   },
+   "core_samples": 0,
+   "mini_samples": 0
+  }
+ },
+ "core_subset_gb": 115.49,
+ "core_files": 3705,
+ "mini_subset_gb": 0.61,
+ "total_data_gb": 1157.4,
+ "aux_gb": 20.5
+}

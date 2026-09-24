@@ -5,8 +5,12 @@ type: dataset
 authors:
   - family-names: Xiao
     given-names: Yao
-version: 0.2.0-mini
-date-released: "2026-09-07"
+version: 1.0.0
+date-released: "2026-09-23"
+identifiers:
+  - type: url
+    value: "https://github.com/Xyrro/AmpScape/releases/tag/v1.0"
+    description: "v1.0 release (GitHub tag; Hub revision v1.0 on Xirro/AmpScape)"
 repository-code: "https://github.com/Xyrro/AmpScape"
 url: "https://huggingface.co/datasets/Xirro/AmpScape"
 license: CC-BY-4.0
