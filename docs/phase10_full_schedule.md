@@ -41,3 +41,12 @@ S runs; GNN last because it is two thirds of the budget and its receptive field,
 - Results table: `python scripts/collect_baselines.py --runs runs/full --out docs/tables/baselines_full.md` (plus the
   T4 reference rows and `scripts/t4_pareto.py --runs` for the learned rows of the Pareto tables).
 - Reports: weekly, and on anything that changes the schedule (queue waits > 2 h, a failing job class, scratch).
+
+## 4. Storage rule for runs (2026-09-24)
+
+A finished S run holds ≈ 2.6 GB of predictions (26 k test items), so 133 runs would exceed the 300 GB scratch quota.
+`scripts/slurm/gpu/offload_runs.py --loop 1800` pushes every finished run (results, config, log, best.pt, predictions,
+T4-reference evaluation) to `aux/results/runs_full/<run>/` on the Hub with sha256 verification and then removes the
+local `predictions/*.h5` and `last.pt`; results, config, log and best.pt stay local. Tables are built from the local
+`results.json` files; predictions are re-downloadable per run for figures.
+
