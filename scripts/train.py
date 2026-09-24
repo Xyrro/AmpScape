@@ -246,6 +246,15 @@ def main():
         "--published-tiers", default="S", help="comma list; XXL only for fully convolutional models"
     )
     ap.add_argument("--no-amp", action="store_true")
+    ap.add_argument(
+        "--resume", action="store_true", help="continue from <out>/last.pt if present (2026-09-24)"
+    )
+    ap.add_argument(
+        "--pause-exit",
+        action="store_true",
+        help="if the time budget stops training before it finishes, write paused.json and exit without evaluating "
+        "(the Slurm wrapper re-queues the job with --resume)",
+    )
     ap.add_argument("--eval-only", default=None, help="checkpoint path; skip training")
     ap.add_argument(
         "--variant",
@@ -336,15 +345,38 @@ def main():
             opt, lambda s: 0.5 * (1 + math.cos(math.pi * min(s / max(steps, 1), 1.0)))
         )
         best, bad, t_start = float("inf"), 0, time.time()
-        with open(out / "log.csv", "w", newline="") as fh:
+        # 2026-09-24 (Phase 10-full on ICE, 16-h walltime): resumable training — `last.pt` holds model, optimiser,
+        # scheduler, epoch, best/bad counters, history and the GPU-hours already spent; `--resume` continues from it and
+        # `done.json` marks a finished run (patience or epochs), so a wrapper can re-queue until done
+        start_ep, spent_h = 1, 0.0
+        last = out / "last.pt"
+        if a.resume and last.exists():
+            ck = torch.load(last, map_location=device)
+            model.load_state_dict(ck["model"])
+            opt.load_state_dict(ck["opt"])
+            sched.load_state_dict(ck["sched"])
+            history = ck["history"]
+            best, bad, start_ep, spent_h = ck["best"], ck["bad"], ck["epoch"] + 1, ck["gpu_h"]
+            print(
+                f"resumed from epoch {ck['epoch']} ({spent_h:.2f} GPU-h so far, best val {best:.4f})",
+                flush=True,
+            )
+        with open(out / "log.csv", "a" if (a.resume and start_ep > 1) else "w", newline="") as fh:
             w = csv.writer(fh)
-            w.writerow(["epoch", "train_loss", "val_loss", "lr", "epoch_s", "cum_gpu_h", "n_train"])
-            for ep in range(1, a.epochs + 1):
+            if start_ep == 1:
+                w.writerow(
+                    ["epoch", "train_loss", "val_loss", "lr", "epoch_s", "cum_gpu_h", "n_train"]
+                )
+            finished = False
+            ep, cum = start_ep - 1, spent_h
+            if start_ep > a.epochs:
+                finished = True
+            for ep in range(start_ep, a.epochs + 1):
                 t0 = time.time()
                 tl = run_epoch(model, a.model, dl_tr, device, opt, sched, amp)
                 vl = run_epoch(model, a.model, dl_va, device, amp=amp)
                 dt = time.time() - t0
-                cum = (time.time() - t_start) / 3600
+                cum = spent_h + (time.time() - t_start) / 3600
                 row = [
                     ep,
                     round(tl, 5),
@@ -385,11 +417,37 @@ def main():
                     )
                 else:
                     bad += 1
-                if bad >= a.patience or (time.time() - t_start) / 60 > a.time_budget_min:
-                    print(
-                        f"stop at epoch {ep} ({'patience' if bad >= a.patience else 'time budget'})"
-                    )
+                torch.save(
+                    {
+                        "model": model.state_dict(),
+                        "opt": opt.state_dict(),
+                        "sched": sched.state_dict(),
+                        "epoch": ep,
+                        "best": best,
+                        "bad": bad,
+                        "history": history,
+                        "gpu_h": cum,
+                    },
+                    out / "last.pt.tmp",
+                )
+                (out / "last.pt.tmp").replace(last)
+                if bad >= a.patience or ep == a.epochs:
+                    finished = True
+                    print(f"stop at epoch {ep} ({'patience' if bad >= a.patience else 'epochs'})")
                     break
+                if (time.time() - t_start) / 60 > a.time_budget_min:
+                    print(f"pause at epoch {ep} (time budget; resume with --resume)")
+                    break
+            if (
+                not finished and a.pause_exit
+            ):  # time budget hit: let the wrapper re-queue with --resume, no evaluation yet
+                (out / "paused.json").write_text(json.dumps({"epoch": ep, "gpu_h": cum}))
+                print("PAUSED_FOR_RESUME", flush=True)
+                return
+            (out / "paused.json").unlink(missing_ok=True)
+            (out / "done.json").write_text(
+                json.dumps({"epoch": ep, "best_val": best, "gpu_h": cum, "finished": finished})
+            )
         model.load_state_dict(torch.load(out / "best.pt", map_location=device)["model"])
 
     # ---- evaluation through the harness ----
