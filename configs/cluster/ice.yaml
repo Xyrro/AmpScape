@@ -4,7 +4,7 @@
 profile_id: ice
 scheduler: slurm
 account: <account>                 # sbatch --account (null = scheduler default)
-qos: null                    # sbatch --qos
+qos: <qos-a>                 # sbatch --qos (required since 2026-09-18: submissions without it are rejected)
 scratch_root: $AMPSCAPE_SCRATCH     # AMPSCAPE_SCRATCH; repo lives here
 node_tmp: /tmp               # node-local scratch used for Circuitscape ASCII grids
 modules:                     # `module load` before anything else (empty list = nothing to load)
@@ -20,15 +20,15 @@ limits:
   max_array_concurrent: 20   # %N on the array (be a good citizen on a shared teaching cluster)
   max_submit_per_user: 500
   cpu_hours_gate: 500        # ask the owner before launching more than this (lifted for the v1.0 run: 13 000 core-hour budget)
-  scratch_pause_gb: 200      # `generate.py submit` refuses while data/ holds more than this (owner checklist e)
+  scratch_pause_gb: 220      # `generate.py submit` refuses while data/ holds more than this (owner checklist e; 2026-09-21: data/ carries 100 GB of tiles, sources, dev, quicklooks; the driver guards the 300 GB quota at 230)
   concurrent_cores_cap: 512  # design cap for the v1.0 arrays (owner runbook item f)
 defaults:                    # per-tier resources for solve shards (measured Phase 5: peak RSS S 1.4 GB ... XXL 9.5 GB)
   S:   {cpus: 1, mem: "6G",  time: "04:00:00", shard_size: 200}
   M:   {cpus: 1, mem: "6G",  time: "04:00:00", shard_size: 100}
-  L:   {cpus: 2, mem: "8G",  time: "04:00:00", shard_size: 40}
-  XL:  {cpus: 4, mem: "16G", time: "04:00:00", shard_size: 8}
-  XXL: {cpus: 8, mem: "12G", time: "04:00:00", shard_size: 2}        # train/val shards: 9.5 GB peak (no CG baseline)
-  XXL_test: {cpus: 8, mem: "20G", time: "04:00:00", shard_size: 2}   # test/OOD shards: ~14.5 GB peak (AMG-CG baseline)
+  L:   {cpus: 1, mem: "8G",  time: "09:00:00", shard_size: 20}   # measured L real tiles: p99 1177 s/landscape -> 20 x 1177 x 1.15 + 20 min = 7.9 h
+  XL:  {cpus: 1, mem: "20G", time: "10:00:00", shard_size: 6}    # 2026-09-21 probe: 1 cpu = 4 cpus (no BLAS gain; Omniscape/CHOLMOD 95 % of the time); 1 500-4 000 s per landscape -> 6 x 4 000 x 1.15 + 20 min
+  XXL: {cpus: 1, mem: "24G", time: "10:00:00", shard_size: 1}    # published tile 10 435 s; x 1.8 tail x 1.15 + start-up        # train/val shards: 9.5 GB peak (no CG baseline)
+  XXL_test: {cpus: 1, mem: "28G", time: "10:00:00", shard_size: 1}   # test/OOD shards: ~14.5 GB peak (AMG-CG baseline)
 network:
   compute_nodes_have_internet: true      # verified 2026-09-05 but never relied upon
   installs_on: login

@@ -20,7 +20,11 @@ def rel_error(pred, target, valid=None) -> float:
 
 def mae_log(pred, target, valid=None) -> float:
     p, t, _ = _pairs(pred, target, valid)
-    return float(np.mean(np.abs(np.log10(np.maximum(p, 1e-12)) - np.log10(t)))) if t.size else float("nan")
+    return (
+        float(np.mean(np.abs(np.log10(np.maximum(p, 1e-12)) - np.log10(t))))
+        if t.size
+        else float("nan")
+    )
 
 
 def spearman_pairs(pred, target, valid=None) -> float:
@@ -52,6 +56,10 @@ def symmetry(pred, valid=None) -> float:
 
 
 def all_reff(pred, target, valid=None) -> dict[str, float]:
-    return {"reff_rel_error": rel_error(pred, target, valid), "reff_mae_log10": mae_log(pred, target, valid),
-            "reff_spearman": spearman_pairs(pred, target, valid), "reff_nn_agreement": nearest_neighbour_agreement(pred, target, valid),
-            "reff_symmetry": symmetry(pred, valid)}
+    return {
+        "reff_rel_error": rel_error(pred, target, valid),
+        "reff_mae_log10": mae_log(pred, target, valid),
+        "reff_spearman": spearman_pairs(pred, target, valid),
+        "reff_nn_agreement": nearest_neighbour_agreement(pred, target, valid),
+        "reff_symmetry": symmetry(pred, valid),
+    }

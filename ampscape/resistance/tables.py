@@ -36,7 +36,9 @@ WATER_CLASS = 80
 
 class SlopeTerm(BaseModel):
     per_degree: float = Field(ge=0, description="multiplicative increase per degree of slope")
-    cap_degrees: float = Field(default=45.0, gt=0, description="slope is clipped to this before use")
+    cap_degrees: float = Field(
+        default=45.0, gt=0, description="slope is clipped to this before use"
+    )
 
 
 class ElevationBand(BaseModel):
@@ -46,7 +48,9 @@ class ElevationBand(BaseModel):
 
 class RoadTerm(BaseModel):
     by_class: dict[int, float] = Field(description="additive resistance per GRIP4 class 1..5")
-    buffer_m: float = Field(default=50.0, ge=0, description="pixels within this distance of a road get the penalty")
+    buffer_m: float = Field(
+        default=50.0, ge=0, description="pixels within this distance of a road get the penalty"
+    )
 
     @model_validator(mode="after")
     def _classes(self):
@@ -89,7 +93,7 @@ class ResistanceTable(BaseModel):
     ghm_additive: float | None = Field(default=None, ge=0)
     water: WaterRule = Field(default_factory=WaterRule)
     nodata_classes: list[int] = Field(default_factory=list)
-    random: dict | None = None    # filled in for random_table (seed, log-sd, base_table_id)
+    random: dict | None = None  # filled in for random_table (seed, log-sd, base_table_id)
 
     @model_validator(mode="after")
     def _consistent(self):
@@ -128,20 +132,31 @@ class ResistanceTable(BaseModel):
         return getattr(self, "_sha256", None)
 
     def provenance(self) -> dict:
-        return {"table_id": self.table_id, "version": self.version, "sha256": self.sha256, "r_max": self.r_max}
+        return {
+            "table_id": self.table_id,
+            "version": self.version,
+            "sha256": self.sha256,
+            "r_max": self.r_max,
+        }
 
 
 # ---------------------------------------------------------------------------
 # Mapping
 # ---------------------------------------------------------------------------
 def _lookup(class_map: np.ndarray, table: dict[int, float], default: float) -> np.ndarray:
-    lut = np.full(max(max(table), int(class_map.max()) if class_map.size else 0) + 1, default, dtype=np.float64)
+    lut = np.full(
+        max(max(table), int(class_map.max()) if class_map.size else 0) + 1,
+        default,
+        dtype=np.float64,
+    )
     for c, v in table.items():
         lut[c] = v
     return lut[np.clip(class_map, 0, len(lut) - 1)]
 
 
-def apply_table(table: ResistanceTable, cov: dict[str, np.ndarray]) -> tuple[np.ndarray, np.ndarray, dict]:
+def apply_table(
+    table: ResistanceTable, cov: dict[str, np.ndarray]
+) -> tuple[np.ndarray, np.ndarray, dict]:
     """Map a covariate stack to (resistance float32 in [1, r_max], nodata bool, stats).
 
     ``cov`` needs the channels written by ``landscapes/real.py``. Resistance is 1.0 at NoData.
@@ -196,10 +211,12 @@ def apply_table(table: ResistanceTable, cov: dict[str, np.ndarray]) -> tuple[np.
     r = r.astype(np.float32)
     valid = r[~nodata]
     stats = {
-        "table_id": table.table_id, "r_min": float(valid.min()) if valid.size else np.nan,
+        "table_id": table.table_id,
+        "r_min": float(valid.min()) if valid.size else np.nan,
         "r_max_obs": float(valid.max()) if valid.size else np.nan,
         "r_median": float(np.median(valid)) if valid.size else np.nan,
-        "frac_nodata": float(nodata.mean()), "frac_at_rmax": float((valid >= table.r_max).mean()) if valid.size else np.nan,
+        "frac_nodata": float(nodata.mean()),
+        "frac_at_rmax": float((valid >= table.r_max).mean()) if valid.size else np.nan,
         "log10_contrast": float(np.log10(valid.max() / valid.min())) if valid.size else np.nan,
     }
     return r, nodata, stats

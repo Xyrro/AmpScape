@@ -71,5 +71,10 @@ def ssim(pred, target, mask=None) -> float:
 
 
 def all_pixel(pred, target, mask=None) -> dict[str, float]:
-    return {"mse": mse(pred, target, mask), "mae_log10eps": mae_log(pred, target, mask), "rel_l2": rel_l2(pred, target, mask),
-            "ssim": ssim(pred, target, mask), "psnr_db": psnr(pred, target, mask)}
+    return {
+        "mse": mse(pred, target, mask),
+        "mae_log10eps": mae_log(pred, target, mask),
+        "rel_l2": rel_l2(pred, target, mask),
+        "ssim": ssim(pred, target, mask),
+        "psnr_db": psnr(pred, target, mask),
+    }

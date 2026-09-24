@@ -9,6 +9,7 @@ pixel count fitted on the measured tiers.
 Usage: python scripts/budget_extrapolation.py --builds data/builds/mini data/builds/probe_M ... \
           --target-cpu-hours 500 --cpus-per-job 4 --overhead 0.15
 """
+
 from __future__ import annotations
 
 import argparse
@@ -23,7 +24,13 @@ TIERS = ["S", "M", "L", "XL", "XXL"]
 PIX = {"S": 128**2, "M": 256**2, "L": 512**2, "XL": 1024**2, "XXL": 2048**2}
 BRIEF_LADDER = {"S": 100_000, "M": 50_000, "L": 10_000, "XL": 2_000, "XXL": 200}
 # configs solved per landscape in the mini design (points, NS, EW, T3, T4; regions on ~40 % of real tiles)
-CONFIGS_PER_SAMPLE = {"points": 1.0, "wall_to_wall": 2.0, "advanced": 1.0, "omniscape": 1.0, "regions": 0.2}
+CONFIGS_PER_SAMPLE = {
+    "points": 1.0,
+    "wall_to_wall": 2.0,
+    "advanced": 1.0,
+    "omniscape": 1.0,
+    "regions": 0.2,
+}
 
 
 def fit_powerlaw(x, y):
@@ -50,10 +57,16 @@ def main() -> None:
     ap.add_argument("--builds", nargs="+", required=True)
     ap.add_argument("--target-cpu-hours", type=float, default=500.0)
     ap.add_argument("--cpus-per-job", type=int, default=4)
-    ap.add_argument("--overhead", type=float, default=0.15, help="fraction added for JIT, I/O, QC, finalize")
+    ap.add_argument(
+        "--overhead", type=float, default=0.15, help="fraction added for JIT, I/O, QC, finalize"
+    )
     ap.add_argument("--out", default="docs/figures/phase05_budget.json")
-    ap.add_argument("--omniscape-scale", default="", help="per-tier multipliers for the omniscape time, e.g. XL=0.27,XXL=0.26 "
-                    "(adopted block sizes vs the measured ones)")
+    ap.add_argument(
+        "--omniscape-scale",
+        default="",
+        help="per-tier multipliers for the omniscape time, e.g. XL=0.27,XXL=0.26 "
+        "(adopted block sizes vs the measured ones)",
+    )
     args = ap.parse_args()
     frames, stor = [], {}
     for b in args.builds:
@@ -70,7 +83,9 @@ def main() -> None:
     print("\n### Measured median solve time per config (s)\n")
     print(med.round(3).to_markdown())
     # per-tier seconds per landscape = Σ configs × multiplicity; missing kinds at a tier are extrapolated
-    oscale = {kv.split("=")[0]: float(kv.split("=")[1]) for kv in args.omniscape_scale.split(",") if kv}
+    oscale = {
+        kv.split("=")[0]: float(kv.split("=")[1]) for kv in args.omniscape_scale.split(",") if kv
+    }
     if oscale and "omniscape" in med:
         for t, f in oscale.items():
             if t in med.index:
@@ -108,25 +123,54 @@ def main() -> None:
             gb = st_all[t] * n / 1e9
             tot_h += cpu_h
             tot_gb += gb
-            rows.append({"tier": t, "samples": n, "s_per_sample": round(per_tier_s[t], 1), "job_h": round(sec / 3600, 1),
-                         "cpu_h": round(cpu_h, 1), "MB_per_sample": round(st_all[t] / 1e6, 2), "GB": round(gb, 1)})
+            rows.append(
+                {
+                    "tier": t,
+                    "samples": n,
+                    "s_per_sample": round(per_tier_s[t], 1),
+                    "job_h": round(sec / 3600, 1),
+                    "cpu_h": round(cpu_h, 1),
+                    "MB_per_sample": round(st_all[t] / 1e6, 2),
+                    "GB": round(gb, 1),
+                }
+            )
         print(f"\n### {title}\n")
         print(pd.DataFrame(rows).to_markdown(index=False))
-        print(f"\n**Total: {tot_h:,.0f} CPU-hours ({args.cpus_per_job} cores/job, +{args.overhead:.0%} overhead), {tot_gb:,.0f} GB**")
+        print(
+            f"\n**Total: {tot_h:,.0f} CPU-hours ({args.cpus_per_job} cores/job, +{args.overhead:.0%} overhead), {tot_gb:,.0f} GB**"
+        )
         return tot_h, tot_gb
 
     brief_h, brief_gb = ladder_table(BRIEF_LADDER, "Brief's original ladder (§4.3)")
     # proposed: keep the brief's tier proportions of *compute* roughly balanced; scale to target
-    weights = {"S": 0.45, "M": 0.25, "L": 0.15, "XL": 0.10, "XXL": 0.05}   # share of the CPU budget per tier
+    weights = {
+        "S": 0.45,
+        "M": 0.25,
+        "L": 0.15,
+        "XL": 0.10,
+        "XXL": 0.05,
+    }  # share of the CPU budget per tier
     proposed = {}
     for t, w in weights.items():
         sec_per = per_tier_s[t] * (1 + args.overhead) * args.cpus_per_job / 3600.0
         n = int(args.target_cpu_hours * w / sec_per)
         proposed[t] = int(round(n, -2)) if n >= 100 else max(n, 1)
-    prop_h, prop_gb = ladder_table(proposed, f"Proposed ladder fitting ≈ {args.target_cpu_hours:.0f} CPU-hours (budget shares S/M/L/XL/XXL = 45/25/15/10/5 %)")
-    pathlib.Path(args.out).write_text(json.dumps({"per_tier_seconds_per_sample": per_tier_s, "storage_bytes_per_sample": st_all,
-                                                  "fits": fits, "brief": {"cpu_h": brief_h, "gb": brief_gb, "ladder": BRIEF_LADDER},
-                                                  "proposed": {"cpu_h": prop_h, "gb": prop_gb, "ladder": proposed}}, indent=1))
+    prop_h, prop_gb = ladder_table(
+        proposed,
+        f"Proposed ladder fitting ≈ {args.target_cpu_hours:.0f} CPU-hours (budget shares S/M/L/XL/XXL = 45/25/15/10/5 %)",
+    )
+    pathlib.Path(args.out).write_text(
+        json.dumps(
+            {
+                "per_tier_seconds_per_sample": per_tier_s,
+                "storage_bytes_per_sample": st_all,
+                "fits": fits,
+                "brief": {"cpu_h": brief_h, "gb": brief_gb, "ladder": BRIEF_LADDER},
+                "proposed": {"cpu_h": prop_h, "gb": prop_gb, "ladder": proposed},
+            },
+            indent=1,
+        )
+    )
     print("\nwrote", args.out)
 
 

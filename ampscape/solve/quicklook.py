@@ -32,13 +32,17 @@ def sample_quicklook(gs: h5py.Group, path: str) -> None:
         if kind in ("points", "wall_to_wall", "regions"):
             panels.append((f"{c}\ncum current", _log(o["cum_current"][...], nd), "viridis"))
             if "voltage" in o:
-                panels.append((f"{c}\nvoltage pair 1", np.ma.masked_array(o["voltage"][0], nd), "coolwarm"))
+                panels.append(
+                    (f"{c}\nvoltage pair 1", np.ma.masked_array(o["voltage"][0], nd), "coolwarm")
+                )
         elif kind == "advanced":
             panels.append(("T3 current", _log(o["current"][...], nd), "viridis"))
             panels.append(("T3 voltage", np.ma.masked_array(o["voltage"][...], nd), "coolwarm"))
         else:
             panels.append(("T4 cum current", _log(o["cum_current"][...], nd), "viridis"))
-            panels.append(("T4 normalized", np.ma.masked_array(o["normalized"][...], nd), "cividis"))
+            panels.append(
+                ("T4 normalized", np.ma.masked_array(o["normalized"][...], nd), "cividis")
+            )
     n = len(panels)
     cols = min(6, n)
     rows = int(np.ceil(n / cols))
@@ -50,8 +54,11 @@ def sample_quicklook(gs: h5py.Group, path: str) -> None:
     for ax in axes:
         ax.set_xticks([])
         ax.set_yticks([])
-    fig.suptitle(f"{meta['sample_id'][:8]} {meta['family']} {meta.get('generator')} {meta.get('resistance_table_id') or ''} "
-                 f"qc={','.join(meta.get('qc_flags', [])) or 'clean'}", fontsize=8)
+    fig.suptitle(
+        f"{meta['sample_id'][:8]} {meta['family']} {meta.get('generator')} {meta.get('resistance_table_id') or ''} "
+        f"qc={','.join(meta.get('qc_flags', [])) or 'clean'}",
+        fontsize=8,
+    )
     fig.tight_layout()
     fig.savefig(path, dpi=80)
     plt.close(fig)
@@ -69,7 +76,9 @@ def shard_quicklooks(final_h5: str, out_dir: str) -> list[str]:
     return paths
 
 
-def contact_sheet(final_h5s: list[str], path: str, max_samples: int = 60, key: str = "points") -> None:
+def contact_sheet(
+    final_h5s: list[str], path: str, max_samples: int = 60, key: str = "points"
+) -> None:
     """Grid of (log R, cum current) thumbnails for the first samples across shards."""
     thumbs = []
     for fh in final_h5s:
@@ -81,8 +90,13 @@ def contact_sheet(final_h5s: list[str], path: str, max_samples: int = 60, key: s
                 if key not in gs["configs"]:
                     continue
                 nd = gs["inputs"]["nodata_mask"][...] > 0
-                thumbs.append((np.ma.masked_array(np.log10(gs["inputs"]["resistance"][...]), nd),
-                               _log(gs["configs"][key]["outputs"]["cum_current"][...], nd), json.loads(gs.attrs["meta"])))
+                thumbs.append(
+                    (
+                        np.ma.masked_array(np.log10(gs["inputs"]["resistance"][...]), nd),
+                        _log(gs["configs"][key]["outputs"]["cum_current"][...], nd),
+                        json.loads(gs.attrs["meta"]),
+                    )
+                )
     n = len(thumbs)
     cols = 10
     rows = int(np.ceil(n / cols))
@@ -92,7 +106,10 @@ def contact_sheet(final_h5s: list[str], path: str, max_samples: int = 60, key: s
         rr, cc = divmod(i, cols)
         axes[2 * rr, cc].imshow(r_img, cmap="magma", interpolation="nearest")
         axes[2 * rr + 1, cc].imshow(c_img, cmap="viridis", interpolation="nearest")
-        axes[2 * rr, cc].set_title((meta.get("generator") or "")[:10] + " " + (meta.get("resistance_table_id") or "")[:8], fontsize=5)
+        axes[2 * rr, cc].set_title(
+            (meta.get("generator") or "")[:10] + " " + (meta.get("resistance_table_id") or "")[:8],
+            fontsize=5,
+        )
     for ax in axes.ravel():
         ax.set_xticks([])
         ax.set_yticks([])

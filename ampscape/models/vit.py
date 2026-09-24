@@ -1,6 +1,7 @@
 """ViT-based encoder-decoder baseline (brief §12.4, 'Swin-UNet or ViT-based'): patch-4 convolutional embedding,
 pre-norm transformer blocks with global attention and a learned positional embedding (bilinearly interpolated for
 other grid sizes), a convolutional decoder that upsamples back to pixel resolution with a full-resolution skip."""
+
 from __future__ import annotations
 
 import torch
@@ -22,11 +23,24 @@ class Block(nn.Module):
 
 
 class ViTUNet(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int = 1, patch: int = 4, dim: int = 192, depth: int = 6, heads: int = 6,
-                 grid: int = 32):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int = 1,
+        patch: int = 4,
+        dim: int = 192,
+        depth: int = 6,
+        heads: int = 6,
+        grid: int = 32,
+    ):
         super().__init__()
         self.patch = patch
-        self.stem = nn.Sequential(nn.Conv2d(in_channels, 32, 3, padding=1), nn.GELU(), nn.Conv2d(32, 32, 3, padding=1), nn.GELU())
+        self.stem = nn.Sequential(
+            nn.Conv2d(in_channels, 32, 3, padding=1),
+            nn.GELU(),
+            nn.Conv2d(32, 32, 3, padding=1),
+            nn.GELU(),
+        )
         self.embed = nn.Conv2d(in_channels, dim, patch, stride=patch)
         self.pos = nn.Parameter(torch.zeros(1, dim, grid, grid))
         nn.init.trunc_normal_(self.pos, std=0.02)
@@ -37,13 +51,21 @@ class ViTUNet(nn.Module):
             ups += [nn.ConvTranspose2d(c, c // 2, 2, stride=2), nn.GroupNorm(8, c // 2), nn.GELU()]
             c, patch = c // 2, patch // 2
         self.decoder = nn.Sequential(*ups)
-        self.head = nn.Sequential(nn.Conv2d(c + 32, 64, 3, padding=1), nn.GELU(), nn.Conv2d(64, out_channels, 1))
+        self.head = nn.Sequential(
+            nn.Conv2d(c + 32, 64, 3, padding=1), nn.GELU(), nn.Conv2d(64, out_channels, 1)
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, _, H, W = x.shape
         s = self.stem(x)
         t = self.embed(x)
-        pos = self.pos if self.pos.shape[-2:] == t.shape[-2:] else nn.functional.interpolate(self.pos, size=t.shape[-2:], mode="bilinear", align_corners=False)
+        pos = (
+            self.pos
+            if self.pos.shape[-2:] == t.shape[-2:]
+            else nn.functional.interpolate(
+                self.pos, size=t.shape[-2:], mode="bilinear", align_corners=False
+            )
+        )
         t = t + pos
         h, w = t.shape[-2:]
         z = t.flatten(2).transpose(1, 2)

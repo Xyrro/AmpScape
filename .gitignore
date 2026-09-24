@@ -1,5 +1,5 @@
 # Data and large artifacts (never commit)
-data/
+/data/
 scratch/
 *.h5
 *.hdf5
@@ -53,3 +53,4 @@ tools/
 .cache/
 envs/
 .conda_pkgs/
+aux/

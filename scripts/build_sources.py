@@ -9,6 +9,7 @@ Usage: python scripts/build_sources.py --tiles data/tiles/pilot --out data/tiles
            --config configs/tasks/sources_default.yaml --seed 20260905 --synthetic 50 \
            --figure docs/figures/pilot_sources_gallery.png
 """
+
 from __future__ import annotations
 
 import argparse
@@ -27,17 +28,29 @@ from ampscape.sources import SourceConfig, generate_all
 def flatten(rows, tile_id, table_id, family, samples):
     for kind, s in samples.items():
         m = s.meta
-        rows.append({
-            "tile_id": tile_id, "table_id": table_id, "family": family, "kind": kind, "k": s.k,
-            "connected": m["connected"], "n_components_touched": m["n_components_touched"],
-            "n_graph_components": m["n_graph_components"], "placement": m.get("placement"),
-            "n_anywhere": m.get("n_anywhere"), "n_low_resistance": m.get("n_low_resistance"),
-            "separation_relaxations": m.get("separation_relaxations"),
-            "min_separation_px_used": m.get("min_separation_px_used"),
-            "n_source_pixels": m.get("n_source_pixels"), "n_ground_pixels": m.get("n_ground_pixels"),
-            "ground_mode": (m.get("ground") or {}).get("mode"), "n_eligible_patches": m.get("n_eligible_patches"),
-            "seed": m["seed"], "source_config_sha256": m["source_config"]["sha256"],
-        })
+        rows.append(
+            {
+                "tile_id": tile_id,
+                "table_id": table_id,
+                "family": family,
+                "kind": kind,
+                "k": s.k,
+                "connected": m["connected"],
+                "n_components_touched": m["n_components_touched"],
+                "n_graph_components": m["n_graph_components"],
+                "placement": m.get("placement"),
+                "n_anywhere": m.get("n_anywhere"),
+                "n_low_resistance": m.get("n_low_resistance"),
+                "separation_relaxations": m.get("separation_relaxations"),
+                "min_separation_px_used": m.get("min_separation_px_used"),
+                "n_source_pixels": m.get("n_source_pixels"),
+                "n_ground_pixels": m.get("n_ground_pixels"),
+                "ground_mode": (m.get("ground") or {}).get("mode"),
+                "n_eligible_patches": m.get("n_eligible_patches"),
+                "seed": m["seed"],
+                "source_config_sha256": m["source_config"]["sha256"],
+            }
+        )
 
 
 def save_npz(path, samples):
@@ -76,7 +89,11 @@ def main() -> None:
             nd = src.read(2) > 0.5
         cov, _ = read_tile(str(tiles / tdf.loc[r.tile_id, "path"]))
         tier_cfg = cfg.for_tier(str(tdf.loc[r.tile_id, "tier"]))
-        seed = int(np.random.default_rng(ss.spawn(1)[0]).integers(0, 2**31 - 1)) if False else args.seed * 1000 + i
+        seed = (
+            int(np.random.default_rng(ss.spawn(1)[0]).integers(0, 2**31 - 1))
+            if False
+            else args.seed * 1000 + i
+        )
         samples = generate_all(R, nd, tier_cfg, seed, landcover=cov["landcover"])
         save_npz(out / "sources" / r.table_id / f"{r.tile_id}.npz", samples)
         flatten(rows, r.tile_id, r.table_id, "real", samples)
@@ -89,12 +106,31 @@ def main() -> None:
     df = pd.DataFrame(rows)
     df.to_parquet(out / "sources.parquet", index=False)
     print(f"{len(df)} configurations; all connected: {bool(df['connected'].all())}")
-    print(df.groupby(["family", "kind"]).agg(n=("kind", "size"), connected=("connected", "mean"), k_mean=("k", "mean"),
-                                             relax=("separation_relaxations", "mean")).round(3).to_string())
+    print(
+        df.groupby(["family", "kind"])
+        .agg(
+            n=("kind", "size"),
+            connected=("connected", "mean"),
+            k_mean=("k", "mean"),
+            relax=("separation_relaxations", "mean"),
+        )
+        .round(3)
+        .to_string()
+    )
     pts = df[df.kind == "points"]
-    print("points placement:", pts["placement"].value_counts().to_dict(),
-          "| anywhere fraction of nodes:", round(pts["n_anywhere"].sum() / pts["k"].sum(), 3))
-    print("regions available on", int((df.kind == "regions").sum()), "of", int((df.kind == "points").sum()), "landscapes")
+    print(
+        "points placement:",
+        pts["placement"].value_counts().to_dict(),
+        "| anywhere fraction of nodes:",
+        round(pts["n_anywhere"].sum() / pts["k"].sum(), 3),
+    )
+    print(
+        "regions available on",
+        int((df.kind == "regions").sum()),
+        "of",
+        int((df.kind == "points").sum()),
+        "landscapes",
+    )
     if args.figure:
         import matplotlib
 
@@ -102,24 +138,47 @@ def main() -> None:
         import matplotlib.pyplot as plt
 
         kinds = ["points", "wall_to_wall_NS", "regions", "advanced", "omniscape"]
-        fig, axes = plt.subplots(len(gallery), len(kinds) + 1, figsize=(2.3 * (len(kinds) + 1), 2.4 * len(gallery)))
+        fig, axes = plt.subplots(
+            len(gallery), len(kinds) + 1, figsize=(2.3 * (len(kinds) + 1), 2.4 * len(gallery))
+        )
         for i, (tile_id, R, nd, samples) in enumerate(gallery):
-            axes[i, 0].imshow(np.ma.masked_array(np.log10(R), nd), cmap="magma", interpolation="nearest")
+            axes[i, 0].imshow(
+                np.ma.masked_array(np.log10(R), nd), cmap="magma", interpolation="nearest"
+            )
             axes[i, 0].set_ylabel(f"{tile_id}\nlarge_mammal", fontsize=7)
             for j, kind in enumerate(kinds, start=1):
                 ax = axes[i, j]
                 ax.imshow(np.log10(R), cmap="gray", alpha=0.6, interpolation="nearest")
                 s = samples.get(kind)
                 if s is None:
-                    ax.text(0.5, 0.5, "no eligible\npatches", ha="center", transform=ax.transAxes, fontsize=7)
+                    ax.text(
+                        0.5,
+                        0.5,
+                        "no eligible\npatches",
+                        ha="center",
+                        transform=ax.transAxes,
+                        fontsize=7,
+                    )
                 elif s.focal_mask is not None:
-                    ax.imshow(np.ma.masked_equal(s.focal_mask, 0), cmap="tab10", interpolation="nearest", vmin=1, vmax=10)
+                    ax.imshow(
+                        np.ma.masked_equal(s.focal_mask, 0),
+                        cmap="tab10",
+                        interpolation="nearest",
+                        vmin=1,
+                        vmax=10,
+                    )
                     for t in s.focal_table:
                         ax.plot(t["col"], t["row"], "w+", ms=6)
                 else:
-                    ax.imshow(np.ma.masked_equal(s.source_strength, 0), cmap="viridis", interpolation="nearest")
+                    ax.imshow(
+                        np.ma.masked_equal(s.source_strength, 0),
+                        cmap="viridis",
+                        interpolation="nearest",
+                    )
                     if s.ground is not None:
-                        ax.imshow(np.ma.masked_equal(s.ground, 0), cmap="autumn", interpolation="nearest")
+                        ax.imshow(
+                            np.ma.masked_equal(s.ground, 0), cmap="autumn", interpolation="nearest"
+                        )
                 if i == 0:
                     ax.set_title(kind, fontsize=8)
             for ax in axes[i]:

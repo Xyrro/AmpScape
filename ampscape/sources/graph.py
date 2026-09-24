@@ -31,8 +31,12 @@ def node_index(nodata: np.ndarray) -> np.ndarray:
     return idx
 
 
-def build_conductance_graph(resistance: np.ndarray, nodata: np.ndarray, four_neighbors: bool = False,
-                            avg_resistances: bool = False) -> tuple[sp.csr_matrix, np.ndarray]:
+def build_conductance_graph(
+    resistance: np.ndarray,
+    nodata: np.ndarray,
+    four_neighbors: bool = False,
+    avg_resistances: bool = False,
+) -> tuple[sp.csr_matrix, np.ndarray]:
     """Symmetric sparse conductance matrix G (n×n) and the node index map.
 
     ``avg_resistances=True`` reproduces Circuitscape's non-default rule (1/mean(R), diagonal /√2).
@@ -52,10 +56,10 @@ def build_conductance_graph(resistance: np.ndarray, nodata: np.ndarray, four_nei
     def add(di: int, dj: int, diagonal: bool) -> None:
         # pair pixel (i, j) with (i + di, j + dj); di >= 0, dj in {-1, 0, 1}
         j0, j1 = max(0, -dj), W - max(0, dj)
-        a = idx[0:H - di, j0:j1]
-        b = idx[di:H, j0 + dj:j1 + dj]
-        ga = g[0:H - di, j0:j1]
-        gb = g[di:H, j0 + dj:j1 + dj]
+        a = idx[0 : H - di, j0:j1]
+        b = idx[di:H, j0 + dj : j1 + dj]
+        ga = g[0 : H - di, j0:j1]
+        gb = g[di:H, j0 + dj : j1 + dj]
         m = (a >= 0) & (b >= 0)
         if avg_resistances:
             w = 1.0 / ((1.0 / ga[m] + 1.0 / gb[m]) / 2.0)
@@ -67,11 +71,11 @@ def build_conductance_graph(resistance: np.ndarray, nodata: np.ndarray, four_nei
         cols.append(b[m])
         vals.append(w)
 
-    add(0, 1, False)   # east
-    add(1, 0, False)   # south
+    add(0, 1, False)  # east
+    add(1, 0, False)  # south
     if not four_neighbors:
-        add(1, 1, True)    # south-east
-        add(1, -1, True)   # south-west
+        add(1, 1, True)  # south-east
+        add(1, -1, True)  # south-west
     n = int((idx >= 0).sum())
     if rows:
         i = np.concatenate(rows)
@@ -89,7 +93,9 @@ def laplacian(G: sp.csr_matrix) -> sp.csr_matrix:
     return (sp.diags(d) - G).tocsr()
 
 
-def component_labels(resistance: np.ndarray, nodata: np.ndarray, four_neighbors: bool = False) -> np.ndarray:
+def component_labels(
+    resistance: np.ndarray, nodata: np.ndarray, four_neighbors: bool = False
+) -> np.ndarray:
     """int32 (H, W) connected-component label per pixel on the exact solver graph; -1 at NoData.
 
     Labels are ordered by component size (0 = largest).

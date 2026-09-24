@@ -35,6 +35,20 @@ predictions file are skipped (the row count is reported), so any subset can be e
   predictions), `phys_focal_current_err` (per-pair maps only: current at a unit source/ground pixel vs 1 A;
   for T1W the cumulative map is the pair map),
   `phys_neg_fraction` / `phys_neg_min_over_max` (non-negativity), `phys_throughput_err` (proxy).
+- **Non-source-pixel metrics** (review addendum WP3): `ns_rel_l2`, `ns_mae_log10eps`, `ns_top1/5/10_iou` restricted to
+  the matrix pixels — T4: source strength = 0; T1/T1W/T1R: outside the focal pixels plus a 2-px Chebyshev halo; T3: outside
+  source and ground pixels plus the halo — because currents are singular at injection pixels and dominate the plain pixel
+  metrics; `ns_fraction` = share of evaluable pixels kept. Masks come from the stored inputs (`focal_mask`,
+  `source_strength`, `ground`), available for every task.
+- **T4 at M and L** (owner decision 2026-09-18): with `--t4-reference aux/t4_bs1_reference/<tier>` the primary T4 metrics of
+  samples in the reference subset are computed against the exact block-1 Omniscape map; the same metrics against the
+  block-centred production target are reported as `bc_*` (secondary); `t4_target` per sample records which target was used.
+- **Block-size rows (WP2)**: `--t4-blocks <aux build> ...` (with `--t4-reference`) appends a T4 error-vs-cost table to
+  `results.md` with the production block, the block-size baselines and the learned model side by side on the evaluated
+  splits; the standalone `scripts/t4_pareto.py` produces the same table plus the Pareto figure across runs.
+- **T4 Pareto rows** (addendum WP2): `scripts/t4_pareto.py --reference aux/t4_bs1_reference/<tier> --blocks aux/t4_blocksize_baselines/<tier>_* --runs runs/...`
+  prints, per split incl. every OOD split, the block-size baselines (blocks ≈ {0.05, 0.1, 0.2}·r, artefact correction on/off) and the
+  learned models side by side with their cost per landscape, all scored against the exact block-1 map; figure `docs/figures/t4_pareto_<tier>.png`.
 - **Efficiency**: `speedup` = solver wall time / inference time per configuration; median and geometric mean.
 - **Solver acceleration** (`--acceleration`, needs `voltage`): AMG-PCG iterations and wall time to
   rtol 1e-6 from the predicted voltage vs from zero, computed in Julia with the same preconditioner and

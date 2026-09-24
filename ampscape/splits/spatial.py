@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-import pathlib
 import math
+import pathlib
 from dataclasses import dataclass
 
 import numpy as np
@@ -67,7 +67,12 @@ class BlockGrid:
         """(lat_min, lat_max, lon_min, lon_max) of a cell."""
         b, j = int(block_id[1:4]), int(block_id[5:8])
         w = 360.0 / self.n_lon(b)
-        return (-90.0 + b * self.size_deg, -90.0 + (b + 1) * self.size_deg, -180.0 + j * w, -180.0 + (j + 1) * w)
+        return (
+            -90.0 + b * self.size_deg,
+            -90.0 + (b + 1) * self.size_deg,
+            -180.0 + j * w,
+            -180.0 + (j + 1) * w,
+        )
 
     def footprint_blocks(self, lat: float, lon: float, half_extent_m: float) -> list[str]:
         """All cells touched by a square tile of half-extent ``half_extent_m`` centred at (lat, lon)."""
@@ -93,7 +98,9 @@ class BlockGrid:
     def fits(self, lat: float, lon: float, half_extent_m: float) -> bool:
         return len(self.footprint_blocks(lat, lon, half_extent_m)) == 1
 
-    def interior_bounds(self, block_id: str, half_extent_m: float) -> tuple[float, float, float, float] | None:
+    def interior_bounds(
+        self, block_id: str, half_extent_m: float
+    ) -> tuple[float, float, float, float] | None:
         """Lat/lon box of tile centres whose tile fits inside the cell (for the sampler); None if none."""
         lat0, lat1, lon0, lon1 = self.cell_bounds(block_id)
         dlat = half_extent_m / 111_320.0
@@ -103,7 +110,9 @@ class BlockGrid:
         return box if box[0] < box[1] and box[2] < box[3] else None
 
 
-FROZEN_ASSIGNMENT = pathlib.Path(__file__).resolve().parents[2] / "configs" / "splits" / "cell_assignment_v1.json"
+FROZEN_ASSIGNMENT = (
+    pathlib.Path(__file__).resolve().parents[2] / "configs" / "splits" / "cell_assignment_v1.json"
+)
 
 
 def load_frozen_assignment(seed: int) -> dict[str, str] | None:
@@ -114,8 +123,12 @@ def load_frozen_assignment(seed: int) -> dict[str, str] | None:
     return d["assignment"] if int(d["seed"]) == int(seed) else None
 
 
-def assign_blocks(block_ids: list[str], seed: int, fractions: dict[str, float] | None = None,
-                  strata: dict[str, str] | None = None) -> dict[str, str]:
+def assign_blocks(
+    block_ids: list[str],
+    seed: int,
+    fractions: dict[str, float] | None = None,
+    strata: dict[str, str] | None = None,
+) -> dict[str, str]:
     """One seeded assignment per block, stratified (optionally) by ``strata[block_id]`` (e.g. realm).
 
     Within each stratum blocks are shuffled deterministically and cut by the fractions in order
@@ -127,7 +140,9 @@ def assign_blocks(block_ids: list[str], seed: int, fractions: dict[str, float] |
     for b in sorted(set(block_ids)):
         groups.setdefault(strata.get(b, "all") if strata else "all", []).append(b)
     for stratum, blocks in groups.items():
-        keyed = sorted(blocks, key=lambda b: hashlib.sha256(f"{seed}|{stratum}|{b}".encode()).hexdigest())
+        keyed = sorted(
+            blocks, key=lambda b: hashlib.sha256(f"{seed}|{stratum}|{b}".encode()).hexdigest()
+        )
         n = len(keyed)
         n_val = int(round(n * fractions["val"]))
         n_test = int(round(n * fractions["test_id"]))
@@ -137,7 +152,9 @@ def assign_blocks(block_ids: list[str], seed: int, fractions: dict[str, float] |
     return out
 
 
-def tile_split(assign: dict[str, str], blocks: list[str], ood_blocks: set[str] | None = None) -> str:
+def tile_split(
+    assign: dict[str, str], blocks: list[str], ood_blocks: set[str] | None = None
+) -> str:
     """Footprint rule: the test-most assignment among the blocks a tile touches."""
     best = "train"
     for b in blocks:
@@ -160,12 +177,24 @@ def _boxes_intersect(a, b) -> bool:
 
 
 def _box_inside(inner, outer) -> bool:
-    return inner[0] >= outer[0] and inner[1] <= outer[1] and inner[2] >= outer[2] and inner[3] <= outer[3]
+    return (
+        inner[0] >= outer[0]
+        and inner[1] <= outer[1]
+        and inner[2] >= outer[2]
+        and inner[3] <= outer[3]
+    )
 
 
-def assign_tiles(tiles: pd.DataFrame, grid: BlockGrid, seed: int, ood_blocks: set[str] | None = None,
-                 strata_col: str | None = "realm", fractions: dict[str, float] | None = None,
-                 exclude_straddling: bool = True, parent_tier: str = "XXL") -> pd.DataFrame:
+def assign_tiles(
+    tiles: pd.DataFrame,
+    grid: BlockGrid,
+    seed: int,
+    ood_blocks: set[str] | None = None,
+    strata_col: str | None = "realm",
+    fractions: dict[str, float] | None = None,
+    exclude_straddling: bool = True,
+    parent_tier: str = "XXL",
+) -> pd.DataFrame:
     """Add ``block_id``, ``footprint_blocks``, ``region``, ``straddles`` and ``split`` columns to a tile table.
 
     Hierarchical regions (dataset plan §5): tiles of ``parent_tier`` (XXL) are their own assignment
@@ -180,14 +209,18 @@ def assign_tiles(tiles: pd.DataFrame, grid: BlockGrid, seed: int, ood_blocks: se
     t["half_m"] = t["size"] * t["pixel_m"] / 2.0
     t["box"] = [tile_box(a, b, h) for a, b, h in zip(t.lat, t.lon, t.half_m, strict=True)]
     t["block_id"] = [grid.block_id(a, b) for a, b in zip(t.lat, t.lon, strict=True)]
-    t["footprint_blocks"] = [grid.footprint_blocks(a, b, h) for a, b, h in zip(t.lat, t.lon, t.half_m, strict=True)]
+    t["footprint_blocks"] = [
+        grid.footprint_blocks(a, b, h) for a, b, h in zip(t.lat, t.lon, t.half_m, strict=True)
+    ]
     strata = None
     if strata_col and strata_col in t:
         strata = t.groupby("block_id")[strata_col].agg(lambda x: x.mode().iloc[0]).to_dict()
     all_blocks = sorted({b for fb in t.footprint_blocks for b in fb})
     frozen = load_frozen_assignment(seed)
     if frozen is not None:
-        assign = {b: frozen.get(b, "train") for b in all_blocks}      # v1.0: pure function of (cell, seed)
+        assign = {
+            b: frozen.get(b, "train") for b in all_blocks
+        }  # v1.0: pure function of (cell, seed)
     else:
         assign = assign_blocks(all_blocks, seed, fractions, strata)
 
@@ -220,8 +253,16 @@ def assign_tiles(tiles: pd.DataFrame, grid: BlockGrid, seed: int, ood_blocks: se
     for r in prow:
         c = comp_of[r.tile_id]
         b = r.box
-        comp_box[c] = b if c not in comp_box else (min(comp_box[c][0], b[0]), max(comp_box[c][1], b[1]),
-                                                   min(comp_box[c][2], b[2]), max(comp_box[c][3], b[3]))
+        comp_box[c] = (
+            b
+            if c not in comp_box
+            else (
+                min(comp_box[c][0], b[0]),
+                max(comp_box[c][1], b[1]),
+                min(comp_box[c][2], b[2]),
+                max(comp_box[c][3], b[3]),
+            )
+        )
 
     # --- assignment per tile ---
     regions, splits, straddles = [], [], []
@@ -251,7 +292,11 @@ def assign_tiles(tiles: pd.DataFrame, grid: BlockGrid, seed: int, ood_blocks: se
             straddles.append(False)
         else:
             regions.append("straddle:cell")
-            splits.append("excluded" if exclude_straddling else tile_split(assign, r.footprint_blocks, ood_blocks))
+            splits.append(
+                "excluded"
+                if exclude_straddling
+                else tile_split(assign, r.footprint_blocks, ood_blocks)
+            )
             straddles.append(True)
     t["region"] = regions
     t["split"] = splits
@@ -265,7 +310,10 @@ def check_no_cross_tier_overlap(t: pd.DataFrame) -> list[tuple[str, str]]:
     """Pairs (train/val tile, test/OOD tile) whose bounding boxes intersect, across all tiers (geometric)."""
     if "box" not in t:
         t = t.copy()
-        t["box"] = [tile_box(a, b, s * p / 2.0) for a, b, s, p in zip(t.lat, t.lon, t["size"], t.pixel_m, strict=True)]
+        t["box"] = [
+            tile_box(a, b, s * p / 2.0)
+            for a, b, s, p in zip(t.lat, t.lon, t["size"], t.pixel_m, strict=True)
+        ]
     trainval = t[t.split.isin(["train", "val"])]
     test = t[~t.split.isin(["train", "val", "excluded"])]
     bad = []
@@ -277,10 +325,15 @@ def check_no_cross_tier_overlap(t: pd.DataFrame) -> list[tuple[str, str]]:
     return bad
 
 
-def synthetic_split(seed_family: int, dataset_seed: int, fractions: dict[str, float] | None = None) -> str:
+def synthetic_split(
+    seed_family: int, dataset_seed: int, fractions: dict[str, float] | None = None
+) -> str:
     """Deterministic split for a synthetic seed family."""
     fractions = fractions or {"train": 0.8, "val": 0.1, "test_id": 0.1}
-    h = int(hashlib.sha256(f"{dataset_seed}|synthetic|{seed_family}".encode()).hexdigest()[:8], 16) / 2**32
+    h = (
+        int(hashlib.sha256(f"{dataset_seed}|synthetic|{seed_family}".encode()).hexdigest()[:8], 16)
+        / 2**32
+    )
     if h < fractions["train"]:
         return "train"
     if h < fractions["train"] + fractions["val"]:
@@ -294,9 +347,12 @@ def ood_flags(row: dict, cfg: dict) -> dict[str, bool]:
     fam = row.get("family")
     return {
         "test_ood_region": row.get("split") == "ood_region",
-        "test_ood_scale": row.get("tier") in o["test_ood_scale"]["tiers"] and row.get("split") not in ("train", "val"),
-        "test_ood_table": fam == "real" and row.get("resistance_table_id") == o["test_ood_table"]["table"],
-        "test_ood_contrast": fam == "synthetic" and float(row.get("contrast") or 0) >= o["test_ood_contrast"]["contrast"],
+        "test_ood_scale": row.get("tier") in o["test_ood_scale"]["tiers"]
+        and row.get("split") not in ("train", "val"),
+        "test_ood_table": fam == "real"
+        and row.get("resistance_table_id") == o["test_ood_table"]["table"],
+        "test_ood_contrast": fam == "synthetic"
+        and float(row.get("contrast") or 0) >= o["test_ood_contrast"]["contrast"],
         "test_ood_synth2real": fam == "real" and row.get("split") == "test_id",
     }
 
@@ -312,14 +368,28 @@ def summarize(t: pd.DataFrame) -> pd.DataFrame:
     return t.groupby(["tier", "split"]).size().unstack("split", fill_value=0)
 
 
-__all__ = ["BlockGrid", "assign_blocks", "assign_tiles", "check_no_cross_tier_overlap", "synthetic_split",
-           "ood_flags", "apply_holdouts", "summarize", "tile_box", "np"]
+__all__ = [
+    "BlockGrid",
+    "assign_blocks",
+    "assign_tiles",
+    "check_no_cross_tier_overlap",
+    "synthetic_split",
+    "ood_flags",
+    "apply_holdouts",
+    "summarize",
+    "tile_box",
+    "np",
+]
 
 
 def region_holdouts(tiles: pd.DataFrame, grid: BlockGrid, cfg: dict) -> tuple[set[str], set[str]]:
     """(ood_blocks, ood_tiles) for the `test_ood_region` hold-out; `unit` = "tile" (default) or "cell"."""
-    held = {r.tile_id for r in tiles.itertuples()
-            if r.realm in cfg.get("hold_out_realms", []) or r.biome_num in cfg.get("hold_out_biome_nums", [])}
+    held = {
+        r.tile_id
+        for r in tiles.itertuples()
+        if r.realm in cfg.get("hold_out_realms", [])
+        or r.biome_num in cfg.get("hold_out_biome_nums", [])
+    }
     if cfg.get("unit", "tile") == "cell":
         return {grid.block_id(r.lat, r.lon) for r in tiles.itertuples() if r.tile_id in held}, set()
     return set(), held
@@ -330,7 +400,11 @@ def apply_tile_holdouts(t: pd.DataFrame, ood_tiles: set[str]) -> pd.DataFrame:
     if not ood_tiles:
         return t
     t = t.copy()
-    ood_regions = {r.region for r in t.itertuples() if r.tile_id in ood_tiles and r.region.startswith("parent:")}
+    ood_regions = {
+        r.region
+        for r in t.itertuples()
+        if r.tile_id in ood_tiles and r.region.startswith("parent:")
+    }
     hit = t.tile_id.isin(ood_tiles) | t.region.isin(ood_regions)
     t.loc[hit & (t.split != "excluded"), "split"] = "ood_region"
     return t

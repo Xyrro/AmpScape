@@ -3,6 +3,7 @@
 
 Usage: python scripts/preview_synthetic.py --out docs/figures/synthetic_gallery.png --n 24 --size 128
 """
+
 from __future__ import annotations
 
 import argparse

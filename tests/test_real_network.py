@@ -9,8 +9,10 @@ import pytest
 
 from ampscape.landscapes import real
 
-pytestmark = pytest.mark.skipif(os.environ.get("AMPSCAPE_NETWORK_TESTS") != "1",
-                                reason="set AMPSCAPE_NETWORK_TESTS=1 to run tests that read public COGs")
+pytestmark = pytest.mark.skipif(
+    os.environ.get("AMPSCAPE_NETWORK_TESTS") != "1",
+    reason="set AMPSCAPE_NETWORK_TESTS=1 to run tests that read public COGs",
+)
 
 
 @pytest.mark.network
@@ -21,7 +23,7 @@ def test_worldcover_and_copdem_two_tile_straddle():
     dem_raw = real.read_copdem(g)
     dem, filled = real.fill_nearest(dem_raw)
     assert (lc == 0).mean() < 0.05
-    assert np.isnan(dem_raw).mean() < 0.05          # only seam rows may be missing
+    assert np.isnan(dem_raw).mean() < 0.05  # only seam rows may be missing
     assert filled < 0.05 and np.isfinite(dem).all()
     assert 40 < dem.min() < dem.max() < 300
 

@@ -50,14 +50,33 @@ WORLDCOVER_YEAR = 2021
 COPDEM30_BUCKET = "https://copernicus-dem-30m.s3.amazonaws.com"
 COPDEM90_BUCKET = "https://copernicus-dem-90m.s3.amazonaws.com"
 
-WORLDCOVER_CLASSES = {10: "tree", 20: "shrub", 30: "grass", 40: "crop", 50: "built", 60: "bare",
-                      70: "snow_ice", 80: "water", 90: "wetland", 95: "mangrove", 100: "moss_lichen"}
+WORLDCOVER_CLASSES = {
+    10: "tree",
+    20: "shrub",
+    30: "grass",
+    40: "crop",
+    50: "built",
+    60: "bare",
+    70: "snow_ice",
+    80: "water",
+    90: "wetland",
+    95: "mangrove",
+    100: "moss_lichen",
+}
 WORLDCOVER_NODATA = 0
-GRIP_TYPE_FIELD = "GP_RTP"      # 1 highway, 2 primary, 3 secondary, 4 tertiary, 5 local
+GRIP_TYPE_FIELD = "GP_RTP"  # 1 highway, 2 primary, 3 secondary, 4 tertiary, 5 local
 HYDRO_ORDER_FIELD = "ORD_STRA"  # Strahler order
 
-CHANNELS = ["landcover", "elevation", "slope", "road_distance", "road_class",
-            "river_distance", "river_order", "ghm"]
+CHANNELS = [
+    "landcover",
+    "elevation",
+    "slope",
+    "road_distance",
+    "road_class",
+    "river_distance",
+    "river_order",
+    "ghm",
+]
 
 # GDAL/rasterio environment for anonymous, windowed COG access
 GDAL_ENV = {
@@ -88,7 +107,7 @@ class TileGrid:
 
     epsg: int
     transform: Affine
-    size: int          # pixels per side
+    size: int  # pixels per side
     pixel_m: float
 
     @property
@@ -106,12 +125,18 @@ class TileGrid:
         return (left, bottom, right, top)
 
     def bounds_wgs84(self, pad_deg: float = 0.0) -> tuple[float, float, float, float]:
-        xmin, ymin, xmax, ymax = transform_bounds(self.crs, CRS.from_epsg(4326), *self.bounds, densify_pts=21)
+        xmin, ymin, xmax, ymax = transform_bounds(
+            self.crs, CRS.from_epsg(4326), *self.bounds, densify_pts=21
+        )
         return (xmin - pad_deg, ymin - pad_deg, xmax + pad_deg, ymax + pad_deg)
 
     def to_dict(self) -> dict:
-        return {"epsg": self.epsg, "transform": list(self.transform)[:6], "size": self.size,
-                "pixel_m": self.pixel_m}
+        return {
+            "epsg": self.epsg,
+            "transform": list(self.transform)[:6],
+            "size": self.size,
+            "pixel_m": self.pixel_m,
+        }
 
 
 def make_grid(lat: float, lon: float, size: int, pixel_m: float) -> TileGrid:
@@ -152,7 +177,9 @@ def worldcover_tile_urls(bounds_wgs84: tuple[float, float, float, float]) -> lis
     return urls
 
 
-def copdem_tile_urls(bounds_wgs84: tuple[float, float, float, float], resolution: int = 30) -> list[str]:
+def copdem_tile_urls(
+    bounds_wgs84: tuple[float, float, float, float], resolution: int = 30
+) -> list[str]:
     """URLs of the 1°×1° Copernicus DEM tiles intersecting a WGS84 bbox."""
     xmin, ymin, xmax, ymax = bounds_wgs84
     bucket, code = (COPDEM30_BUCKET, "10") if resolution == 30 else (COPDEM90_BUCKET, "30")
@@ -178,8 +205,14 @@ def _src_pixel_m(src, grid: TileGrid) -> float:
     return rx
 
 
-def _read_into_grid(url_or_path: str, grid: TileGrid, resampling: Resampling, dst: np.ndarray,
-                    nodata_fill, decimate: Resampling | None = None) -> tuple[bool, dict]:
+def _read_into_grid(
+    url_or_path: str,
+    grid: TileGrid,
+    resampling: Resampling,
+    dst: np.ndarray,
+    nodata_fill,
+    decimate: Resampling | None = None,
+) -> tuple[bool, dict]:
     """Reproject one source raster (COG URL or local file) onto ``grid`` in place; (covered?, provenance).
 
     Resampling rules (dataset plan §5.1, amendment C2): when the target pixel is ≥ 2× the source pixel the window is
@@ -193,27 +226,57 @@ def _read_into_grid(url_or_path: str, grid: TileGrid, resampling: Resampling, ds
             if src.crs.to_epsg() == 4326:
                 xmin, ymin, xmax, ymax = grid.bounds_wgs84(pad_deg=0.02)
             else:
-                xmin, ymin, xmax, ymax = transform_bounds(grid.crs, src.crs, *grid.bounds, densify_pts=21)
+                xmin, ymin, xmax, ymax = transform_bounds(
+                    grid.crs, src.crs, *grid.bounds, densify_pts=21
+                )
             window = src.window(xmin, ymin, xmax, ymax).round_offsets().round_lengths()
             if window.width <= 0 or window.height <= 0:
                 return False, prov
             src_m = _src_pixel_m(src, grid)
             ratio = grid.pixel_m / max(src_m, 1e-9)
             ds = int(ratio // 2) if (decimate is not None and ratio >= 2.0) else 1
-            prov = {"source_pixel_m": round(src_m, 2), "decimation": ds, "decimate_rule": decimate.name if ds > 1 else None,
-                    "reproject_rule": resampling.name}
+            prov = {
+                "source_pixel_m": round(src_m, 2),
+                "decimation": ds,
+                "decimate_rule": decimate.name if ds > 1 else None,
+                "reproject_rule": resampling.name,
+            }
             if ds > 1:
-                out_shape = (max(1, int(math.ceil(window.height / ds))), max(1, int(math.ceil(window.width / ds))))
-                data = src.read(1, window=window, out_shape=out_shape, boundless=True, resampling=decimate,
-                                fill_value=src.nodata if src.nodata is not None else nodata_fill)
-                src_transform = src.window_transform(window) * rasterio.Affine.scale(window.width / out_shape[1], window.height / out_shape[0])
+                out_shape = (
+                    max(1, int(math.ceil(window.height / ds))),
+                    max(1, int(math.ceil(window.width / ds))),
+                )
+                data = src.read(
+                    1,
+                    window=window,
+                    out_shape=out_shape,
+                    boundless=True,
+                    resampling=decimate,
+                    fill_value=src.nodata if src.nodata is not None else nodata_fill,
+                )
+                src_transform = src.window_transform(window) * rasterio.Affine.scale(
+                    window.width / out_shape[1], window.height / out_shape[0]
+                )
             else:
-                data = src.read(1, window=window, boundless=True, fill_value=src.nodata if src.nodata is not None else nodata_fill)
+                data = src.read(
+                    1,
+                    window=window,
+                    boundless=True,
+                    fill_value=src.nodata if src.nodata is not None else nodata_fill,
+                )
                 src_transform = src.window_transform(window)
             tmp = np.full(grid.shape, nodata_fill, dtype=dst.dtype)
-            reproject(data, tmp, src_transform=src_transform, src_crs=src.crs,
-                      src_nodata=src.nodata, dst_transform=grid.transform, dst_crs=grid.crs,
-                      dst_nodata=nodata_fill, resampling=resampling)
+            reproject(
+                data,
+                tmp,
+                src_transform=src_transform,
+                src_crs=src.crs,
+                src_nodata=src.nodata,
+                dst_transform=grid.transform,
+                dst_crs=grid.crs,
+                dst_nodata=nodata_fill,
+                resampling=resampling,
+            )
             # pixels this source actually covered (NaN-safe: NaN != NaN is always True)
             if isinstance(nodata_fill, float) and math.isnan(nodata_fill):
                 filled = np.isfinite(tmp)
@@ -225,7 +288,9 @@ def _read_into_grid(url_or_path: str, grid: TileGrid, resampling: Resampling, ds
         return False, prov
 
 
-RESAMPLING_PROV: dict[str, dict] = {}     # last-read provenance per source (filled by the readers below)
+RESAMPLING_PROV: dict[
+    str, dict
+] = {}  # last-read provenance per source (filled by the readers below)
 
 
 def read_worldcover(grid: TileGrid) -> np.ndarray:
@@ -233,7 +298,9 @@ def read_worldcover(grid: TileGrid) -> np.ndarray:
     out = np.full(grid.shape, WORLDCOVER_NODATA, dtype=np.int16)
     with rasterio.Env(**GDAL_ENV):
         for url in worldcover_tile_urls(grid.bounds_wgs84(0.05)):
-            _, prov = _read_into_grid(url, grid, Resampling.nearest, out, WORLDCOVER_NODATA, decimate=Resampling.mode)
+            _, prov = _read_into_grid(
+                url, grid, Resampling.nearest, out, WORLDCOVER_NODATA, decimate=Resampling.mode
+            )
             if prov:
                 RESAMPLING_PROV["landcover"] = {"source_res_m": 10, "rule": "majority", **prov}
     return out
@@ -245,15 +312,21 @@ def read_copdem(grid: TileGrid) -> np.ndarray:
     with rasterio.Env(**GDAL_ENV):
         bb = grid.bounds_wgs84(0.05)
         for url30, url90 in zip(copdem_tile_urls(bb, 30), copdem_tile_urls(bb, 90), strict=True):
-            ok, prov = _read_into_grid(url30, grid, Resampling.bilinear, out, np.nan, decimate=Resampling.average)
+            ok, prov = _read_into_grid(
+                url30, grid, Resampling.bilinear, out, np.nan, decimate=Resampling.average
+            )
             if not ok:
-                ok, prov = _read_into_grid(url90, grid, Resampling.bilinear, out, np.nan, decimate=Resampling.average)
+                ok, prov = _read_into_grid(
+                    url90, grid, Resampling.bilinear, out, np.nan, decimate=Resampling.average
+                )
             if prov:
                 RESAMPLING_PROV["elevation"] = {"source_res_m": 30, "rule": "mean", **prov}
     return out
 
 
-def read_local_raster(path: str, grid: TileGrid, resampling: Resampling = Resampling.bilinear) -> np.ndarray:
+def read_local_raster(
+    path: str, grid: TileGrid, resampling: Resampling = Resampling.bilinear
+) -> np.ndarray:
     """Local global raster (gHM 1 km) on the tile grid; area mean when the target pixel is coarser."""
     out = np.full(grid.shape, np.nan, dtype=np.float32)
     _, prov = _read_into_grid(path, grid, resampling, out, np.nan, decimate=Resampling.average)
@@ -292,8 +365,9 @@ def slope_degrees(elev: np.ndarray, pixel_m: float) -> np.ndarray:
 # ---------------------------------------------------------------------------
 # Vector -> distance rasters
 # ---------------------------------------------------------------------------
-def distance_and_attribute(gdf, grid: TileGrid, attr: str, all_touched: bool = True
-                           ) -> tuple[np.ndarray, np.ndarray]:
+def distance_and_attribute(
+    gdf, grid: TileGrid, attr: str, all_touched: bool = True
+) -> tuple[np.ndarray, np.ndarray]:
     """Rasterise line features and return (distance_m to nearest feature, attribute of nearest).
 
     ``gdf`` may be empty or None: distance is then a large sentinel (10 × tile extent) and the
@@ -304,19 +378,31 @@ def distance_and_attribute(gdf, grid: TileGrid, attr: str, all_touched: bool = T
     if gdf is None or len(gdf) == 0:
         return np.full(grid.shape, far, dtype=np.float32), np.zeros(grid.shape, dtype=np.int16)
     g = gdf.to_crs(grid.crs)
-    shapes = [(geom, int(val)) for geom, val in zip(g.geometry, g[attr], strict=True)
-              if geom is not None and not geom.is_empty]
-    burned = rasterize(shapes, out_shape=grid.shape, transform=grid.transform, fill=0,
-                       all_touched=all_touched, dtype="int32")
+    shapes = [
+        (geom, int(val))
+        for geom, val in zip(g.geometry, g[attr], strict=True)
+        if geom is not None and not geom.is_empty
+    ]
+    burned = rasterize(
+        shapes,
+        out_shape=grid.shape,
+        transform=grid.transform,
+        fill=0,
+        all_touched=all_touched,
+        dtype="int32",
+    )
     if not burned.any():
         return np.full(grid.shape, far, dtype=np.float32), np.zeros(grid.shape, dtype=np.int16)
-    dist, (iy, ix) = ndimage.distance_transform_edt(burned == 0, sampling=grid.pixel_m,
-                                                     return_indices=True)
+    dist, (iy, ix) = ndimage.distance_transform_edt(
+        burned == 0, sampling=grid.pixel_m, return_indices=True
+    )
     nearest_attr = burned[iy, ix].astype(np.int16)
     return dist.astype(np.float32), nearest_attr
 
 
-def read_vectors_bbox(paths: list[str], bounds_wgs84: tuple[float, float, float, float], columns: list[str]):
+def read_vectors_bbox(
+    paths: list[str], bounds_wgs84: tuple[float, float, float, float], columns: list[str]
+):
     """Read features intersecting a WGS84 bbox from one or more shapefiles (pyogrio bbox filter)."""
     import geopandas as gpd
     import pandas as pd
@@ -357,7 +443,9 @@ class TileSpec:
     stratum: dict = dataclasses.field(default_factory=dict)
 
 
-def extract_tile(spec: TileSpec, sources: SourcePaths) -> tuple[dict[str, np.ndarray], TileGrid, dict]:
+def extract_tile(
+    spec: TileSpec, sources: SourcePaths
+) -> tuple[dict[str, np.ndarray], TileGrid, dict]:
     """[network] Build the covariate stack for one tile. Returns (channels, grid, qc)."""
     grid = make_grid(spec.lat, spec.lon, spec.size, spec.pixel_m)
     bb = grid.bounds_wgs84(0.02)
@@ -375,15 +463,29 @@ def extract_tile(spec: TileSpec, sources: SourcePaths) -> tuple[dict[str, np.nda
     river_dist, river_ord = distance_and_attribute(rivers, grid, HYDRO_ORDER_FIELD)
 
     resampling = {k: dict(v) for k, v in RESAMPLING_PROV.items()}
-    resampling["slope"] = {"rule": "derived_after", "note": "computed from the resampled elevation on the target grid"}
-    resampling["road_distance"] = {"rule": "min", "note": "rasterised at the target grid (all_touched) then EDT"}
-    resampling["river_distance"] = {"rule": "min", "note": "rasterised at the target grid (all_touched) then EDT"}
+    resampling["slope"] = {
+        "rule": "derived_after",
+        "note": "computed from the resampled elevation on the target grid",
+    }
+    resampling["road_distance"] = {
+        "rule": "min",
+        "note": "rasterised at the target grid (all_touched) then EDT",
+    }
+    resampling["river_distance"] = {
+        "rule": "min",
+        "note": "rasterised at the target grid (all_touched) then EDT",
+    }
     resampling["road_class"] = resampling["river_order"] = {"rule": "nearest_feature"}
     RESAMPLING_PROV.clear()
     channels = {
-        "landcover": landcover, "elevation": elev, "slope": slope,
-        "road_distance": road_dist, "road_class": road_cls,
-        "river_distance": river_dist, "river_order": river_ord, "ghm": ghm,
+        "landcover": landcover,
+        "elevation": elev,
+        "slope": slope,
+        "road_distance": road_dist,
+        "road_class": road_cls,
+        "river_distance": river_dist,
+        "river_order": river_ord,
+        "ghm": ghm,
     }
     n = landcover.size
     qc = {
@@ -393,7 +495,9 @@ def extract_tile(spec: TileSpec, sources: SourcePaths) -> tuple[dict[str, np.nda
         "frac_dem_nan": float(np.isnan(elev_raw).mean()),
         # DEM gaps over land only: Copernicus DEM has no ocean cells, so coastal tiles (XXL especially) would be rejected
         # for water, which the landcover water fraction already accounts for
-        "frac_dem_nan_land": float((np.isnan(elev_raw) & (landcover != 80) & (landcover != WORLDCOVER_NODATA)).mean()),
+        "frac_dem_nan_land": float(
+            (np.isnan(elev_raw) & (landcover != 80) & (landcover != WORLDCOVER_NODATA)).mean()
+        ),
         "frac_dem_filled": frac_dem_filled,
         "frac_ghm_nan": float(np.isnan(ghm_raw).mean()),
         "frac_ghm_filled": frac_ghm_filled,
@@ -408,16 +512,32 @@ def extract_tile(spec: TileSpec, sources: SourcePaths) -> tuple[dict[str, np.nda
     return channels, grid, qc
 
 
-def write_tile(path: str, channels: dict[str, np.ndarray], grid: TileGrid, spec: TileSpec, qc: dict,
-               source_versions: dict) -> str:
+def write_tile(
+    path: str,
+    channels: dict[str, np.ndarray],
+    grid: TileGrid,
+    spec: TileSpec,
+    qc: dict,
+    source_versions: dict,
+) -> str:
     """Write the covariate stack as a tiled, deflate-compressed multi-band GeoTIFF; return sha256."""
     pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
     bands = CHANNELS
     profile = {
-        "driver": "GTiff", "height": grid.size, "width": grid.size, "count": len(bands),
-        "dtype": "float32", "crs": grid.crs, "transform": grid.transform, "nodata": -9999.0,
-        "tiled": True, "blockxsize": min(256, grid.size), "blockysize": min(256, grid.size),
-        "compress": "deflate", "predictor": 2, "zlevel": 6,
+        "driver": "GTiff",
+        "height": grid.size,
+        "width": grid.size,
+        "count": len(bands),
+        "dtype": "float32",
+        "crs": grid.crs,
+        "transform": grid.transform,
+        "nodata": -9999.0,
+        "tiled": True,
+        "blockxsize": min(256, grid.size),
+        "blockysize": min(256, grid.size),
+        "compress": "deflate",
+        "predictor": 2,
+        "zlevel": 6,
     }
     with rasterio.open(path, "w", **profile) as dst:
         for i, name in enumerate(bands, start=1):
@@ -426,10 +546,19 @@ def write_tile(path: str, channels: dict[str, np.ndarray], grid: TileGrid, spec:
             dst.write(a, i)
             dst.set_band_description(i, name)
         qc_tags = {k: v for k, v in qc.items() if k != "resampling"}
-        dst.update_tags(tile_id=spec.tile_id, lat=spec.lat, lon=spec.lon, tier=spec.tier,
-                        pixel_m=spec.pixel_m, epsg=grid.epsg, stratum=json.dumps(spec.stratum),
-                        qc=json.dumps(qc_tags), source_versions=json.dumps(source_versions),
-                        resampling=json.dumps(qc.get("resampling", {})), channels=",".join(bands))
+        dst.update_tags(
+            tile_id=spec.tile_id,
+            lat=spec.lat,
+            lon=spec.lon,
+            tier=spec.tier,
+            pixel_m=spec.pixel_m,
+            epsg=grid.epsg,
+            stratum=json.dumps(spec.stratum),
+            qc=json.dumps(qc_tags),
+            source_versions=json.dumps(source_versions),
+            resampling=json.dumps(qc.get("resampling", {})),
+            channels=",".join(bands),
+        )
     h = hashlib.sha256()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):

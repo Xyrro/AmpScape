@@ -35,9 +35,10 @@ def test_detects_bad_dtype_shape_values_and_meta(tmp_path):
         sid = list(f)[0]
         g = f[sid]["inputs"]
         r = g["resistance"][...]
-        r[0, 0] = 0.5                     # < 1 on a valid pixel
+        r[0, 0] = 0.5  # < 1 on a valid pixel
         del g["resistance"]
         g.create_dataset("resistance", data=r)
+
     rep = _corrupt(tmp_path, bad_resistance)
     assert any("resistance < 1" in e for e in rep.errors)
 
@@ -47,12 +48,14 @@ def test_detects_bad_dtype_shape_values_and_meta(tmp_path):
         m = g["nodata_mask"][...].astype(np.int32)
         del g["nodata_mask"]
         g.create_dataset("nodata_mask", data=m)
+
     rep = _corrupt(tmp_path, bad_dtype)
     assert any("nodata_mask: dtype" in e for e in rep.errors)
 
     def missing_output(f):
         sid = list(f)[0]
         del f[sid]["configs"]["points"]["outputs"]["reff"]
+
     rep = _corrupt(tmp_path, missing_output)
     assert any("missing dataset reff" in e for e in rep.errors)
 
@@ -63,6 +66,7 @@ def test_detects_bad_dtype_shape_values_and_meta(tmp_path):
         c[1, 1] = np.nan
         del g["current"]
         g.create_dataset("current", data=c)
+
     rep = _corrupt(tmp_path, nonfinite)
     assert any("non-finite" in e for e in rep.errors)
 
@@ -71,6 +75,7 @@ def test_detects_bad_dtype_shape_values_and_meta(tmp_path):
         m = json.loads(f[sid].attrs["meta"])
         del m["solver_versions"]
         f[sid].attrs["meta"] = json.dumps(m)
+
     rep = _corrupt(tmp_path, bad_meta)
     assert any("meta invalid" in e for e in rep.errors)
 
@@ -94,7 +99,11 @@ def test_zarr_export_roundtrip(tmp_path):
     g = zarr.open_group(str(tmp_path / "shard.zarr"), mode="r")
     sid = list(g.group_keys())[0]
     with h5py.File(SMOKE) as f:
-        np.testing.assert_array_equal(g[sid]["inputs"]["resistance"][...], f[sid]["inputs"]["resistance"][...])
-        np.testing.assert_array_equal(g[sid]["configs"]["points"]["outputs"]["cum_current"][...],
-                                      f[sid]["configs"]["points"]["outputs"]["cum_current"][...])
+        np.testing.assert_array_equal(
+            g[sid]["inputs"]["resistance"][...], f[sid]["inputs"]["resistance"][...]
+        )
+        np.testing.assert_array_equal(
+            g[sid]["configs"]["points"]["outputs"]["cum_current"][...],
+            f[sid]["configs"]["points"]["outputs"]["cum_current"][...],
+        )
         assert json.loads(g[sid].attrs["meta"])["sample_id"] == sid

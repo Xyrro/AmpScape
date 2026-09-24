@@ -139,6 +139,66 @@ end
 using SparseArrays
 using AlgebraicMultigrid
 
+# ---------------------------------------------------------------------------
+# Rescue of Circuitscape's linear solves (2026-09-22, incident (i)): Circuitscape 5.17.1 `solve_linear_system` raises
+# an error whenever the relative residual of a solve is ≥ 1e-4 (CHOLMOD: `factor \ rhs` unrefined; CG: Krylov.cg with
+# rtol 1e-6 / 100 000 iterations). On contrast-10⁶ 2048² landscapes this aborted whole Omniscape maps and advanced
+# solves although one step of iterative refinement (or a direct factorisation of the window) solves them to 1e-8.
+# These method replacements keep Circuitscape's results bit-identical whenever its check passes and only act where it
+# would have thrown: CHOLMOD → iterative refinement with the same factorisation; CG → CHOLMOD factorisation of the
+# same matrix + refinement. Every rescue is counted (`RESCUED_SOLVES`) and recorded in the solve's stats.
+# ---------------------------------------------------------------------------
+const RESCUED_SOLVES = Ref(0)
+const RESCUE_TARGET = 1e-8
+
+function _refine_cholmod!(lhs::AbstractVector, factor, matrix, rhs::AbstractVector)
+    nb = norm(rhs)
+    r = norm(matrix * lhs .- rhs) / nb
+    for _ in 1:4
+        r < RESCUE_TARGET && break
+        d = factor \ (rhs .- matrix * lhs)
+        lhs2 = lhs .+ d
+        r2 = norm(matrix * lhs2 .- rhs) / nb
+        r2 < r || break
+        lhs .= lhs2; r = r2
+    end
+    return r
+end
+
+function _rescued_cholmod_solve(factor, matrix, rhs)
+    lhs = factor \ rhs
+    for col = 1:size(rhs, 2)
+        residual = norm(matrix * lhs[:, col] .- rhs[:, col]) / norm(rhs[:, col])
+        if residual >= 1e-4                                   # Circuitscape would have thrown here
+            x = Vector(lhs[:, col]); r2 = _refine_cholmod!(x, factor, matrix, Vector(rhs[:, col]))
+            r2 < 1e-4 || error("CHOLMOD solver residual $r2 (after refinement; $residual before) exceeds tolerance 1e-4 for column $col")
+            lhs[:, col] = x; RESCUED_SOLVES[] += 1
+        end
+    end
+    lhs
+end
+
+function _rescued_cg_solve(G::SparseMatrixCSC{T,V}, curr::Vector{T}, M)::Vector{T} where {T,V}
+    v, stats = Circuitscape.Krylov.cg(G, curr, M = M, ldiv = true, rtol = T(1e-6), itmax = 100_000)
+    residual = norm(G * v .- curr) / norm(curr)
+    if residual >= 1e-4                                       # Circuitscape would have thrown here
+        F = cholesky(Symmetric(G))
+        x = Vector{T}(F \ curr); r2 = _refine_cholmod!(x, F, G, curr)
+        r2 < 1e-4 || error("CG solver did not converge: relative residual $r2 (after CHOLMOD rescue; $residual by CG) exceeds tolerance 1e-4")
+        RESCUED_SOLVES[] += 1
+        return x
+    end
+    v
+end
+
+# The replacements are installed at load time (`__init__`), not at precompile time: Julia refuses method overwriting
+# of another module during precompilation (observed 2026-09-23: the package then loaded uncached in every task).
+function __init__()
+    @eval Circuitscape.solve_linear_system(factor::SparseArrays.CHOLMOD.Factor, matrix, rhs) = _rescued_cholmod_solve(factor, matrix, rhs)
+    @eval Circuitscape.solve_linear_system(G::SparseMatrixCSC{T,V}, curr::Vector{T}, M) where {T,V} = _rescued_cg_solve(G, curr, M)
+    return nothing
+end
+
 """Laplacian of the Circuitscape graph (8-neighbour, NoData removed, average conductance) and node index map."""
 function graph_laplacian(R::AbstractMatrix, nodata::AbstractMatrix{Bool})
     H, W = size(R)
@@ -338,7 +398,10 @@ function refine_voltage!(L::SparseMatrixCSC, idx::AbstractMatrix{<:Integer}, vol
             out["error"] = "cholesky failed: " * sprint(showerror, err)
             nothing
         end
-        F === nothing && return out
+        if F === nothing                                       # refinement skipped: report the unrefined residual
+            out["residual_after"] = before
+            return out
+        end
         d = F \ r
         xf .+= d
         r2 = bf .- Af * xf
@@ -375,6 +438,7 @@ function _run_cs(cfg::Dict{String,String}, st::SolveStats)
     st.started_utc = Dates.format(now(UTC), "yyyy-mm-ddTHH:MM:SS")
     GC.gc()
     rss0 = Sys.maxrss()
+    n0 = RESCUED_SOLVES[]
     t = @elapsed r = try
         with_logger(NullLogger()) do
             Circuitscape.compute(cfg)
@@ -383,6 +447,7 @@ function _run_cs(cfg::Dict{String,String}, st::SolveStats)
         st.error = sprint(showerror, err)
         nothing
     end
+    RESCUED_SOLVES[] > n0 && (st.solver_params["rescued_solves"] = RESCUED_SOLVES[] - n0)
     st.wall_s = t
     st.maxrss_mb = Sys.maxrss() / 2^20
     st.converged = r !== nothing
@@ -570,7 +635,7 @@ end
 function solve_omniscape(R::AbstractMatrix, nodata::AbstractMatrix{Bool}, S::AbstractMatrix;
                          radius::Int, block_size::Int, solver = "cg+amg", precision = "double",
                          source_threshold = 0.0, four_neighbors = false, correct_artifacts = true,
-                         workdir = mktempdir())
+                         workdir = mktempdir(), fallback = "cg+amg")
     # Omniscape creates `project_name` in the CURRENT DIRECTORY even with write_outputs = false (and
     # suffixes _1, _2, ... when it exists). Point it at a per-solve temp dir and remove it afterwards.
     project = joinpath(workdir, "omniscape_project")
@@ -594,6 +659,7 @@ function solve_omniscape(R::AbstractMatrix, nodata::AbstractMatrix{Bool}, S::Abs
         "precision", "connect_four_neighbors_only", "correct_artifacts", "calc_flow_potential", "calc_normalized_current"])
     st.started_utc = Dates.format(now(UTC), "yyyy-mm-ddTHH:MM:SS")
     GC.gc()
+    n0 = RESCUED_SOLVES[]
     t = @elapsed res = try
         with_logger(NullLogger()) do
             run_omniscape(cfg, Rm; source_strength = Sm, write_outputs = false)
@@ -602,6 +668,28 @@ function solve_omniscape(R::AbstractMatrix, nodata::AbstractMatrix{Bool}, S::Abs
         st.error = sprint(showerror, err)
         nothing
     end
+    # 2026-09-22 (XXL shard 66): Omniscape's CHOLMOD path aborts a window solve whose residual exceeds its 1e-4 check
+    # ("CHOLMOD solver residual ... exceeds tolerance 1e-4") on a contrast-10⁶ 2048² mosaic; retry the whole map with
+    # the fallback solver (Omniscape's cg+amg) and record fallback_used, as solve_pairwise does
+    if res === nothing && fallback !== nothing && fallback != solver
+        err1 = st.error
+        cfg["solver"] = fallback
+        rm(project; recursive = true, force = true)
+        t2 = @elapsed res = try
+            with_logger(NullLogger()) do
+                run_omniscape(cfg, Rm; source_strength = Sm, write_outputs = false)
+            end
+        catch err
+            st.error = err1 * " | fallback failed: " * sprint(showerror, err)
+            nothing
+        end
+        t += t2
+        if res !== nothing
+            st.solver = fallback; st.solver_params["solver"] = fallback; st.fallback_used = true
+            st.error = "reference solver ($solver) failed: " * err1
+        end
+    end
+    RESCUED_SOLVES[] > n0 && (st.solver_params["rescued_solves"] = RESCUED_SOLVES[] - n0)
     st.wall_s = t
     st.maxrss_mb = Sys.maxrss() / 2^20
     st.converged = res !== nothing
@@ -724,7 +812,8 @@ function solve_shard(inputs_h5::AbstractString, outputs_h5::AbstractString; solv
                     S = h5_hw(gc, "source_strength")
                     radius = Int(attrs(gin)["omni_radius"]); bs = Int(attrs(gin)["omni_block_size"])
                     thr = haskey(attrs(gc), "source_threshold") ? Float64(attrs(gc)["source_threshold"]) : 0.0
-                    res = solve_omniscape(R, nodata, S; radius, block_size = bs, solver = omniscape_solver, source_threshold = thr, workdir = wd)
+                    ca = haskey(attrs(gin), "omni_correct_artifacts") ? Int(attrs(gin)["omni_correct_artifacts"]) != 0 : true   # aux block-size studies
+                    res = solve_omniscape(R, nodata, S; radius, block_size = bs, solver = omniscape_solver, source_threshold = thr, workdir = wd, correct_artifacts = ca)
                     h5_hw!(og, "cum_current", res.cum_current)
                     h5_hw!(og, "flow_potential", res.flow_potential)
                     h5_hw!(og, "normalized", res.normalized)
@@ -743,7 +832,20 @@ function solve_shard(inputs_h5::AbstractString, outputs_h5::AbstractString; solv
             @info @sprintf("solved %d samples (%d skipped) in %.1f s", n_done, n_skip, time() - t_start)
         end
     end
+    # completion marker (owner requirement 2026-09-16): written LAST, after both files are closed, and only when every
+    # sample of the inputs file has a complete outputs group; finalize refuses shards without it
+    all_ids = String[]
+    hin = h5open(inputs_h5, "r"); all_ids = collect(keys(hin["samples"])); close(hin)
     close(fin); close(fout)
+    hout = h5open(outputs_h5, "r")
+    complete = all(haskey(hout["samples"], sid) && haskey(attrs(hout["samples"][sid]), "complete") for sid in all_ids)
+    close(hout)
+    if complete && only === nothing && configs === nothing && max_samples == typemax(Int)
+        open(outputs_h5 * ".done", "w") do io
+            JSON.print(io, Dict("n_samples" => length(all_ids), "finished_utc" => Dates.format(Dates.now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS"),
+                                "inputs_h5" => inputs_h5, "outputs_h5" => outputs_h5))
+        end
+    end
     @info @sprintf("shard done: %d solved, %d skipped, %.1f s", n_done, n_skip, time() - t_start)
     return (solved = n_done, skipped = n_skip, seconds = time() - t_start)
 end

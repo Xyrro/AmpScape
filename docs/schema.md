@@ -69,3 +69,15 @@ hold 0 in output maps; nothing is normalised or clipped. See `docs/task_specific
 
 One row per (sample, config): identifiers, family/tier/generator/table/tile, K, placement, seed,
 solver, timings, residuals, `qc_flags`, `qc_pass`, `qc_trainval`, split and OOD flags, shard file.
+
+
+## Index column `skipped_configs` (added 2026-09-16)
+
+Per sample (repeated on each of its rows): the planned source configurations that are **undefined on that landscape
+and therefore legitimately absent**, as `config (task: reason); …`, empty when every planned configuration is present.
+Reasons: `regions (T1R: no eligible habitat patches …)` — fewer than two habitat patches of the minimum size on the
+largest component (real tiles) or no habitat information (synthetic landscapes without a patch mosaic);
+`wall_to_wall_NS/EW (T1W: … edge strip has no valid pixel …)` — the edge strip is entirely NoData (large-NoData hard
+cases, coastal tiles); `advanced (T3: degenerate source/ground …)`. The same information is in every sample's meta
+(`planned_configs`, `skipped_configs`, `skipped_reasons`). A planned configuration that is absent *without* being
+listed here would be missing data — the per-tier audit (`scripts/audit_tier.py`) verifies that this never happens.

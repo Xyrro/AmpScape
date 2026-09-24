@@ -1,6 +1,47 @@
 # Changelog
 
-## [Unreleased]
+## [1.0.0] — 2026-09-23
+
+v1.0 data release: 174 400 landscapes / 902 904 rows / 1 157 GB on `Xirro/AmpScape` (revision `v1.0`), five audited tiers,
+post-run precision pass, validated Croissant, final card, statistics figures, generation post-mortem.
+
+### Post-run precision pass — 2026-09-22/23
+- Every T1/T1W/T1R/T3 row above 1e-9, unmeasured, CG-fallback or QC-failed re-solved in place on the Hub with
+  reduced-system CHOLMOD + refinement, true residual per pair recorded, currents/Reff recomputed, provenance kept
+  (`resolved_post_run`, `solver_original`); QC-failed T4 rows re-run whole with the Circuitscape solve rescue; full
+  audit after each tier; split lists exclude samples with QC-failing rows. Per-tier table: `docs/tables/precision_pass.md`.
+- AmpScapeSolve: Circuitscape `solve_linear_system` rescue (incident (i)); Omniscape fallback solver; corrupt-outputs
+  guard in `generate.py solve`; OOM-aware resubmission and the 50-job queue cap in the driver.
+- Tooling: `scripts/precision_pass.py` (select / submit as a work queue / run / batched verified upload / status / publish),
+  `julia/AmpScapeSolve.jl/scripts/resolve_rows.jl`, `scripts/precision_summary.py`; index shard names without `.part`.
+
+### XL launch, parallel uploads, aux publication — 2026-09-21
+- Tier L complete and audited (1 000 shards, QC fail 0.013 %, 380.5 GB); audit rule fixed for all-skipped task groups.
+- XL: 667 shards planned and prepared; cpu probe (1 vs 4 cpus: no speed-up) → 1 cpu per task for XL/XXL; waves of 300.
+- `sync_shards.py --worker k/N`: N parallel uploaders per tier with per-worker leases/staging and commit retry.
+- `scripts/push_aux.py`: scratch-only evaluation assets published under `aux/` (dev subset, mini, WP5 probe set,
+  WP1/WP2 block builds, `test_ood_published`, dev baseline results); `data/builds/published` regenerated.
+- Scratch clean-up (owner-approved): S/M/L quicklooks deleted, task logs archived, superseded pilot builds removed;
+  solver task logs no longer carry progress bars.
+
+### Addendum WP1/WP2 at L — 2026-09-20
+- `audit_tier.py`: a task-group file absent from the Hub is a discrepancy only when some sample of the shard still
+  wants a configuration of that group after its skipped configurations are removed (L false positive on 41 shards
+  whose every `regions` sample was skipped; generation log (g2)).
+- L block-1 reference complete (60 samples: mean rel-L2 0.028, 2 of 60 flagged; index + summary on the Hub under
+  `aux/t4_bs1_reference/L/`), L block-size Pareto rows (blocks 3/5/11, correction on/off; `docs/tables/t4_pareto_L.md`,
+  `aux/t4_blocksize_baselines/L/` on the Hub). `aux_t4_blocks.py compare`: cross-file inputs lookup after a top-up,
+  `tail_gt5pct` column written by the script, unreadable Hub samples skipped with a warning.
+
+### v1.0 generation + Phase 11 — 2026-09-15/16
+- v1.0 freeze (`v1.0-pipeline` = 8491bbe): frozen cell assignment, tile-level hold-out, `test_ood_scale_strict`, decimated
+  tile reader with resampling provenance, per-tier tile manifests, live streaming sync + scratch guard, runbook.
+- v1.0 tile set (13 958 tiles, 69 790 rasters); tier S generation (100 000 landscapes, 500 shards) streaming to the public
+  `Xirro/AmpScape`; autonomous tier driver for M → L → XL → XXL; two incidents (scratch quota; partial-finalize race)
+  recorded in `docs/status/generation_log.md` with the fixes (one-commit uploads, sample-count validation, finalize
+  guards, intermediates deleted on validated finalize).
+- Phase 11: README, `docs/generation_guide.md`, `docs/contributing.md`, notebooks 01–05, CI workflow, connectivity test,
+  ruff formatting of the whole tree; tuning pass and official baseline configs (`docs/tables/tuning_dev.md`).
 
 ### Dev subset + Phase 10 — 2026-09-14
 - v1.0 planner (`ampscape/solve/plan_v1.py`, `scripts/plan_v1.py`): per-tier prefix streams; v1.0 synthetic sampler with the

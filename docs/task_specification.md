@@ -235,7 +235,7 @@ constraints in `docs/compute_env.md` (300 GB scratch quota).
 | Landscape family | synthetic {GRF, fractal, NLMpy cluster/gradient/mosaic, barriers}, real (biome × continent × gHM tercile strata) | `test_ood_synth2real`, `test_ood_region` |
 | Contrast R_max/R_min | {10, 10², 10³, 10⁴, 10⁵, 10⁶} | `test_ood_contrast` (train ≤ 10⁵, test 10⁶) |
 | Resistance table (real) | generic_hm, large_mammal, amphibian, forest_bird, random_table | `test_ood_table` |
-| Raster size | tiers S–XXL | `test_ood_scale` (train ≤ L, test XL/XXL). **Disclosure (owner decision 2026-09-14):** for XXL this split isolates *resolution* — XXL footprints (2 048 km) overlap finer-tier training regions, which is unavoidable (32 footprints cover ≈ 90 % of land) and disclosed; XL stays overlap-free through cell assignment. `test_ood_scale_strict`: ≈ 6 XXL real tiles placed entirely inside non-training macro-cells, with zero overlap with any training tile at any tier (checked geometrically at finalize). |
+| Raster size | tiers S–XXL | `test_ood_scale` (train ≤ L, test XL/XXL). **Confound:** pixel size (100 m → 1 km), raster size and the T4 radius in km co-vary across tiers; see `docs/addendum_WP5_report.md`. **Disclosure (owner decision 2026-09-14):** for XXL this split isolates *resolution* — XXL footprints (2 048 km) overlap finer-tier training regions, which is unavoidable (32 footprints cover ≈ 90 % of land) and disclosed; XL stays overlap-free through cell assignment. `test_ood_scale_strict`: ≈ 6 XXL real tiles placed entirely inside non-training macro-cells, with zero overlap with any training tile at any tier (checked geometrically at finalize). |
 | Source configuration | K ∈ [2,8] points, WDPA regions, edge strips, S/Gnd fields, Omniscape windows | in-distribution |
 | Graph connectivity | 8 (main), 4 (ablation subset) | flagged, not a split |
 
@@ -246,7 +246,7 @@ constraints in `docs/compute_env.md` (300 GB scratch quota).
 | T1 / T1W | MAE in log10(C + ε·max C) space (ε = 1e-6), relative L2 | top-q% IoU, pinch-point recall, Spearman, conservation residual; SSIM/PSNR secondary |
 | T2 | relative error of Reff (pairs), Spearman over pairs | log-MAE, nearest-neighbour rank agreement |
 | T3 | log10-ε MAE of current; MAE of voltage | conservation + Kirchhoff residuals; **solver acceleration** (CG iterations from predicted voltage vs zero) |
-| T4 | log10-ε MAE of cum_current and normalized | top-q% IoU, corridor Dice; SSIM/PSNR secondary |
+| T4 | log10-ε MAE of cum_current and normalized. **At M and L: computed against the exact block-1 Omniscape map on the official reference subsets (`aux/t4_bs1_reference/<tier>`, ≈ 1 000 M / 45–60 L samples over test_id and every OOD split); metrics against the block-centred production target are secondary (`bc_*`).** At S the production target is exact; at XL/XXL only the production target exists (fidelity bound in `docs/t4_fidelity.md`) | top-q% IoU, corridor Dice, non-source rel-L2; SSIM/PSNR secondary |
 | all | inference time vs `solve_time_s` → speed-up; metric vs size on `test_ood_scale` | |
 | T1, T3 (acceleration track) | CG iterations and wall time to reach the reference residual when warm-started from the predicted voltage map vs from zero (`SolveStats.cg_baseline`), on `test_id` and every OOD split | |
 

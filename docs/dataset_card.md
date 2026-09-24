@@ -9,11 +9,10 @@ configs: []   # filled by scripts/push_to_hub.py from the layout (one config per
 
 # AmpScape
 
-> **v1.0 generation in progress — shards are being added; index and card finalised on completion.**
-> Started 2026-09-15 on the university Slurm cluster with streaming upload (each shard is validated, uploaded and
-> checksum-verified before it appears here). Tier order S → M → L → XL → XXL. Until completion, `index/<tier>.parquet`
-> and `splits/full/*.parquet` cover the shards uploaded so far and are re-published as tiers grow; the card, the
-> Croissant file and the baseline tables are updated at the end. Pipeline tag: `v1.0-pipeline`.
+**v1.0 (2026-09-23).** Generated 2026-09-16 → 09-22 on the university Slurm cluster with streaming, checksum-verified
+upload; every tier passed a full Hub-vs-plan audit; the post-run precision pass (09-22/23) re-solved 129 722 rows so
+that every T1/T1W/T1R/T3 row carries its true Kirchhoff residual. Pipeline tag `v1.0-pipeline` (freeze) and release tag
+`v1.0` (GitHub and Hub revision). Cost: 16 552 core-hours. Full account: `docs/generation_postmortem.md`.
 
 AmpScape is a benchmark of **circuit-theoretic landscape connectivity** solved with the reference
 solvers Circuitscape.jl 5.17.1 and Omniscape.jl 0.6.2, for training and fairly comparing learned
@@ -31,6 +30,34 @@ species-calibrated and must not be read as ecological truth for any taxon. (3) S
 come from neutral landscape models and random fields with documented priors. (4) Omniscape is run
 with `block_size = largest odd ≤ radius/10`, a deliberate, documented approximation of the
 per-pixel (block 1) Omniscape whose fidelity was measured (≈ 2–5 % relative L2 at coarser blocks).
+
+## Final counts (v1.0)
+
+| tier | landscapes | configuration rows | synthetic / real | GB on the Hub | rows failing QC |
+|---|---|---|---|---|---|
+| S | 100,000 | 527,281 | 60,000 / 40,000 | 142.4 | 1 |
+| M | 50,000 | 264,128 | 30,000 / 20,000 | 251.7 | 4 |
+| L | 20,000 | 105,949 | 12,000 / 8,000 | 380.9 | 11 |
+| XL | 4,000 | 21,006 | 2,400 / 1,600 | 281.7 | 7 |
+| XXL | 400 | 2,008 | 210 / 190 | 100.7 | 2 |
+| **total** | **174,400** | **920,372** | | **1157.4** | 25 |
+
+Subsets: `mini` (0.61 GB, the first 3 S shards), `core` (115.49 GB, 3,705 files: 20 000 S + 10 000 M + 5 000 L landscapes),
+`full` (1157.4 GB); auxiliary evaluation sets and results under `aux/` (20.5 GB, `aux/README.md`).
+Every tier and every task group is a self-contained set of HDF5 shards (`data/<tier>/<group>/shard-XXXXX.h5`, inputs
+included), so any tier or task group can be downloaded alone (`snapshot_download(allow_patterns="data/L/T4/*")`).
+The 25 rows failing QC after the precision pass (24 landscapes, all synthetic at contrast ≥ 10⁴) stay in the index
+with their flags and are excluded from the split lists. Statistics figures: `docs/tables/dataset_statistics.md`.
+
+## Generation incidents (summary; details in `docs/status/generation_log.md` and `docs/generation_postmortem.md`)
+
+Eleven operational incidents occurred during the run, none of which left silently corrupted or missing data: scratch
+quota exhaustion (a), a partial-finalize race (b) and a double submission (c) on tier S — repaired and confirmed
+replaced shard by shard; duplicate supervisors after a login-node switch (d) and finals validated mid-write (e) —
+leases and atomic renames; an undersized L walltime (f) — 62 shards silently timed out, re-solved; out-of-memory
+kills on the `regions` CG+AMG fallback at XL/XXL (h); Circuitscape's hard 1e-4 residual check aborting T4/T3 solves
+on contrast-10⁶ 2048² landscapes (i) — rescued by refinement and re-solved; corrupt outputs after OOM kills (j); and an
+index column that briefly carried a staging file name. Every affected row was re-solved and every tier re-audited.
 
 ## Dataset structure
 
@@ -61,6 +88,55 @@ tile-level: a tile is `ood_region` when its own biome (Montane Grasslands & Shru
 realm (Australasia) is held out. Other OOD sets: held-out resistance table (`forest_bird`), held-out
 contrast (10⁶), held-out scale (XL/XXL for models trained ≤ L), and a synthetic→real flag. **Pilot caveat:** the mini's 50 real tiles over-represent the held-out regions
 (20 of 50) because the Phase 2 pilot sampled those strata for coverage; this is not a v1.0 property.
+
+## T4 targets: block-centred Omniscape with a measured approximation
+
+Omniscape targets at M–XXL use `block_size = largest odd ≤ radius/10` (block 1, i.e. exact, at S). Against the exact
+block-1 map the production M target deviates by 3.1 % relative L2 on average (tail to 25 % on fragmented high-contrast
+landscapes; top-5 % IoU 0.95, pinch-point recall 0.95). Against the exact map the production L target (block 5) deviates by 2.8 % on average (60-sample reference, 2 samples above 5 %). Block-1 reference subsets at M (1 000 samples) and L (60)
+are published under `aux/t4_bs1_reference/` with per-sample deviations and a > 5 % tail flag; T4 leaderboard metrics at M
+and L are reported against these exact targets (`docs/t4_fidelity.md`).
+
+Every auxiliary evaluation set and result the benchmark depends on is on the Hub under `aux/` (dev subset, mini build,
+`test_ood_published`, the WP5 scale-probe set, the block-1 reference and block-size builds, dev baseline results):
+`docs/aux_layout.md`.
+
+## Scale split caveat
+
+Pixel size, raster size and (for T4) the physical window radius co-vary across tiers (only S → M changes the raster
+alone), so `test_ood_scale` measures combined scale transfer; a controlled probe set separating the axes is planned
+(`docs/addendum_WP5_report.md`).
+
+## Solver precision: every pairwise/advanced row carries its true residual (post-run precision pass)
+
+After generation, every T1/T1W/T1R/T3 row whose Kirchhoff residual was above 1e-9, unmeasured (T1 `points` rows with
+K ≥ 5 and T1R rows keep no per-pair voltages, so production never measured them), solved by the CG+AMG fallback, or
+QC-failed was re-solved pair by pair with CHOLMOD on the reduced system plus iterative refinement and its true relative
+residual recorded (`residual_rel` = max over pairs; per-pair values and methods in `solver_stats.resolved_post_run`;
+`qc_flags` contains `resolved_post_run`; `solver_original` keeps the production solver where it changed). Per-tier
+counts and the achieved-residual distribution: `docs/tables/precision_pass.md`. Rows that could not reach 1e-6 in
+double precision (a few dozen synthetic landscapes at contrast ≥ 10⁴) are flagged `residual_high` with `qc_pass =
+false` and their samples are excluded from the split lists — never silently kept. T4 (Omniscape) rows have no single
+linear system; their solver's per-window residual check is enforced by Circuitscape (≤ 1e-4) with the rescue described
+in `docs/t4_fidelity.md`.
+
+## Absent configurations are labelled, not missing
+
+Some planned source configurations are undefined on a given landscape — a wall-to-wall strip that is entirely NoData,
+a real tile without two habitat patches for the focal-region task, a degenerate source/ground draw. Such samples keep
+their other configurations, and the index column `skipped_configs` (and the sample meta) lists each absent
+configuration with its task and reason, e.g. `regions (T1R: no eligible habitat patches …)`. Every other planned
+configuration is present: the per-tier audit against the plan enforces it before a tier is declared complete.
+
+## Reproducibility
+
+Generation note: during the tier-S run the scratch disk filled and 149 S shards had to be re-finalized from their
+intact solver outputs; no solve was lost and every shard was re-validated before upload.
+
+Every sample records the solver versions, parameters, residuals and the pipeline tag/commit. Regenerating a shard from
+`v1.0-pipeline` on the same CPU model reproduces every stored array bitwise; across CPU models (the cluster node types)
+CHOLMOD/BLAS results differ in the last bits (≤ 1.2e-9 relative on the checked shards), so cross-hardware reproducibility
+is stated at that tolerance, not bitwise.
 
 ## Metrics caveat
 

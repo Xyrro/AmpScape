@@ -15,7 +15,7 @@ first after the freeze checklist is approved.
 | solver | CHOLMOD reference, CG baselines on test/OOD samples, QC threshold 1e-6 |
 | planner | `scripts/plan_v1.py --tier T --n N --out data/v1/T --shard-size S` (prefix streams; the dev subset is the first 3 000 S / 500 M) |
 
-## 1. Cost and array design (512 concurrent cores; ≤ 400 tasks per array under the 500-job submit limit)
+## 1. Cost and array design (512 concurrent cores; ≤ 400 tasks per array under the 500-job submit limit — **2026-09-22: the <qos-a> QoS MaxSubmitPU is now 50 jobs per user**, so arrays must pack several shards per task and stay ≤ 50 tasks)
 
 Per-landscape wall time (dev measurements for S/M, Phase-5 scaling for L–XXL; single core except XL/XXL):
 
@@ -28,6 +28,11 @@ Per-landscape wall time (dev measurements for S/M, Phase-5 scaling for L–XXL; 
 | XXL | 400 | 10 600 | 1 | ≈ 3 h | 8 (test: 20 GB) | 400 | 64 | 7 | ≈ 1 200 | 70 GB |
 | total | 174 400 | | | | | 3 067 | | | **≈ 9 800 (+15 % overhead ≈ 11 300)** | ≈ 840 GB |
 
+**Correction 2026-09-21:** the XL and XXL rows above are *single-core* hours; with the profile's 4 / 8 cpus per task
+(memory sizing) Slurm charges 4× / 8× that. Measured so far: S 2 061, M 1 692, L 5 713 core-hours (L: 806 s per
+landscape single-core, plus the timeout and idle-core losses of generation log (f)). See `docs/status/latest.md`
+(2026-09-21) for the XL/XXL options.
+
 Walltime 04:00:00 everywhere (shard sizes chosen for ≈ 3.2 h so that one Julia start-up per shard is amortised and
 a 4 h limit still holds). Submission order **S → M → L → XL → XXL**; the next tier starts when the previous tier's
 final wave is queued. The S tier alone (110 GB) fits under the 200 GB scratch guard; from M on, waves are sized so
@@ -39,23 +44,73 @@ that `finalized-but-not-uploaded` never exceeds ≈ 80 GB (the sync loop drains 
 source scripts/env.sh
 python scripts/plan_v1.py --tier S --n 100000 --out data/v1/S --shard-size 200 --dataset-version 1.0.0
 sbatch scripts/slurm/dev/prepare_dev.sh data/v1/S                 # inputs (no network needed after tile extraction)
-python scripts/generate.py submit --build data/v1/S --max-concurrent 400          # arrays of ≤ 400 shards; scratch guard
+python scripts/generate.py submit --build data/v1/S --shards 0-399 --max-concurrent 400   # then --shards 400-499; scratch guard
 # finalize + validate + stream, in the sync loop (login node, HF pushes only here):
-nohup scripts/slurm/v1/sync_loop.sh data/v1/S S > data/v1/S/logs/sync_loop.out 2>&1 &
+setsid nohup scripts/slurm/v1/sync_loop.sh data/v1/S S >/dev/null 2>&1 < /dev/null &   # see §2.1
 ```
 
-`sync_loop.sh` every 15 min: `generate.py finalize --build … --quicklooks` (new shards only), then
-`python scripts/sync_shards.py --build … --tier … --live --publish-index` — validate → split by task group →
+Finalize (merge, QC, schema validation, quicklooks) runs on the compute node at the end of every array task
+(`solve_shard.sbatch`), or through `scripts/slurm/v1/finalize_range.sh` for shards solved before that change (tier S).
+`sync_loop.sh` every 15 min runs only `python scripts/sync_shards.py --build … --tier … --live --publish-index` — validate → split by task group →
 upload → verify sha256 on the Hub → `.uploaded` marker → delete the final shard and staged files locally; the
 index rows, `.ok`/`.uploaded` markers and quicklooks stay on scratch. A shard that fails verification twice gets
 `.upload_failed` and the loop exits non-zero (stop rule).
 
+### 2.1 Sync supervisor (login node, detached from any session)
+
+```bash
+setsid nohup $AMPSCAPE_SCRATCH/scripts/slurm/v1/sync_loop.sh data/v1/S S >/dev/null 2>&1 < /dev/null &
+```
+
+That is the exact restart command (owner requirement): safe to run at any time — a pid lock
+(`$AMPSCAPE_SCRATCH/logs/sync_S.pid`) refuses a second copy, every step is idempotent (finalize skips existing
+finals, sync skips `.uploaded` shards, uploads are verified by checksum before anything is deleted). Log:
+`$AMPSCAPE_SCRATCH/logs/sync.log` (one block per 15-min cycle: finalize, sync records, counts). Stop with
+`kill $(cat $AMPSCAPE_SCRATCH/logs/sync_S.pid)`. Replace `S` by the tier for later tiers (one loop per tier).
+
+**Parallel uploaders (owner 2026-09-21, XL/XXL):** N loops per tier, worker k owning the shards with index ≡ k (mod N),
+each under its own lease `logs/lease_sync_<tier>_w<k>.json` and pid lock `sync_<tier>_w<k>.pid`, same
+validate → one-commit upload → sha256 verify → delete rule, staging `hf/tmp_w<k>/`; only worker 0 publishes the index.
+The driver starts them (`SYNC_WORKERS = 4`, 120-s interval); manual restart of the set:
+
+```bash
+for k in 0 1 2 3; do setsid nohup $AMPSCAPE_SCRATCH/scripts/slurm/v1/sync_loop.sh data/v1/XL XL 120 $k/4 >/dev/null 2>&1 < /dev/null & done
+```
+
+Stop one with `kill $(cat $AMPSCAPE_SCRATCH/logs/sync_XL_w<k>.pid)`. Measured single-loop rate at L: 52 shards/h
+(20 GB/h) while shards were available, 21 shards/h averaged over the tier (the loop was solver-limited most of the time).
+
+### 2.2 Autonomous tier driver (owner instruction 2026-09-16)
+
+```bash
+setsid nohup $AMPSCAPE_SCRATCH/.venv/bin/python $AMPSCAPE_SCRATCH/scripts/slurm/v1/generation_driver.py >/dev/null 2>&1 < /dev/null &
+```
+
+`scripts/slurm/v1/generation_driver.py` (detached, pid lock `logs/driver.pid`, state `logs/driver_state.json`, log
+`logs/driver.log`, 10-min cycles) waits until tier S is fully on the Hub, then runs M → L → XL → XXL: plans the tier,
+prepares one wave ahead (Slurm), submits a wave only when the upload backlog is below one wave, `data/` < 200 GB and
+no array of that tier is running, starts the tier's sync supervisor, resubmits missing shards once, and writes
+`logs/tier_boundary_<tier>.txt` + the generation log at every tier boundary. It stops (writing `logs/ALERT.txt` with
+the reason) when the stop rule triggers (QC fail > 1 %, a shard failing upload twice), scratch exceeds 250 GB, a sync
+supervisor exits, planning/prepare fails, or shards are still missing after one resubmission. Restart with the same
+command after removing `logs/ALERT.txt` once the cause is fixed.
+
+**Never submit the same shard twice**: `generate.py submit` skips shards with a pending/running task for the build; do not
+bypass it with hand-written `sbatch` calls (incident (c), 2026-09-16).
+
 ## 3. Resume procedure
 
 Everything is idempotent at the shard level: `prepare` skips shards with inputs, the array skips shards with a
-final file, `finalize` skips existing finals, `sync` skips `.uploaded`. After a node failure or a cancelled array:
-`python scripts/generate.py status --build data/v1/T` → `submit` again (only missing shards are queued). After a
-login-node restart: relaunch `sync_loop.sh`. Nothing needs the network except tile extraction and the uploads.
+final or an outputs file, `finalize` skips existing finals, `sync` skips `.uploaded`.
+
+**Login-node reboot mid-run** (owner requirement 2): running and pending Slurm array tasks are unaffected — they are
+owned by the scheduler, not by the login session. Only two things live on the login node and must be re-launched:
+1. the sync supervisor — the one-line command in §2.1 (safe to repeat; the lock prevents duplicates);
+2. any array **not yet submitted** (later waves / tiers): `python scripts/generate.py status --build data/v1/T`
+   shows the state; `python scripts/generate.py submit --build data/v1/T --shards a-b --max-concurrent 400` queues
+   only the shards that have neither a final nor an outputs file (already-solved shards are picked up by finalize).
+After a compute-node failure or a cancelled array the same `submit` re-queues the missing shards. Nothing needs the
+network except tile extraction and the uploads.
 
 ## 4. Daily summary and stop rule
 
@@ -64,12 +119,63 @@ login-node restart: relaunch `sync_loop.sh`. Nothing needs the network except ti
 verified on the Hub, local GB, core-hours used (sacct). **Stop rule:** pause submissions and report to the owner if
 the QC failure rate of any tier exceeds 1 % or any shard fails to upload twice (both are printed as TRIGGERED).
 
-## 5. Scratch guard
+## 5. Scratch budget and submission waves (revised 2026-09-16 after the tier-S quota incident)
+
+Measured on tier S (final numbers): a finalized shard of 200 landscapes is 130–250 MB (mean ≈ 250 MB incl. K ≤ 4 pair maps; the five task-group files on the Hub sum to 1.14× the final because each carries the sample inputs), tier S occupies 142 GB on the Hub; its raw intermediates are ≈ 245 MB (inputs
+37 MB + outputs 208 MB) and exist from `prepare` until the finalize inside the array task deletes them; the
+validated final exists until the sync loop has verified it on the Hub (one commit per shard, five task-group files;
+measured throughput ≈ 25–30 shards/h ≈ 3.5 GB/h for S). Scratch is 300 GB; the fixed footprint (sources 19 GB,
+v1.0 tiles 36 GB, dev/mini/published builds 22 GB, environments, Julia depot) is ≈ 90 GB, so the generation may
+use **≤ 200 GB** in flight:
+
+    in_flight = (shards prepared but not yet finalized) × (inputs + outputs)
+              + (finalized, not yet uploaded) × final_size            must stay < 200 GB − fixed ≈ 110 GB
+
+| tier | landscapes / shard | final / shard | intermediates / shard | max shards in flight (110 GB) | wave size | shards per tier |
+|---|---|---|---|---|---|---|
+| S | 200 | 0.13 GB | 0.25 GB | ≈ 290 (all raw) → 400 if raw is deleted at finalize | **200** | 500 |
+| M | 100 | 0.30 GB (measured, median) | 0.7 GB | ≈ 100 | **80** | 500 |
+| L | 20 | 0.26 GB | 0.5 GB | ≈ 140 | **100** | 1 000 |
+| XL | 6 | 0.30 GB | 0.6 GB | ≈ 120 | **100** | 667 |
+| XXL | 1 | 0.17 GB | 0.35 GB | ≈ 200 | **64** | 400 |
+
+Rules: (1) `prepare` only the next wave (inputs are 15–20 % of the intermediates but add up: 100 000 S inputs were
+18 GB); (2) submit the next wave only when `uploaded ≥ submitted − wave_size` (i.e. the upload backlog is below one
+wave) and `du -sb data/` < 200 GB — `generate.py submit` enforces the second; (3) the finalize inside the array task
+deletes the raw inputs/outputs of every validated shard, so a wave's intermediates vanish as it completes; (4) the
+sync loop never writes more than one shard's temporary split at a time and removes it in every case.
+
+What went wrong on tier S: all 500 shards ran at once (the scheduler granted 500 cores), finalize ran in a separate
+array after the solves, and the sync only deleted the *final* after upload — so 500 × (245 + 130) MB ≈ 190 GB of
+S data plus the fixed footprint filled the 300 GB quota; the split of shard 12 was truncated by the full disk and the
+loop retried it every 15 min without counting the failure. Fixed as above (owner items 1–5).
+
+## 6. Scratch guard
 
 `generate.py submit` refuses while `data/` holds more than 200 GB (`limits.scratch_pause_gb` in
 `configs/cluster/local.yaml`; override `--ignore-scratch-guard` only with the owner's approval). Scratch cap is 300 GB.
 
-## 6. On completion
+## 7. On completion
 
 Assemble the final per-tier indexes and split lists (`publish_index`), the Croissant file and the dataset card
 (remove the in-progress notice), push the tuned baseline results, mint the Zenodo DOI (Phase 12).
+
+## 8. Post-run precision pass (owner 2026-09-21; `docs/post_run_resolve_plan.md`)
+
+Runs after XXL, tier by tier, never alongside generation of the same tier:
+
+```bash
+source scripts/env.sh
+python scripts/precision_pass.py select --tier S --work work/precision/S --mode a          # rows: cg+amg, > 1e-9, unmeasured
+python scripts/precision_pass.py submit --tier S --work work/precision/S --per-task 4      # Slurm arrays of `run`
+python scripts/precision_pass.py status --tier S --work work/precision/S
+python scripts/precision_pass.py upload --tier S --work work/precision/S                   # login node; repeat until pending = 0
+sbatch ... scripts/audit_tier.py --build data/v1/S --tier S --workers 4                    # full audit, must be clean
+python scripts/precision_pass.py publish --tier S                                          # once, at the very end of the pass
+```
+
+`run` downloads the shard's touched task-group files, re-solves the rows in place (reduced-system CHOLMOD + refinement,
+true residual per pair, currents/Reff recomputed, `solver_original` / `resolved_post_run` / `residual_per_pair` in
+`solver_stats`), rebuilds the touched index rows with the production QC and writes everything under `work/`; nothing
+reaches the Hub until `upload` verifies the sha256 of each re-uploaded file and updates the shard's `.uploaded` record.
+

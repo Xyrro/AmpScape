@@ -3,6 +3,7 @@ average-conductance rule (row-normalised); L residual message-passing layers
     h_i <- h_i + MLP([h_i, sum_j w_ij (h_j - h_i)])
 so the update uses the exact graph structure (conductance-weighted neighbour differences, the discrete gradient of
 Kirchhoff's law). Receptive field = L hops, the known limitation of local message passing on large grids."""
+
 from __future__ import annotations
 
 import torch
@@ -29,11 +30,17 @@ class GridGNN(nn.Module):
         self.layers = nn.ModuleList([MPLayer(dim) for _ in range(layers)])
         self.dec = nn.Sequential(nn.Linear(dim, dim), nn.GELU(), nn.Linear(dim, out_channels))
 
-    def forward(self, x: torch.Tensor, node_index: torch.Tensor, edge_index: torch.Tensor, edge_weight: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        node_index: torch.Tensor,
+        edge_index: torch.Tensor,
+        edge_weight: torch.Tensor,
+    ) -> torch.Tensor:
         """x (B, C, H, W); node_index (B, H, W) with global node ids (-1 = NoData); edge_index (2, E) global ids."""
         B, C, H, W = x.shape
         valid = node_index >= 0
-        feats = x.permute(0, 2, 3, 1)[valid]                       # (N, C) in global node order (row-major per sample)
+        feats = x.permute(0, 2, 3, 1)[valid]  # (N, C) in global node order (row-major per sample)
         h = self.enc(feats)
         for layer in self.layers:
             h = layer(h, edge_index, edge_weight)
@@ -47,7 +54,15 @@ class MultiScaleGridGNN(nn.Module):
     majority NoData) extends the receptive field 4× per hop; coarse features are scattered back to the fine nodes and
     refined by fine-graph layers. Depth: `coarse_layers` on the coarse graph, `fine_layers` on the fine graph."""
 
-    def __init__(self, in_channels: int, out_channels: int = 1, dim: int = 64, coarse_layers: int = 12, fine_layers: int = 6, factor: int = 4):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int = 1,
+        dim: int = 64,
+        coarse_layers: int = 12,
+        fine_layers: int = 6,
+        factor: int = 4,
+    ):
         super().__init__()
         self.factor = factor
         self.enc = nn.Sequential(nn.Linear(in_channels, dim), nn.GELU(), nn.Linear(dim, dim))
@@ -56,14 +71,28 @@ class MultiScaleGridGNN(nn.Module):
         self.fine = nn.ModuleList([MPLayer(dim) for _ in range(fine_layers)])
         self.dec = nn.Sequential(nn.Linear(dim, dim), nn.GELU(), nn.Linear(dim, out_channels))
 
-    def forward(self, x, node_index, edge_index, edge_weight, coarse_edge_index, coarse_edge_weight, fine_to_coarse, n_coarse: int):
+    def forward(
+        self,
+        x,
+        node_index,
+        edge_index,
+        edge_weight,
+        coarse_edge_index,
+        coarse_edge_weight,
+        fine_to_coarse,
+        n_coarse: int,
+    ):
         B, C, H, W = x.shape
         valid = node_index >= 0
         h = self.enc(x.permute(0, 2, 3, 1)[valid])
         # mean-pool fine features onto coarse nodes
         ok = fine_to_coarse >= 0
-        hc = torch.zeros(n_coarse, h.shape[1], device=h.device, dtype=h.dtype).index_add_(0, fine_to_coarse[ok], h[ok])
-        cnt = torch.zeros(n_coarse, device=h.device, dtype=h.dtype).index_add_(0, fine_to_coarse[ok], torch.ones(int(ok.sum()), device=h.device, dtype=h.dtype))
+        hc = torch.zeros(n_coarse, h.shape[1], device=h.device, dtype=h.dtype).index_add_(
+            0, fine_to_coarse[ok], h[ok]
+        )
+        cnt = torch.zeros(n_coarse, device=h.device, dtype=h.dtype).index_add_(
+            0, fine_to_coarse[ok], torch.ones(int(ok.sum()), device=h.device, dtype=h.dtype)
+        )
         hc = hc / cnt.clamp_min(1.0)[:, None]
         for layer in self.coarse:
             hc = layer(hc, coarse_edge_index, coarse_edge_weight)

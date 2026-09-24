@@ -3,6 +3,7 @@
 
 Usage: python scripts/plot_tiles.py --manifest data/tiles/pilot/tiles.parquet --out docs/figures --prefix pilot
 """
+
 from __future__ import annotations
 
 import argparse
@@ -44,14 +45,24 @@ def main() -> None:
     cmap = plt.get_cmap("tab20")
     for i, b in enumerate(biomes):
         sub = ok[ok["biome_num"] == b]
-        ax.scatter(sub["lon"], sub["lat"], s=28, color=cmap(i % 20), edgecolor="k", linewidth=0.4,
-                   label=f"{b:02d} {sub['biome_name'].iloc[0][:34]} ({len(sub)})", zorder=3)
+        ax.scatter(
+            sub["lon"],
+            sub["lat"],
+            s=28,
+            color=cmap(i % 20),
+            edgecolor="k",
+            linewidth=0.4,
+            label=f"{b:02d} {sub['biome_name'].iloc[0][:34]} ({len(sub)})",
+            zorder=3,
+        )
     ax.set_xlim(-180, 180)
     ax.set_ylim(-60, 80)
     ax.set_xlabel("lon")
     ax.set_ylabel("lat")
-    ax.set_title(f"AmpScape {args.prefix} tiles: {len(ok)} accepted, {ok['biome_num'].nunique()} biomes, "
-                 f"{ok['realm'].nunique()} realms, {ok['stratum'].nunique()} strata")
+    ax.set_title(
+        f"AmpScape {args.prefix} tiles: {len(ok)} accepted, {ok['biome_num'].nunique()} biomes, "
+        f"{ok['realm'].nunique()} realms, {ok['stratum'].nunique()} strata"
+    )
     ax.legend(fontsize=6, loc="lower left", ncol=2, framealpha=0.9)
     fig.tight_layout()
     fig.savefig(out / f"{args.prefix}_tiles_map.png", dpi=120)
@@ -64,14 +75,20 @@ def main() -> None:
     fig, axes = plt.subplots(len(pick), 4, figsize=(10, 2.4 * len(pick)))
     for row, (_, r) in zip(axes, pick.iterrows(), strict=True):
         ch, _ = real.read_tile(str(root / r["path"]))
-        panels = [("landcover", ch["landcover"], "tab20"), ("elevation", ch["elevation"], "terrain"),
-                  ("log10 road dist", np.log10(1 + ch["road_distance"]), "viridis"), ("ghm", ch["ghm"], "magma")]
+        panels = [
+            ("landcover", ch["landcover"], "tab20"),
+            ("elevation", ch["elevation"], "terrain"),
+            ("log10 road dist", np.log10(1 + ch["road_distance"]), "viridis"),
+            ("ghm", ch["ghm"], "magma"),
+        ]
         for ax, (name, a, cm) in zip(row, panels, strict=True):
             ax.imshow(a, cmap=cm, interpolation="nearest")
             ax.set_xticks([])
             ax.set_yticks([])
             ax.set_title(name, fontsize=7)
-        row[0].set_ylabel(f"{r['tile_id']}\n{r['biome_name'][:28]}\n({r['lat']:.1f}, {r['lon']:.1f})", fontsize=6)
+        row[0].set_ylabel(
+            f"{r['tile_id']}\n{r['biome_name'][:28]}\n({r['lat']:.1f}, {r['lon']:.1f})", fontsize=6
+        )
     fig.tight_layout()
     fig.savefig(out / f"{args.prefix}_tiles_gallery.png", dpi=90)
     print("wrote", out / f"{args.prefix}_tiles_map.png", "and gallery")

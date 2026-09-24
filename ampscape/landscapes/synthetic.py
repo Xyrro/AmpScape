@@ -326,12 +326,19 @@ DEFAULT_PRIOR: dict = {
         "p_oriented": 0.5,
         "gap_fraction": (0.0, 0.3),
         "gap_length_px": (2.0, 8.0),
-        "barrier_cost": (0.7, 1.0),   # cost value written on barrier pixels (before contrast)
+        "barrier_cost": (0.7, 1.0),  # cost value written on barrier pixels (before contrast)
     },
     "p_nodata": 0.3,
     "nodata": {"fraction": (0.02, 0.25), "length_scale": (4.0, 32.0)},
     "contrast": CONTRAST_LEVELS,
-    "contrast_weights": (1, 1, 1, 1, 1, 0.5),   # 10^6 is test-only (held out); sampled at half weight
+    "contrast_weights": (
+        1,
+        1,
+        1,
+        1,
+        1,
+        0.5,
+    ),  # 10^6 is test-only (held out); sampled at half weight
     "mapping": "log",
 }
 
@@ -340,9 +347,9 @@ DEFAULT_PRIOR: dict = {
 class SyntheticLandscape:
     """A generated landscape plus everything needed to regenerate it."""
 
-    resistance: np.ndarray            # float32 (H, W) in [1, contrast]; 1.0 at NoData
-    nodata_mask: np.ndarray           # bool (H, W)
-    cost_field: np.ndarray            # float32 (H, W) in [0, 1]
+    resistance: np.ndarray  # float32 (H, W) in [1, contrast]; 1.0 at NoData
+    nodata_mask: np.ndarray  # bool (H, W)
+    cost_field: np.ndarray  # float32 (H, W) in [0, 1]
     generator: str
     params: dict = field(default_factory=dict)
     seed: int = 0
@@ -366,12 +373,19 @@ def _ui(rng: np.random.Generator, lo_hi: tuple[int, int]) -> int:
 def generate_field(name: str, shape: Shape, params: dict, rng: np.random.Generator) -> np.ndarray:
     """Dispatch a base generator by name with explicit parameters."""
     if name == "grf":
-        return gaussian_random_field(shape, params["length_scale"], rng,
-                                     params.get("anisotropy", 1.0), params.get("angle_deg", 0.0))
+        return gaussian_random_field(
+            shape,
+            params["length_scale"],
+            rng,
+            params.get("anisotropy", 1.0),
+            params.get("angle_deg", 0.0),
+        )
     if name == "fractal":
         return midpoint_displacement(shape, params["roughness"], rng)
     if name == "random_cluster":
-        return nlm_random_cluster(shape, params["p"], rng, params.get("neighbourhood", "8-neighbourhood"))
+        return nlm_random_cluster(
+            shape, params["p"], rng, params.get("neighbourhood", "8-neighbourhood")
+        )
     if name == "planar_gradient":
         return nlm_planar_gradient(shape, params["direction_deg"], rng)
     if name == "edge_gradient":
@@ -383,8 +397,14 @@ def generate_field(name: str, shape: Shape, params: dict, rng: np.random.Generat
     raise ValueError(f"unknown generator {name!r}")
 
 
-def _draw_body(rng: np.random.Generator, h: int, w: int, prior: dict, name: str,
-               nodata_fraction: tuple[float, float] | None = None) -> tuple[np.ndarray, np.ndarray, dict]:
+def _draw_body(
+    rng: np.random.Generator,
+    h: int,
+    w: int,
+    prior: dict,
+    name: str,
+    nodata_fraction: tuple[float, float] | None = None,
+) -> tuple[np.ndarray, np.ndarray, dict]:
     """Base field + overlays + NoData for generator ``name`` (shared by the default and v1.0 samplers).
 
     The RNG call order is the one of the Phase-2 sampler, so :func:`sample_landscape` is unchanged bitwise.
@@ -432,9 +452,15 @@ def _draw_body(rng: np.random.Generator, h: int, w: int, prior: dict, name: str,
             "gap_length_px": _u(rng, bp["gap_length_px"]),
             "barrier_cost": _u(rng, bp["barrier_cost"]),
         }
-        bmask = linear_barriers((h, w), bparams["n_lines"], bparams["width_px"], rng,
-                                bparams["orientation_deg"], gap_fraction=bparams["gap_fraction"],
-                                gap_length_px=bparams["gap_length_px"])
+        bmask = linear_barriers(
+            (h, w),
+            bparams["n_lines"],
+            bparams["width_px"],
+            rng,
+            bparams["orientation_deg"],
+            gap_fraction=bparams["gap_fraction"],
+            gap_length_px=bparams["gap_length_px"],
+        )
         fld = fld.copy()
         fld[bmask] = np.maximum(fld[bmask], bparams["barrier_cost"])
         params["barriers"] = bparams
@@ -442,7 +468,10 @@ def _draw_body(rng: np.random.Generator, h: int, w: int, prior: dict, name: str,
     # NoData
     if nodata_fraction is not None or rng.uniform() < prior["p_nodata"]:
         npz = prior["nodata"]
-        nparams = {"fraction": _u(rng, nodata_fraction or npz["fraction"]), "length_scale": _u(rng, npz["length_scale"])}
+        nparams = {
+            "fraction": _u(rng, nodata_fraction or npz["fraction"]),
+            "length_scale": _u(rng, npz["length_scale"]),
+        }
         nodata = random_nodata((h, w), nparams["fraction"], nparams["length_scale"], rng)
         params["nodata"] = nparams
     else:
@@ -473,19 +502,43 @@ def sample_landscape(seed: int, shape: Shape, prior: dict | None = None) -> Synt
 # ---------------------------------------------------------------------------
 # v1.0 sampler: generator mix + named hard-case stratum (configs/datasets/v1_0.yaml, dataset plan §2.2/§3)
 # ---------------------------------------------------------------------------
-V1_BASE_CONTRASTS: tuple[int, ...] = (10, 100, 1000, 10_000)      # non-hard landscapes; 10^5 / 10^6 only via the hard stratum
+V1_BASE_CONTRASTS: tuple[int, ...] = (
+    10,
+    100,
+    1000,
+    10_000,
+)  # non-hard landscapes; 10^5 / 10^6 only via the hard stratum
 V1_CORRIDOR_CONTRASTS: tuple[int, ...] = (100, 1000, 10_000)
-V1_MIX: dict = {"grf": 0.24, "fractal": 0.16, "random_cluster": 0.12, "planar_gradient": 0.04, "edge_gradient": 0.04,
-                "distance_gradient": 0.08, "mosaic": 0.12, "hard": 0.20}
-V1_HARD: dict = {"high_contrast_1e5": 0.20, "high_contrast_1e6": 0.10, "rmax_saturated": 0.15, "narrow_corridor": 0.30,
-                 "large_nodata": 0.25}
+V1_MIX: dict = {
+    "grf": 0.24,
+    "fractal": 0.16,
+    "random_cluster": 0.12,
+    "planar_gradient": 0.04,
+    "edge_gradient": 0.04,
+    "distance_gradient": 0.08,
+    "mosaic": 0.12,
+    "hard": 0.20,
+}
+V1_HARD: dict = {
+    "high_contrast_1e5": 0.20,
+    "high_contrast_1e6": 0.10,
+    "rmax_saturated": 0.15,
+    "narrow_corridor": 0.30,
+    "large_nodata": 0.25,
+}
 V1_LARGE_NODATA_FRACTION: tuple[float, float] = (0.25, 0.45)
-V1_SATURATION_FRACTION: tuple[float, float] = (0.55, 0.75)        # share of valid pixels at r_max
+V1_SATURATION_FRACTION: tuple[float, float] = (0.55, 0.75)  # share of valid pixels at r_max
 
 
-def corridor_walls(shape: Shape, n_walls: int, rng: np.random.Generator, width_px: int = 2,
-                   gaps_range: tuple[int, int] = (1, 3), gap_px_range: tuple[int, int] = (1, 3),
-                   min_gap_spacing_px: int = 8) -> tuple[np.ndarray, list[dict]]:
+def corridor_walls(
+    shape: Shape,
+    n_walls: int,
+    rng: np.random.Generator,
+    width_px: int = 2,
+    gaps_range: tuple[int, int] = (1, 3),
+    gap_px_range: tuple[int, int] = (1, 3),
+    min_gap_spacing_px: int = 8,
+) -> tuple[np.ndarray, list[dict]]:
     """Barrier walls spanning the raster, each opened by 1–3 gaps of 1–3 px (dataset plan §3, ``narrow_corridor``).
 
     Every wall runs through a random anchor at an orientation within ±15° of horizontal or vertical, so it

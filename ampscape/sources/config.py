@@ -40,7 +40,9 @@ class SourceFieldCfg(BaseModel):
 
 
 class GroundCfg(BaseModel):
-    modes: list[Literal["edge", "all_edges", "patches"]] = Field(default_factory=lambda: ["edge", "all_edges", "patches"])
+    modes: list[Literal["edge", "all_edges", "patches"]] = Field(
+        default_factory=lambda: ["edge", "all_edges", "patches"]
+    )
     edge_width_px: int = Field(default=1, ge=1)
     n_patches_range: tuple[int, int] = (1, 3)
     patch_radius_px: int = Field(default=3, ge=1)
@@ -52,7 +54,9 @@ class AdvancedCfg(BaseModel):
 
 
 class OmniscapeCfg(BaseModel):
-    source: SourceFieldCfg = Field(default_factory=lambda: SourceFieldCfg(quantile=0.5, normalize_total=None, scale_max=1.0))
+    source: SourceFieldCfg = Field(
+        default_factory=lambda: SourceFieldCfg(quantile=0.5, normalize_total=None, scale_max=1.0)
+    )
     source_threshold: float = Field(default=0.0, ge=0)
 
 

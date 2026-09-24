@@ -28,19 +28,47 @@ from pydantic import BaseModel, Field, ValidationError
 
 SCHEMA_VERSION = "0.2"
 KINDS = {"points", "wall_to_wall", "regions", "advanced", "omniscape"}
-KIND_TASK = {"points": "T1,T2", "wall_to_wall": "T1W", "regions": "T1R", "advanced": "T3", "omniscape": "T4"}
+KIND_TASK = {
+    "points": "T1,T2",
+    "wall_to_wall": "T1W",
+    "regions": "T1R",
+    "advanced": "T3",
+    "omniscape": "T4",
+}
 CONFIG_INPUTS = {
-    "points": {"focal_mask": np.int32}, "wall_to_wall": {"focal_mask": np.int32}, "regions": {"focal_mask": np.int32},
-    "advanced": {"source_strength": np.float32, "ground": np.int8}, "omniscape": {"source_strength": np.float32},
+    "points": {"focal_mask": np.int32},
+    "wall_to_wall": {"focal_mask": np.int32},
+    "regions": {"focal_mask": np.int32},
+    "advanced": {"source_strength": np.float32, "ground": np.int8},
+    "omniscape": {"source_strength": np.float32},
 }
 CONFIG_OUTPUTS = {
-    "points": {"cum_current": np.float32, "reff": np.float64, "labels": np.int32, "pair_index": np.int32},
-    "wall_to_wall": {"cum_current": np.float32, "reff": np.float64, "labels": np.int32, "pair_index": np.int32},
-    "regions": {"cum_current": np.float32, "reff": np.float64, "labels": np.int32, "pair_index": np.int32},
+    "points": {
+        "cum_current": np.float32,
+        "reff": np.float64,
+        "labels": np.int32,
+        "pair_index": np.int32,
+    },
+    "wall_to_wall": {
+        "cum_current": np.float32,
+        "reff": np.float64,
+        "labels": np.int32,
+        "pair_index": np.int32,
+    },
+    "regions": {
+        "cum_current": np.float32,
+        "reff": np.float64,
+        "labels": np.int32,
+        "pair_index": np.int32,
+    },
     "advanced": {"current": np.float32, "voltage": np.float32},
-    "omniscape": {"cum_current": np.float32, "flow_potential": np.float32, "normalized": np.float32},
+    "omniscape": {
+        "cum_current": np.float32,
+        "flow_potential": np.float32,
+        "normalized": np.float32,
+    },
 }
-OPTIONAL_OUTPUTS = {"pairwise_current": np.float32, "voltage": np.float32}   # pairwise kinds, K <= 4
+OPTIONAL_OUTPUTS = {"pairwise_current": np.float32, "voltage": np.float32}  # pairwise kinds, K <= 4
 
 
 class MetaModel(BaseModel):
@@ -72,7 +100,7 @@ class MetaModel(BaseModel):
     created_at: str
     pipeline_git_sha: str
     dataset_version: str
-    resampling: dict | None = None      # real tiles (owner amendment C2); required from schema 0.3
+    resampling: dict | None = None  # real tiles (owner amendment C2); required from schema 0.3
 
 
 class ValidationReport(BaseModel):
@@ -87,7 +115,9 @@ class ValidationReport(BaseModel):
         return not self.errors
 
 
-def _check_ds(g: h5py.Group, name: str, dtype, shape: tuple | None, errs: list[str], where: str) -> h5py.Dataset | None:
+def _check_ds(
+    g: h5py.Group, name: str, dtype, shape: tuple | None, errs: list[str], where: str
+) -> h5py.Dataset | None:
     if name not in g:
         errs.append(f"{where}: missing dataset {name}")
         return None
@@ -99,7 +129,9 @@ def _check_ds(g: h5py.Group, name: str, dtype, shape: tuple | None, errs: list[s
     return d
 
 
-def validate_sample(gs: h5py.Group, errs: list[str], warns: list[str], max_samples_arrays: bool = True) -> int:
+def validate_sample(
+    gs: h5py.Group, errs: list[str], warns: list[str], max_samples_arrays: bool = True
+) -> int:
     sid = gs.name.strip("/")
     try:
         meta = MetaModel.model_validate(json.loads(gs.attrs["meta"]))
@@ -141,7 +173,11 @@ def validate_sample(gs: h5py.Group, errs: list[str], warns: list[str], max_sampl
             errs.append(f"{sid}/{cname}: missing outputs")
             continue
         for name, dt in CONFIG_OUTPUTS[kind].items():
-            shape = (H, W) if name in ("cum_current", "current", "voltage", "flow_potential", "normalized") else None
+            shape = (
+                (H, W)
+                if name in ("cum_current", "current", "voltage", "flow_potential", "normalized")
+                else None
+            )
             _check_ds(go, name, dt, shape, errs, f"{sid}/{cname}")
         for name, dt in OPTIONAL_OUTPUTS.items():
             if kind in ("points", "wall_to_wall", "regions") and name in go:
@@ -151,7 +187,11 @@ def validate_sample(gs: h5py.Group, errs: list[str], warns: list[str], max_sampl
         for a in ("solver_stats", "qc_flags", "qc_pass"):
             if a not in go.attrs:
                 errs.append(f"{sid}/{cname}: missing attr {a}")
-        if kind in ("points", "wall_to_wall", "regions") and "reff" in go and "focal_mask" in gc["inputs"]:
+        if (
+            kind in ("points", "wall_to_wall", "regions")
+            and "reff" in go
+            and "focal_mask" in gc["inputs"]
+        ):
             K = len(np.unique(gc["inputs"]["focal_mask"][...])) - 1
             if go["reff"].shape != (K, K):
                 errs.append(f"{sid}/{cname}: reff shape {go['reff'].shape} != ({K}, {K})")
@@ -173,7 +213,9 @@ def validate_shard(path: str, max_samples: int | None = None) -> ValidationRepor
             if a not in f.attrs:
                 rep.errors.append(f"root: missing attr {a}")
         if f.attrs.get("schema_version") not in (SCHEMA_VERSION, "0.1"):
-            rep.warnings.append(f"root: schema_version {f.attrs.get('schema_version')} (validator {SCHEMA_VERSION})")
+            rep.warnings.append(
+                f"root: schema_version {f.attrs.get('schema_version')} (validator {SCHEMA_VERSION})"
+            )
         for i, sid in enumerate(f):
             if max_samples and i >= max_samples:
                 break
@@ -184,29 +226,64 @@ def validate_shard(path: str, max_samples: int | None = None) -> ValidationRepor
 
 def schema_markdown() -> str:
     """Render docs/schema.md from the definitions above."""
-    lines = ["# AmpScape shard schema", "", f"Schema version **{SCHEMA_VERSION}** (`ampscape.io.schema`). One HDF5 file per shard, one group per sample.", "",
-             "## Root attributes", "", "`dataset_version`, `schema_version`, `pipeline_git_sha`, `created_at`.", "",
-             "## Sample group `/<sample_id>/`", "", "Attribute `meta` (JSON) with the fields of `MetaModel`:", "",
-             "| field | type | note |", "|---|---|---|"]
+    lines = [
+        "# AmpScape shard schema",
+        "",
+        f"Schema version **{SCHEMA_VERSION}** (`ampscape.io.schema`). One HDF5 file per shard, one group per sample.",
+        "",
+        "## Root attributes",
+        "",
+        "`dataset_version`, `schema_version`, `pipeline_git_sha`, `created_at`.",
+        "",
+        "## Sample group `/<sample_id>/`",
+        "",
+        "Attribute `meta` (JSON) with the fields of `MetaModel`:",
+        "",
+        "| field | type | note |",
+        "|---|---|---|",
+    ]
     for name, fld in MetaModel.model_fields.items():
-        lines.append(f"| `{name}` | `{fld.annotation}` | {'required' if fld.is_required() else 'optional'} |")
-    lines += ["", "### `inputs/`", "", "| dataset | dtype | shape |", "|---|---|---|",
-              "| `resistance` | float32 | (H, W) — R ∈ [1, r_max], 1.0 at NoData |",
-              "| `nodata_mask` | uint8 | (H, W) — 1 = NoData |",
-              "| `covariates` | float32 | (C, H, W) — real tiles; `attrs.channels` |", ""]
-    lines += ["### `configs/<name>/`", "", "Attributes `kind`, `task_ids`, `focal_table` (JSON), `source_meta` (JSON).", "",
-              "| kind | tasks | inputs | outputs (raw solver output) |", "|---|---|---|---|"]
+        lines.append(
+            f"| `{name}` | `{fld.annotation}` | {'required' if fld.is_required() else 'optional'} |"
+        )
+    lines += [
+        "",
+        "### `inputs/`",
+        "",
+        "| dataset | dtype | shape |",
+        "|---|---|---|",
+        "| `resistance` | float32 | (H, W) — R ∈ [1, r_max], 1.0 at NoData |",
+        "| `nodata_mask` | uint8 | (H, W) — 1 = NoData |",
+        "| `covariates` | float32 | (C, H, W) — real tiles; `attrs.channels` |",
+        "",
+    ]
+    lines += [
+        "### `configs/<name>/`",
+        "",
+        "Attributes `kind`, `task_ids`, `focal_table` (JSON), `source_meta` (JSON).",
+        "",
+        "| kind | tasks | inputs | outputs (raw solver output) |",
+        "|---|---|---|---|",
+    ]
     for k in ("points", "wall_to_wall", "regions", "advanced", "omniscape"):
         ins = ", ".join(f"`{n}` {np.dtype(d).name}" for n, d in CONFIG_INPUTS[k].items())
         outs = ", ".join(f"`{n}` {np.dtype(d).name}" for n, d in CONFIG_OUTPUTS[k].items())
         if k in ("points", "wall_to_wall", "regions"):
             outs += "; K ≤ 4 also `pairwise_current`, `voltage` float32 (P, H, W)"
         lines.append(f"| {k} | {KIND_TASK[k]} | {ins} | {outs} |")
-    lines += ["", "Output group attributes: `solver_stats` (JSON `SolveStats`), `qc_flags` (JSON list), `qc_pass` (bool).", "",
-              "Conventions: north-up row-major rasters; pair (i, j): node i grounded, 1 A injected at j; NoData pixels",
-              "hold 0 in output maps; nothing is normalised or clipped. See `docs/task_specification.md`.", "",
-              "## Parquet index", "", "One row per (sample, config): identifiers, family/tier/generator/table/tile, K, placement, seed,",
-              "solver, timings, residuals, `qc_flags`, `qc_pass`, `qc_trainval`, split and OOD flags, shard file.", ""]
+    lines += [
+        "",
+        "Output group attributes: `solver_stats` (JSON `SolveStats`), `qc_flags` (JSON list), `qc_pass` (bool).",
+        "",
+        "Conventions: north-up row-major rasters; pair (i, j): node i grounded, 1 A injected at j; NoData pixels",
+        "hold 0 in output maps; nothing is normalised or clipped. See `docs/task_specification.md`.",
+        "",
+        "## Parquet index",
+        "",
+        "One row per (sample, config): identifiers, family/tier/generator/table/tile, K, placement, seed,",
+        "solver, timings, residuals, `qc_flags`, `qc_pass`, `qc_trainval`, split and OOD flags, shard file.",
+        "",
+    ]
     return "\n".join(lines)
 
 
@@ -224,7 +301,9 @@ def main(argv: list[str] | None = None) -> int:
     rc = 0
     for p in a.paths:
         rep = validate_shard(p)
-        print(f"{p}: {rep.n_samples} samples, {rep.n_configs} configs, {len(rep.errors)} errors, {len(rep.warnings)} warnings")
+        print(
+            f"{p}: {rep.n_samples} samples, {rep.n_configs} configs, {len(rep.errors)} errors, {len(rep.warnings)} warnings"
+        )
         for e in rep.errors[:20]:
             print("  ERROR", e)
         rc |= int(not rep.ok)

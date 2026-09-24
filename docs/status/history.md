@@ -177,3 +177,294 @@ Full report: `docs/phase_09_report.md`.
 - Tests: 129 passing.
 
 Full report: `docs/phase_10_report.md`.
+
+---
+
+# Status — 2026-09-15 (v1.0 freeze checklist)
+
+**Checklist a–f done except the reproducibility verdict (b, running); waiting for approval to launch tier S.**
+
+| item | result |
+|---|---|
+| a. pipeline freeze | no pending change affects stored outputs (the tuning pass touched models only); tag **`v1.0-pipeline` = `8491bbe`**, pushed; `pipeline_tag` + `pipeline_git_sha` recorded in every shard root, sample meta and index row |
+| b. reproducibility | four dev shards regenerated from the tagged tree (S shards 0 synthetic / 18 real, M shards 0 / 8; 2.3–3.7 h each): **M 0, M 8 and S 0 are bitwise identical in every dataset** (1 239 / 1 440 / 3 107 datasets; only timing, host and provenance attributes differ). **S 18 is not**: 392 of 3 354 datasets differ in the last bits (max relative difference 1.2e-9; Reff, voltages, pair maps) with matching residual-level stats — it is the one shard whose dev solve ran on a different CPU node (Gold 6226 vs the node used for the other three), i.e. CHOLMOD/BLAS results are bitwise reproducible on identical hardware and agree to ~1e-9 relative across the cluster node types. Per the rule, and independently because the C2 land-cover rule changed the real S tiles, **the dev subset is regenerated as part of v1.0 rather than reused**; the datasheet states reproducibility as bitwise on identical hardware, ≤ 1e-9 relative across CPU types |
+| c. v1.0 real tiles | `data/tiles/v1.0`: **S 8 000 / M 4 000 / L 1 600 / XL 320 / XXL 32 + 6 strict** accepted (71 / 36 / 10 / 5 / 1 rejected, prefix mode, lists extended by 5 % with the prefix verified identical), 6.5 h of Slurm extraction with the new decimated reader (XXL 7.6 min per tile). Strata: 166 biome × realm × gHM-tercile strata at S (median 66 tiles); **short of the plan's floor of 150 S tiles per biome: Mangroves 128 (an OOD-only biome) and RESOLVE "N/A" polygons 28** (28 S / 14 M / 14 L / 1 XL tiles carry biome "N/A"; flagged, kept). Every other biome ≥ 244 at S; realms Palearctic 1 936 … Oceania 15. Resistance rasters (5 per tile) being built (job 5786761) |
+| d. Hub | `Xirro/AmpScape` is **public** with the in-progress notice at the top of the card; the 39 dev-era files (mini shards, index, splits, stats, croissant) were removed first — the repo holds only README and .gitattributes until the first S shards land |
+| e. streaming sync | `sync_shards.py --live`: validate → split by task group → upload → verify Hub sha256 → `.uploaded` → delete final + staged files, index rows/markers/quicklooks kept; `--publish-index` re-publishes `index/<tier>.parquet` + split lists; a shard failing verification twice gets `.upload_failed` and the loop stops; `generate.py submit` refuses above **200 GB** under `data/` (`limits.scratch_pause_gb`) |
+| f. runbook | `docs/generation_runbook.md`: order S → M → L → XL → XXL, shard sizes for ≈ 3.2 h shards (S 200, M 100, L 20, XL 6 @ 4 cpus, XXL 1 @ 8 cpus), arrays ≤ 400 tasks under the 512-core cap, ≈ 11 300 core-hours incl. overhead, ≈ 840 GB streamed; resume procedure; `scripts/generation_log.py` appends the daily summary to `docs/status/generation_log.md`; stop rule (QC fail > 1 % in a tier or a shard failing upload twice) |
+
+Also done from the same message:
+- Decisions 1, 2, 4 and the generation decision recorded (`DECISIONS.md`); XXL / `test_ood_scale` disclosure in the task spec and the card; `test_ood_scale_strict` = 6 XXL tiles sampled inside test_id cells only (3 cells qualify) with a geometric zero-overlap check at finalize.
+- **Tuning pass (2.69 GPU-h, 16 runs, `docs/tables/tuning_dev.md`)**: FNO recovers on T1 with 64 modes + the distance-to-source channel (rel-L2 1.14 → 0.34); the GNN improves with a 4×-coarsened graph level + distance (1.04 → 0.69) but stays behind the U-Net; the wide U-Net and patch-2 ViT are within single-seed noise; the distance channel does not help the convolutional models. **Frozen official configs** (`ampscape.models.OFFICIAL`): U-Net base, FNO m64+dist, ViT base, GNN multi-scale+dist. Cumulative GPU use this phase 4.5 h of the 20-h gate. GPU request noted at 1 000 GPU-h in `docs/tables/gpu_budget.md`.
+- Found and fixed on the way: the macro-cell split depended on which cells held tiles (now frozen for the whole grid, `configs/splits/cell_assignment_v1.json`, 70 land cells 56/7/7); the tile reader read full-resolution windows (XXL impossible) — now decimated from COG overviews with the C2 rules and per-channel provenance; DEM gaps counted over land only; per-tier tile manifests for concurrent extraction.
+- Consequence for the dev subset: S land cover now follows the C2 majority rule (was nearest), so the **real** half of dev is not bitwise reproducible and is regenerated as part of v1.0 (owner's fallback); the synthetic half is.
+
+Tests: 129 passing. Next on approval: `plan_v1.py --tier S --n 100000 --out data/v1/S --shard-size 200`, prepare, submit in two arrays (400 + 100), start `sync_loop.sh`; report when the first 10 % of S shards are validated and on the Hub; Phase 11 starts once S is running.
+
+---
+
+# Status — 2026-09-16 (tier S generation running; quota incident fixed)
+
+- **Tier S**: 500 / 500 shards solved, finalized and validated (QC fail 0.000 %); **153 uploaded and verified** on the public
+  `Xirro/AmpScape` at 16:46Z (50th shard at 16:00Z), 347 finals waiting; upload rate ≈ 125 shards/h after the fix
+  (one Hub commit per shard) → S fully on the Hub in ≈ 3 h. Core-hours used: 1 686 (solves + prepare + finalize +
+  re-finalize). GB on Hub (`data/S/`): 30.4. Scratch: 199 GB of 300 (was 300/300).
+- **Incident**: all 500 S shards ran at once; finalize ran in a separate array; the sync deleted only the final after
+  upload, so raw intermediates (≈ 245 MB/shard) + finals (≈ 130 MB/shard) filled the 300 GB quota at 11:26Z; the split
+  of shard 12 was truncated and retried every 15 min; 149 finals written after that point were truncated too.
+- **Fixes (owner items 1–5)**: partial staging files removed; 83.6 GB of raw inputs/outputs of validated shards deleted,
+  the 149 truncated finals deleted and re-finalized from their intact outputs (10 Slurm tasks, 0 QC failures);
+  sync rewritten (per-shard temporary split always removed, one commit per shard, sha256 verified per file, attempt
+  counter with `.upload_failed` after two consecutive failures, unreadable finals marked `.invalid` and skipped);
+  finalize deletes raw intermediates after a validated write (inside the array task for all further tiers);
+  generation log fixed (solved count from finals/markers, GB on Hub from the Hub listing, concurrent-deletion safe);
+  scratch budget and wave sizes in `docs/generation_runbook.md` §5 (M: waves of 80 shards, submit the next wave only
+  when the upload backlog is below one wave and `data/` < 200 GB).
+- Next: M is **not** submitted until the S backlog is uploaded (rule 2); Phase 11 (docs, notebooks, CI, datasheet) starts now.
+
+---
+
+# Status — 2026-09-16 evening (tier S repair, autonomous driver armed, Phase 11 delivered)
+
+- **Tier S**: two incidents (scratch quota; partial-finalize race that shipped 72 shards with 178–199 of 200 samples,
+  shard 104 with 5) — both recorded in `docs/status/generation_log.md`. Fixes: one Hub commit per shard with per-shard
+  temporary staging, sample-count validation against the manifest (sync and finalize), finalize refuses partially
+  solved shards and deletes intermediates on success, two-failure stop rule. The 72 shards were re-prepared and are being
+  re-solved (array 5834442, ≈ 3 h), then re-finalized and re-uploaded in place; the other 428 shards are on the Hub.
+- **Autonomous driver** (`scripts/slurm/v1/generation_driver.py`, detached) waits for S to be complete, then runs
+  M → L → XL → XXL in waves per the runbook §5, reports at tier boundaries (`logs/tier_boundary_<tier>.txt`), and stops on
+  the stop rule / scratch > 250 GB / a dead sync supervisor (`logs/ALERT.txt`).
+- **Phase 11** delivered (`docs/phase_11_report.md`): README, generation guide, contributing guide, notebooks 01–05, CI
+  workflow (lint, offline tests, Julia tests, 5-sample smoke), connectivity test; tree ruff-formatted; 130 tests passing.
+- Scratch 172 GB of 300; GB on Hub (data/S) ≈ 60; core-hours ≈ 1 700 + 220 for the repair.
+
+---
+
+# Status — 2026-09-17 (tier S complete and audited; driver running M)
+
+- **Tier S complete**: 500 / 500 shards (100 000 landscapes, 522 629 configuration rows) validated with the full integrity check
+  (planned sample ids and configurations, manifest count, Hub sha256) and on the public `Xirro/AmpScape`; **full audit clean**
+  (500 shards, 2 500 Hub files, 0 discrepancies); the 72 repaired shards replaced their Hub copies (same paths, new checksums,
+  72 / 72 confirmed). QC fail rate 0.000 %. Core-hours 2 061 (incl. the repairs). GB on Hub (`data/S/`) 142. Upload rate
+  after the sync fix ≈ 125 shards/h.
+- Incidents (a) quota, (b) partial finalize, (c) double submission — all in `docs/status/generation_log.md`, each with its
+  structural fix (one-commit uploads + intermediate cleanup; solver completion marker + full-integrity validation;
+  submit guard against queued/running tasks). The published index carries `skipped_configs` with reasons per sample.
+- **Driver restarted**: M → L → XL → XXL in waves per the runbook, with a full audit required at every tier boundary.
+- Phase 11 delivered; CI green.
+
+---
+
+# Status — 2026-09-19 (tiers S and M complete and audited; L running; addendum WP1/WP2 in progress)
+
+- **Tier M complete**: 500 / 500 shards (50 000 landscapes) validated, uploaded and **audited clean** (full Hub-vs-plan audit
+  gate in the driver); QC fail rate 0.002 % (one contrast-10⁶ configuration at the residual threshold); 251.5 GB on the Hub
+  for M (394 GB total with S). One shard (434) needed a re-finalize after a write race between two finalize jobs; the driver
+  now alerts on `.invalid` shards and re-finalizes solved-but-unfinalized shards itself.
+- **Tier L started** (1 000 shards of 20, waves of 100, prepare-ahead one wave). Generation core-hours so far ≈ 3 850.
+- **Addendum**: WP3 done; WP5 analysis done (probe design + ≈ 60 CPU-h estimate awaiting confirmation); WP1 part 1 done and the
+  owner decision implemented (block-1 reference = official T4 surface at M/L, `--t4-reference` in the harness, tail flag,
+  docs); the M reference is being grown to 1 000 samples (800 block-1 solves queued) and the three WP2 block-size builds
+  (block 3 without artefact correction, block 7 with/without) are queued on the same samples; the cluster changed the default QoS
+  (explicit `<qos-a>` now required — fixed in the profile after two silent submission failures).
+
+---
+
+# Status — 2026-09-19 (WP1 + WP2 delivered; L generating; supervisor incident closed)
+
+- **Addendum WP1 (`docs/addendum_WP1_report.md`)**: 1 000-sample block-1 reference at M (official T4 evaluation surface):
+  production block 3 deviates from exact by 0.029 rel-L2 mean (median 0.027), 4.7 % of samples above 5 % (11 % of
+  synthetic, 1.4 % of real), top-5 % IoU 0.93, pinch recall 0.93; per-sample index with the tail flag published under
+  `aux/t4_bs1_reference/M/` on the Hub; `evaluate.py --t4-reference`.
+- **Addendum WP2 (`docs/addendum_WP2_report.md`, `docs/tables/t4_pareto_M.md`, `docs/figures/t4_pareto_M.png`)**: block-size
+  Pareto at M — the artefact correction is worth 4× in rel-L2 at no cost (block 3: 0.029 vs 0.111 without); block 7 with
+  correction 0.098 at 25 s; block-size error is nearly split-independent; `evaluate.py --t4-blocks` prints block rows beside
+  a model. L rows and learned-model rows pending (L production; GPU allocation). **Stopped for confirmation.**
+- **Generation**: S and M complete and audited; L wave 2 of 10 running (87 of 1 000 shards on the Hub), scratch 180 GB,
+  ≈ 5 100 core-hours. Incident (d): a session restart on another login node started duplicate supervisors; caught in
+  10 min, no double submission, cross-host leases added (`logs/lease_*.json`); the driver is being restarted under the
+  lease protocol; the S/M/L sync loops from the previous session keep running on `<login-node>`.
+
+---
+
+# Status — 2026-09-20 (L block-1 reference and L Pareto rows delivered; L final wave running)
+
+- **Addendum WP1 at L (`docs/addendum_WP1_report.md` §6)**: the 60-sample L block-1 reference is complete (20 synthetic +
+  40 real tiles over test_id / test_ood / ood_region). Production block 5 deviates from the exact map by 0.028 rel-L2 mean
+  (test_id 0.032, test_ood 0.020, ood_region 0.028; max 0.058), non-source 0.033, top-5 % IoU 0.93, pinch recall 0.94;
+  2 of 60 flagged above 5 % (both synthetic; no real tile). Block 1 at L costs 22× production (3.7 CPU-h per landscape,
+  ≈ 225 CPU-h in total). Index with `tail_gt5pct` and summary published on the Hub under `aux/t4_bs1_reference/L/`; it is
+  the L T4 evaluation surface (`evaluate.py --t4-reference aux/t4_bs1_reference/L_bs1`).
+- **Addendum WP2 at L (`docs/addendum_WP2_report.md`, `docs/tables/t4_pareto_L.md`, `docs/figures/t4_pareto_L.png`)**: block
+  3 / production 5 / 11 and 5-without-correction on the same 60 samples. Block 3 and block 5 are within 0.2–0.4 points of
+  rel-L2 of each other at 2.5–2.9× the cost; block 11 loses 4–6 points for a 3.6× saving; the artefact correction is worth
+  3–5× in rel-L2 at zero cost. The production block is the knee of the front at L as at M. Rows published under
+  `aux/t4_blocksize_baselines/L/` on the Hub.
+- **Tooling**: `aux_t4_blocks.py compare` looks a sample's inputs up across all inputs files (top-up re-chunking broke the
+  first full run), writes the tail flag itself, and skips unreadable Hub samples with a warning.
+- **Generation**: L 900 of 1 000 shards validated and on the Hub (QC fail 0.017 %), final wave 900–999 running since
+  18:43Z (9-h walltime), scratch 193 GB, ≈ 9 300 core-hours, no alert, driver (lease on gnr-1) and L sync loop (gnr-2)
+  alive. After the wave: driver audit gate → L tier-boundary report → XL planned and submitted automatically.
+- **Pending**: learned-model rows for the Pareto tables and the probe-set evaluation (GPU allocation); WP4/6/7.
+
+---
+
+# Status — 2026-09-21 (tier L complete and audited; XL held for a core-hour budget decision)
+
+## Tier L boundary
+
+| item | value |
+|---|---|
+| shards validated, uploaded, audited | 1 000 of 1 000 (20 000 landscapes, 105 949 index rows) |
+| full Hub-vs-plan audit | clean (0 discrepancies, 4 958 files: 4 000 T1/T1W/T3/T4 + 958 T1R) |
+| QC fail rate | 0.013 % |
+| GB on Hub | L 380.5 (S 142.2, M 251.5; total 774) |
+| upload window | 09-19 03:23Z → 09-21 01:12Z (45.8 h), ≈ 21 shards/h |
+| L core-hours (ampscape-L tasks) | 5 713 (runbook estimate 3 300; includes 569 in timed-out tasks and the idle second core of waves 1–4) |
+| core-hours since 09-15, all ampscape-* jobs | 10 273 (production 9 466 + approved aux work 805) |
+| scratch | 0 GB of L left locally; ≈ 190 GB total |
+
+L per-landscape solve time, measured on the 662 completed single-core tasks: median 4.48 h per 20-landscape shard
+(806 s per landscape), p99 5.26 h, max 5.48 h — the 9-h walltime held with no timeouts after the tail rule.
+
+The first L audit flagged 41 shards; all were one false positive (the audit demanded a `T1R` file for shards whose every
+`regions` sample was legitimately skipped — generation log (g2)); fixed in `audit_tier.py`, re-audit clean, no data
+changed. The `regions` skip rate is ≈ 50 % of the planned samples at both M and L (labelled in `skipped_configs`).
+
+## XL held — the budget cannot cover XL + XXL as planned (owner decision needed)
+
+The runbook's per-tier table (§1) counted XL and XXL in *single-core* hours (2 150 + 1 200) while the cluster profile
+allocates 4 cpus per XL task and 8 per XXL task for memory (`configs/cluster/local.yaml`); Slurm accounting charges the
+allocated cpus, so the table under-counted those tiers by 4× and 8×. With 10 273 core-hours used, 2 727 remain of the
+13 000 budget.
+
+Estimates from the measured L time (806 s per landscape, single core) scaled by the Phase-5 T4 ratio (L→XL 3.3×,
+XL→XXL 5×):
+
+| option | XL (4 000) | XXL (400) | total run | vs 13 000 |
+|---|---|---|---|---|
+| A. profile as is (4 / 8 cpus, no speedup) | ≈ 12 000–15 600 | ≈ 9 400–12 400 | ≈ 32 000–38 000 | 2.5–3× over |
+| B. 1 cpu per task, memory-only allocation (`-c1 --mem 16G/20G`, allowed: no MaxMemPerCPU on <cpu-partition>) | ≈ 3 000–3 900 | ≈ 1 200–1 550 | ≈ 14 500–15 800 | +11–22 % |
+| C. B plus the brief's original counts (XL 2 000, XXL 200; prefix streams make this a clean prefix of the v1.0 design) | ≈ 1 500–2 000 | ≈ 600–800 | ≈ 12 400–13 100 | within budget |
+| D. multi-core allocation if CHOLMOD/BLAS speed-up is near-linear (unmeasured) | between A and B | | | |
+
+Walltimes at 1 cpu stay within the 10-h profile (XL 6 landscapes × ≈ 2 700–3 300 s × tail 1.8; XXL 1 landscape).
+The solver hands the allocated cores to BLAS/CHOLMOD (`solve_shard.sbatch`), so option D is possible only if the
+speed-up is measured. **Action taken:** the driver was stopped before any XL submission (planning ran as a Slurm job;
+the XL manifest exists). A 4-shard probe (2 shards at 1 cpu, 2 at 4 cpus, ≈ 60 core-h) measures the real XL
+per-landscape time and the thread speed-up so the decision rests on numbers; results in `docs/status/generation_log.md`
+when the probe finishes (≈ 6–8 h).
+
+**Recommendation:** option B (1 cpu everywhere, full counts): the walltimes hold, XL/XXL remain test-only tiers of the
+frozen design, and the overrun is 11–22 % of the budget (≈ 1 500–2 800 core-hours); if the probe shows a ≥ 2×
+speed-up at 4 cpus, use it for XXL only (the largest single solves), otherwise 1 cpu throughout.
+
+## Also delivered today
+WP1/WP2 at L (60-sample block-1 reference, block-size Pareto rows) — see the 2026-09-20 entry.
+
+---
+
+# Status — 2026-09-21 08:30Z (XL launched at 1 cpu, 300 concurrent; parallel uploaders; aux publication running)
+
+- **Owner decisions applied**: full counts, 30 000 core-hour gate, wall-clock optimisation, 4 parallel uploaders, waves
+  300 (after the approved clean-up: quicklooks deleted, task logs archived 12 GB → 0.4 GB, superseded pilot builds
+  removed; scratch 146 GB → settling to ≈ 95 GB).
+- **XL probe → 1 cpu per task**: per landscape 1 500–4 030 s at both 1 and 4 cpus (means ≈ 2 400 vs ≈ 2 500 s;
+  Omniscape/CHOLMOD 95 % of the time, no BLAS gain), so the ≥ 1.5× rule selects 1 cpu; XXL likewise 1 cpu (16 GB;
+  20 GB for test shards). Estimated cost XL ≈ 2 800, XXL ≈ 1 150 core-hours (total run ≈ 14 500).
+- **XL running**: wave 0–299 submitted 08:24Z (job 5882104), all 300 tasks running at once (cluster 418/1 384 cores
+  busy); 4 sync workers `XL_w0..3` under leases; XXL pre-planned (job 5882430) so the boundary loses no time.
+- **Completion estimate**: XL wave 2 ≈ 13–14Z, wave 3 (67 shards) ≈ 19Z, XL audited ≈ 2026-09-22 03Z; XXL (400 shards,
+  2 waves of ≈ 3–5 h) ≈ 2026-09-22 14–16Z. Upload rate after (4 workers) reported when wave 1 lands.
+- **Slip and fix**: `data/builds/published` (the 46-sample `test_ood_published` set, local-only) was deleted with the pilot
+  builds before its reference check was read; regenerated identically (ids verified, QC 100 %) and, per the new owner
+  rule, being published under `aux/test_ood_published/` together with every other scratch-only evaluation asset
+  (`aux/dev/{S,M}`, `aux/mini`, `aux/scale_probe/`, `aux/t4_bs1_reference/{M,L}` full builds,
+  `aux/t4_blocksize_baselines/{M,L}/*`, `aux/results/{predictions,runs_dev,runs_tune}`; ≈ 20 GB, `scripts/push_aux.py`,
+  sha256-verified, log `logs/push_aux.log`). **No further deletions without listing exact paths first.**
+- Not pushed (results of throwaway runs, listed for the owner): `runs/calib` (60 MB), `runs/smoke` (121 MB).
+
+---
+
+# Status — 2026-09-22 05:20Z (tier XL complete and audited; XXL starting; precision pass ready)
+
+## Tier XL boundary
+
+| item | value |
+|---|---|
+| shards validated, uploaded, audited | 667 of 667 (4 000 landscapes, 21 006 index rows) |
+| full Hub-vs-plan audit | clean (0 discrepancies, 3 132 files) |
+| QC fail rate | 0.033 % |
+| GB on Hub | XL 281.3 (S 142.2, M 251.5, L 380.5; total 1 056) |
+| upload window | 09-21 09:03Z → 09-22 04:08Z (19.1 h), 4 workers, peak hour 125 shards / 35 GB |
+| XL core-hours (1 cpu per task) | 3 684 (estimate 2 800; 4 OOM re-runs and the probe included) |
+| core-hours since 09-15, all ampscape-* jobs | 13 986 of the 30 000 gate |
+| wall-clock XL | 20 h 51 from first submission (08:24Z) to audited complete (05:15Z) |
+| scratch | 128 GB |
+
+Incidents: (h) four shards OUT_OF_MEMORY on the `regions` CG+AMG fallback (root cause `PosDefException` in
+Circuitscape's CHOLMOD path; profile 20 GB, automatic 48 GB re-runs) — no data lost; the fallback rows (47 at XL)
+are re-solved by the post-run precision pass. Rows for that pass at XL: 2 225 above 1e-9, 2 526 unmeasured (non-T4).
+
+## XXL
+400 shards (1 landscape each; all test splits; 240 regions configs) planned and prepared ahead; the driver picked them
+up at the boundary (`prepared_upto = 399`) and submits wave 0–299 at 1 cpu / 24 GB (test shards 28 GB), 10-h walltime,
+4 uploaders; ≈ 3–5 h per shard → XXL audited ≈ 2026-09-22 16–20Z.
+
+## Precision pass (owner 2026-09-21, two parts)
+Tooling validated end-to-end (`docs/post_run_resolve_plan.md` §7, runbook §8); starts after XXL, tier by tier.
+
+---
+
+# Status — 2026-09-22 15:30Z (v1.0 generation complete: all five tiers audited; precision pass started)
+
+## Tier XXL boundary and whole-run totals
+
+| item | XXL | whole run |
+|---|---|---|
+| shards validated, uploaded, audited | 400 of 400 (400 landscapes, 2 008 rows) | 3 067 shards, 174 400 landscapes |
+| audit | clean (1 708 files) | S, M, L, XL, XXL all clean |
+| QC fail rate | 0.45 % (9 rows: 7 `regions` residual_high, 1 T4, 1 T3 — all repaired by the precision pass) | S 0.000 %, M 0.002 %, L 0.013 %, XL 0.033 %, XXL 0.45 % |
+| GB on Hub (data/) | ≈ 100 | 1 155.8 |
+| core-hours | 1 228 (1 cpu; 7 OOM re-runs at 176 GB) | 15 218 of the 30 000 gate |
+| wall-clock | 06:18Z first upload → 15:24Z audited (10 h from submission) | S start 09-16 → 09-22 15:24Z |
+| scratch | — | 117 GB |
+
+Incident (i) resolved: Circuitscape's hard 1e-4 residual check aborted Omniscape maps and advanced solves on contrast-10⁶
+2048² landscapes in both solvers; AmpScapeSolve now rescues exactly those solves by refinement (bit-identical
+otherwise), validated on the failing landscape; the rows that failed before the change are repaired by the precision
+pass at XXL. Index defect fixed (shard names carried the `.part` staging suffix); all published indexes clean.
+
+## Precision pass (owner 2026-09-21) — started
+Tier S selected and submitted (rows above 1e-9, unmeasured T1/T1R rows, `cg+amg` rows, QC-failed rows; 125 Slurm
+tasks of 4 shards); then upload → full audit → M → L → XL → XXL; index republished once at the end.
+
+---
+
+# Status — 2026-09-23 20:45Z (precision pass complete on all tiers; v1.0 data ready for the tag)
+
+- **Precision pass done (owner 2026-09-21, parts 1 and 2):** 129 722 T1/T1W/T1R/T3 rows re-solved in place on the Hub
+  (S 68 008, M 37 639, L 18 691, XL 4 774, XXL 610) with reduced-system CHOLMOD + refinement; every such row now carries its
+  true residual (0 unmeasured rows left); 189 former `cg+amg` rows are now `cholmod` with `solver_original` kept; 3 861
+  rows sit at the double-precision floor above 1e-9 (recorded); **20 rows above 1e-6** (all synthetic at contrast
+  ≥ 10⁴) are flagged `residual_high`, `qc_pass = false`, and their samples are excluded from the split lists; the two
+  incident-(i) XXL rows are repaired. Per-tier table: `docs/tables/precision_pass.md`; datasheet section added.
+- **Audits:** S, M, L, XL, XXL all clean after the pass; indexes and split lists republished once (final).
+- **Cost:** ≈ 245 CPU-h of solves; generation + pass ≈ 15 500 core-hours of the 30 000 gate. Hub data ≈ 1.16 TB.
+- **Operational notes:** Hub commit limit (128/h) → batched uploads; cluster `MaxSubmitPU` now 50 → work-queue workers;
+  XL/XXL real-tile rows need 48–128 GB per worker; Circuitscape solve rescue installed at load time (precompile-safe).
+- **Next (owner):** v1.0 tag; WP4/WP6/WP7 and the learned baselines await the GPU allocation.
+
+---
+
+# Status — 2026-09-23 (v1.0 tagged; stopping — everything after this is GPU work)
+
+- Card finalised (in-progress notice removed; final counts, sizes, core-hours, incident and precision-pass summaries).
+- Croissant regenerated from the final indexes and validated with mlcroissant (30 distributions, 5 record sets, 0
+  errors); core subset 115.5 GB (3 705 files), mini 0.61 GB, full 1 157.4 GB; any tier or task group downloads alone
+  (verified: `data/XXL/T1R/*` alone, self-contained inputs + outputs).
+- Statistics figures and table: `docs/figures/dataset_stats_*.png`, `docs/tables/dataset_statistics.md` (contrast,
+  biome/realm, NoData fraction, solve-time distributions, per-tier storage); also under `aux/` on the Hub.
+- `docs/generation_postmortem.md`: timeline, all incidents with root causes and fixes, final cost (16 552 core-hours),
+  runbook changes for reproduction.
+- Tags: GitHub `v1.0`, Hub revision `v1.0`; `CITATION.cff` 1.0.0 (2026-09-23); recorded in DECISIONS.
