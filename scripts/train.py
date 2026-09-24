@@ -16,6 +16,7 @@ import argparse
 import csv
 import json
 import math
+import os
 import pathlib
 import subprocess
 import sys
@@ -441,7 +442,11 @@ def main():
             if (
                 not finished and a.pause_exit
             ):  # time budget hit: let the wrapper re-queue with --resume, no evaluation yet
-                (out / "paused.json").write_text(json.dumps({"epoch": ep, "gpu_h": cum}))
+                (out / "paused.json").write_text(
+                    json.dumps(
+                        {"epoch": ep, "gpu_h": cum, "job": os.environ.get("SLURM_JOB_ID", "")}
+                    )
+                )
                 print("PAUSED_FOR_RESUME", flush=True)
                 return
             (out / "paused.json").unlink(missing_ok=True)

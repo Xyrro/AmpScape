@@ -21,9 +21,15 @@ ARGS=(--model "$MODEL" --task "$TASK" --tier "$TIER" --root "$ROOT" --out "$OUT"
 [ -n "$MAXTRAIN" ] && ARGS+=(--max-train "$MAXTRAIN")
 [ -n "$EXTRA" ] && ARGS+=($EXTRA)
 python scripts/train.py "${ARGS[@]}" 2>&1 | grep -v Warning | tee -a "$OUT/train.log" | tail -40
-if [ -f "$OUT/paused.json" ] && [ ! -f "$OUT/done.json" ]; then
-  echo "paused at $(cat "$OUT/paused.json"); re-queueing with --resume"
-  sbatch --parsable -A coc -q coc-ice -p "${SLURM_JOB_PARTITION}" -N1 -n1 -c "${SLURM_CPUS_PER_TASK:-6}" --mem="${MEM:-48G}" \
+# re-queue only when THIS job paused on its time budget (paused.json carries the job id): a job that crashed (bad GPU,
+# missing file) must not re-queue itself — the driver re-submits it elsewhere. Cap: 40 re-queues per run.
+PJ=$(python -c "import json,sys; print(json.load(open('$OUT/paused.json')).get('job',''))" 2>/dev/null || echo "")
+NRQ=$(cat "$OUT/requeues.txt" 2>/dev/null || echo 0)
+EXCL=""; [ -s logs/gpu_bad_nodes.txt ] && EXCL="--exclude=$(tr '\n' ',' < logs/gpu_bad_nodes.txt | sed 's/,$//')"
+if [ -f "$OUT/paused.json" ] && [ ! -f "$OUT/done.json" ] && [ "$PJ" = "$SLURM_JOB_ID" ] && [ "$NRQ" -lt 40 ]; then
+  echo $((NRQ + 1)) > "$OUT/requeues.txt"
+  echo "paused at $(cat "$OUT/paused.json"); re-queueing with --resume (re-queue $((NRQ + 1)), $EXCL)"
+  sbatch --parsable $EXCL -A coc -q coc-ice -p "${SLURM_JOB_PARTITION}" -N1 -n1 -c "${SLURM_CPUS_PER_TASK:-6}" --mem="${MEM:-48G}" \
     --gres="${GRES:-gpu:1}" -t "${WALL:-16:00:00}" -J "$SLURM_JOB_NAME" -o "$OUT/slurm_%j.out" \
     --export=ALL,MODEL="$MODEL",TASK="$TASK",TIER="$TIER",SEED="$SEED",OUT="$OUT",ROOT="$ROOT",EPOCHS="$EPOCHS",BATCH="$BATCH",PATIENCE="$PATIENCE",WORKERS="$WORKERS",MAXTRAIN="$MAXTRAIN",EXTRA="$EXTRA",MEM="${MEM:-48G}",GRES="${GRES:-gpu:1}",WALL="${WALL:-16:00:00}" \
     scripts/slurm/gpu/train_full.sbatch
