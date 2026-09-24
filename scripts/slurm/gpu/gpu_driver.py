@@ -38,7 +38,8 @@ MAX_QUEUED_TOTAL = 45  # QoS MaxSubmitPU = 50
 SCRATCH_LIMIT_GB = (
     265.0  # total quota guard (300 GB): base ≈ 117 GB, so ≈ 150 GB of staged groups at most
 )
-LOOKAHEAD = 6  # pending jobs whose data is staged ahead
+LOOKAHEAD = 12  # pending jobs whose data is staged ahead
+EVICT_LOOKAHEAD = 12  # a staged group is evictable when none of the next N pending jobs (nor a running job) needs it
 GROUP_GB = {
     ("S", "T1"): 32,
     ("S", "T3"): 25,
@@ -356,7 +357,10 @@ def cycle(jobs: list[dict], st: dict) -> None:
         key = (j["tier"], GROUP[j["task"]])
         if key not in needed:
             needed.append(key)
-    need_set = {(jj["tier"], GROUP[jj["task"]]) for jj in pending}
+    # groups that may be evicted: not used by a running job and not needed by the next EVICT_LOOKAHEAD pending jobs
+    # (re-staging a group takes minutes at the measured 8–10 GB/min, so eviction is cheap)
+    running_jobs = [j for j in jobs if j["name"] in running]
+    need_set = {(jj["tier"], GROUP[jj["task"]]) for jj in running_jobs + pending[:EVICT_LOOKAHEAD]}
     for tier, group in needed:
         if staged(tier, group):
             if not stats_ready(tier):
@@ -386,7 +390,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 log(
                     f"scratch {quota_gb():.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {SCRATCH_LIMIT_GB:.0f} GB yet"
                 )
-                break  # keep the priority order: do not stage a later group before this one
+                continue  # a smaller group further down the list may fit; jobs keep their priority at submission
         stage(tier, group)
         if staged(tier, group) and not stats_ready(tier):
             submit_stats(tier, group, st)
