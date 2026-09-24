@@ -6,7 +6,7 @@
 |---|---|---|---|
 | T1 U-Net | 0.111 | 0.238 | 0.392 |
 | T1 FNO | 0.198 | 0.266 | 0.364 |
-| T1 ViT | 0.238 | 0.238 | 0.644 (structural, see DECISIONS) |
+| T1 ViT | 0.238 | 0.533 | 0.644 (structural, see DECISIONS) |
 | T4 U-Net | 0.040 | 0.051 | staging |
 | T4 FNO | 0.070 | 0.079 | staging |
 | T4 ViT | 0.071 | 0.099 | staging |
