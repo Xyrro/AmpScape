@@ -162,7 +162,7 @@ def main() -> None:
         ]
         axi.boxplot(
             data,
-            labels=[c.replace("wall_to_wall_", "w2w_") for c in CONFIG_ORDER],
+            tick_labels=[c.replace("wall_to_wall_", "w2w_") for c in CONFIG_ORDER],
             showfliers=False,
         )
         axi.set_title(f"tier {t}")
