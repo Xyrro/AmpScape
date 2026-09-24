@@ -119,7 +119,7 @@ def rebuild_rows(h5: pathlib.Path, shard: str, touched: set[tuple[str, str]]) ->
 
     from ampscape.solve.finalize import index_rows_from_final
 
-    df = index_rows_from_final(str(h5), shard)
+    df = index_rows_from_final(str(h5), f"{shard}.h5")  # same spelling as the production rows
     df = df[[(s, c) in touched for s, c in zip(df.sample_id, df.config)]].copy()
     orig, flags = [], []
     with h5py.File(h5, "r") as f:

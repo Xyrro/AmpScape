@@ -389,8 +389,14 @@ def publish_index(
     if not rows:
         return {"status": "no index rows"}
     idx = pd.concat([pd.read_parquet(p) for p in rows], ignore_index=True)
-    if "split" not in idx and (build / "index.parquet").exists():
-        idx = pd.read_parquet(build / "index.parquet")
+    # one spelling for the shard file name ("shard-00012.h5"); rows rebuilt by the precision pass carried the stem
+    idx["shard"] = (
+        idx.shard.astype(str)
+        .str.replace(".part", "", regex=False)
+        .map(lambda x: x if x.endswith(".h5") else x + ".h5")
+    )
+    # 2026-09-23: the per-shard rows are the source of truth (the precision pass updates them in place); the tier-level
+    # index.parquet is a derived copy and is refreshed here, never read back (it published stale rows once)
     if "split" not in idx:  # per-shard finalize rows carry no split: apply the v1.0 rule now
         from ampscape.splits.assign import add_splits
 
@@ -434,6 +440,7 @@ def publish_index(
     idx["subset_full"] = True
     (staging / "index").mkdir(parents=True, exist_ok=True)
     idx.to_parquet(staging / "index" / f"{tier}.parquet", index=False)
+    idx.to_parquet(build / "index.parquet", index=False)  # refreshed derived copy for local tools
     for sub in ("mini", "core", "full"):
         part = idx[idx[f"subset_{sub}"]]
         if not len(part):
