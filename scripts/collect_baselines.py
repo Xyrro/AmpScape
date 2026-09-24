@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import re
 
 KEYS = [
     "mae_log10eps",
@@ -26,6 +27,25 @@ GROUPS = [
     ("published_S_test_ood_published", "published S"),
     ("published_XXL_test_ood_published", "published XXL"),
 ]
+TIERS = ("S", "M", "L", "XL", "XXL")
+
+
+def parse_group(tag: str) -> tuple[str, str] | None:
+    """('tier', 'split') for an evaluation group key '<root>_<tier>_<split>' (root may contain no '_'; the full runs
+    use root 'hfcache'); published groups map to 'published <tier>'."""
+    for t, name in GROUPS:
+        if tag == t:
+            return (
+                "S" if name.startswith("published S") else "XXL" if "XXL" in name else "S",
+                name,
+            )
+    m = re.match(r"^[^_]+_(S|M|L|XL|XXL)_(test_id|test_ood|ood_region|train|val)$", tag)
+    if m:
+        return m.group(1), m.group(2)
+    m = re.match(r"^published_(S|M|L|XL|XXL)_test_ood_published$", tag)
+    if m:
+        return m.group(1), f"published {m.group(1)}"
+    return None
 
 
 def fmt(v):
@@ -37,6 +57,10 @@ def main():
     ap.add_argument("--runs", default="runs/dev")
     ap.add_argument("--coarsen", default="data/predictions/dev_coarsen4")
     ap.add_argument("--out", default="docs/tables/baselines_dev.md")
+    ap.add_argument(
+        "--title",
+        default="Learned baselines on the dev subset (tier S, single seed) vs the coarsen-×4 baseline",
+    )
     a = ap.parse_args()
     rows = []
     for d in sorted(pathlib.Path(a.runs).glob("*_T*")):
@@ -45,10 +69,11 @@ def main():
             continue
         r = json.loads(p.read_text())
         cfg = r["config"]
-        for tag, name in GROUPS:
-            e = r["eval"].get(tag)
-            if not e:
+        for tag, e in r["eval"].items():
+            parsed = parse_group(tag)
+            if not e or parsed is None:
                 continue
+            tier, name = parsed
             t = cfg["task"]
             m = e.get(t, {})
             sp = (m.get("speedup") or {}).get("speedup_median")
@@ -56,6 +81,7 @@ def main():
                 {
                     "model": d.name,
                     "task": t,
+                    "tier": tier,
                     "split": name,
                     "n": e.get("n_rows"),
                     **{k: m.get(k) for k in KEYS},
@@ -66,7 +92,7 @@ def main():
                 }
             )
     cz = pathlib.Path(a.coarsen)
-    for split in ("test_id", "test_ood", "ood_region"):
+    for split in ("test_id", "test_ood", "ood_region") if cz.exists() else []:
         p = cz / f"eval_{split}" / "results.json"
         if not p.exists():
             continue
@@ -77,6 +103,7 @@ def main():
             rows.append(
                 {
                     "model": "coarsen4 (non-learned)",
+                    "tier": "S",
                     "task": t,
                     "split": split,
                     "n": agg.get("mae_log10eps", {}).get("n"),
@@ -88,15 +115,24 @@ def main():
                 }
             )
     lines = [
-        "# Learned baselines on the dev subset (tier S, single seed) vs the coarsen-×4 baseline",
+        f"# {a.title}",
         "",
-        "| task | split | model | n | mae_log10eps | rel_l2 | top5_iou | pinch_recall | spearman | corridor_dice | ssim | speed-up (median) | params (M) | epochs | train GPU-h |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| task | tier | split | model | n | mae_log10eps | rel_l2 | top5_iou | pinch_recall | spearman | corridor_dice | ssim | speed-up (median) | params (M) | epochs | train GPU-h |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
-    order = {"test_id": 0, "test_ood": 1, "ood_region": 2, "published S": 3, "published XXL": 4}
-    for r in sorted(rows, key=lambda r: (r["task"], order[r["split"]], r["model"])):
+    order = {"test_id": 0, "test_ood": 1, "ood_region": 2, "train": 5, "val": 6}
+    torder = {t: i for i, t in enumerate(TIERS)}
+    for r in sorted(
+        rows,
+        key=lambda r: (
+            r["task"],
+            torder.get(r["tier"], 9),
+            order.get(r["split"], 3 if r["split"].startswith("published") else 8),
+            r["model"],
+        ),
+    ):
         lines.append(
-            f"| {r['task']} | {r['split']} | {r['model']} | {r['n']} | "
+            f"| {r['task']} | {r['tier']} | {r['split']} | {r['model']} | {r['n']} | "
             + " | ".join(fmt(r[k]) for k in KEYS)
             + f" | {fmt(r['speedup'])} | {fmt(r['params_M'])} | {r['epochs'] or '–'} | {fmt(r['gpu_h'])} |"
         )
