@@ -445,10 +445,14 @@ def cycle(jobs: list[dict], st: dict) -> None:
             if quota_gb() + size > SCRATCH_LIMIT_GB:
                 # mark the pinned groups (furthest next use first) that would free enough space as draining
                 need = quota_gb() + size - SCRATCH_LIMIT_GB
+                # small tiers first (their legs end within 2 h; an M/L group stays pinned for hours), then the
+                # group whose next pending use is furthest away
                 pinned = sorted(
-                    (first_use.get(g_, 10**6), g_) for g_ in running_groups if g_ != (tier, group)
+                    (TIERS.index(g_[0]), -first_use.get(g_, 10**6), g_)
+                    for g_ in running_groups
+                    if g_ != (tier, group)
                 )
-                for _, g_ in reversed(pinned):
+                for _, _, g_ in pinned:
                     if need <= 0:
                         break
                     draining.add(g_)
