@@ -35,7 +35,24 @@ MAX_GPU = (
     10  # concurrent jobs of ours on coc-gpu (56-GPU partition group cap shared with other users)
 )
 MAX_QUEUED_TOTAL = 45  # QoS MaxSubmitPU = 50
-SCRATCH_LIMIT_GB = 230.0  # total quota guard (300 GB)
+SCRATCH_LIMIT_GB = (
+    265.0  # total quota guard (300 GB): base ≈ 117 GB, so ≈ 150 GB of staged groups at most
+)
+LOOKAHEAD = 6  # pending jobs whose data is staged ahead
+GROUP_GB = {
+    ("S", "T1"): 32,
+    ("S", "T3"): 25,
+    ("S", "T4"): 30,
+    ("M", "T1"): 57,
+    ("M", "T3"): 43,
+    ("M", "T4"): 54,
+    ("L", "T1"): 84,
+    ("L", "T3"): 64,
+    ("L", "T4"): 82,
+    ("XL", "T1"): 61,
+    ("XL", "T3"): 47,
+    ("XL", "T4"): 61,
+}
 GRES = "gpu:l40s:1"
 PARTITION = "coc-gpu"
 WALL = "16:00:00"
@@ -332,36 +349,45 @@ def cycle(jobs: list[dict], st: dict) -> None:
     active = our_jobs()
     running = {n for n, s in active.items() if not n.startswith("stats-")}
     pending = [j for j in jobs if not done(j) and j["name"] not in running]
-    # staging: the first pending jobs' data, in priority order, subject to scratch
+    # staging: data of the next pending jobs, in priority order, only when the group fits under the quota guard
+    # (2026-09-24: an unguarded staging chain hit the 300 GB quota); groups no pending job needs are evicted first
     needed = []
-    for j in pending[: MAX_GPU * 2]:
+    for j in pending[:LOOKAHEAD]:
         key = (j["tier"], GROUP[j["task"]])
         if key not in needed:
             needed.append(key)
+    need_set = {(jj["tier"], GROUP[jj["task"]]) for jj in pending}
     for tier, group in needed:
-        if not staged(tier, group):
-            if quota_gb() > SCRATCH_LIMIT_GB - 90:
-                # evict staged groups no pending job needs
-                need_set = {(jj["tier"], GROUP[jj["task"]]) for jj in pending}
-                for p in sorted((CACHE / "staged").glob("*.json")):
-                    t_, g_ = p.stem.split("_", 1)
-                    if (t_, g_) not in need_set:
-                        subprocess.run(
-                            [
-                                sys.executable,
-                                "scripts/slurm/gpu/stage_data.py",
-                                "evict",
-                                "--tier",
-                                t_,
-                                "--group",
-                                g_,
-                            ]
-                        )
-                        log(f"evicted {t_}/{g_} (no pending job needs it)")
-                if quota_gb() > SCRATCH_LIMIT_GB - 90:
-                    log(f"scratch {quota_gb():.0f} GB: cannot stage {tier}/{group} yet")
-                    continue
-            stage(tier, group)
+        if staged(tier, group):
+            if not stats_ready(tier):
+                submit_stats(tier, group, st)
+            continue
+        size = GROUP_GB.get((tier, group), 60.0)
+        if quota_gb() + size > SCRATCH_LIMIT_GB:
+            for p in (
+                sorted((CACHE / "staged").glob("*.json")) if (CACHE / "staged").exists() else []
+            ):
+                t_, g_ = p.stem.split("_", 1)
+                if (t_, g_) not in need_set:
+                    subprocess.run(
+                        [
+                            sys.executable,
+                            "scripts/slurm/gpu/stage_data.py",
+                            "evict",
+                            "--tier",
+                            t_,
+                            "--group",
+                            g_,
+                        ],
+                        capture_output=True,
+                    )
+                    log(f"evicted {t_}/{g_} (no pending job needs it)")
+            if quota_gb() + size > SCRATCH_LIMIT_GB:
+                log(
+                    f"scratch {quota_gb():.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {SCRATCH_LIMIT_GB:.0f} GB yet"
+                )
+                break  # keep the priority order: do not stage a later group before this one
+        stage(tier, group)
         if staged(tier, group) and not stats_ready(tier):
             submit_stats(tier, group, st)
     # submission in priority order
