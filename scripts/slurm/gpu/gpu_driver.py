@@ -61,10 +61,10 @@ TIERS = ["S", "M", "L", "XL"]
 GROUP = {"T1": "T1", "T3": "T3", "T4": "T4"}
 # per-tier resources: (batch, cpus, mem)
 RES = {
-    "S": {"batch": 16, "cpus": 6, "mem": "48G"},
-    "M": {"batch": 8, "cpus": 6, "mem": "64G"},
-    "L": {"batch": 4, "cpus": 8, "mem": "96G"},
-    "XL": {"batch": 2, "cpus": 8, "mem": "128G"},
+    "S": {"batch": 16, "cpus": 6, "mem": "64G"},
+    "M": {"batch": 8, "cpus": 6, "mem": "96G"},
+    "L": {"batch": 4, "cpus": 8, "mem": "128G"},
+    "XL": {"batch": 2, "cpus": 8, "mem": "160G"},
 }
 GNN_BATCH = {"S": 8, "M": 4, "L": 1, "XL": 1}
 # GPU-hours per run from docs/tables/gpu_budget.md (30-epoch scenario, per seed)
@@ -260,8 +260,13 @@ def submit_stats(tier: str, group: str, st: dict) -> None:
 def submit(j: dict, st: dict) -> None:
     out = RUNS / j["name"]
     out.mkdir(parents=True, exist_ok=True)
-    res = RES[j["tier"]]
+    res = dict(RES[j["tier"]])
     batch = GNN_BATCH[j["tier"]] if j["model"] == "gnn" else res["batch"]
+    prev = st["submitted"].get(j["name"], {})
+    if prev.get(
+        "oom"
+    ):  # a previous attempt was killed for host memory: double it (node limit 191 GB)
+        res["mem"] = f"{min(int(res['mem'].rstrip('G')) * 2 ** prev['oom'], 180)}G"
     export = (
         f"ALL,MODEL={j['model']},TASK={j['task']},TIER={j['tier']},SEED={j['seed']},OUT={out},ROOT={CACHE},"
         f"EPOCHS={j.get('epochs', 30)},BATCH={batch},PATIENCE=8,WORKERS={res['cpus']},MAXTRAIN={j.get('maxtrain', '')},"
@@ -308,10 +313,31 @@ def submit(j: dict, st: dict) -> None:
             "at": now(),
             "tag": j["tag"],
             "est_h": est_hours(j),
+            "mem": res["mem"],
+            "oom": prev.get("oom", 0),
         }
         log(f"submitted {j['tag']} {j['name']} (est {est_hours(j):.1f} GPU-h): job {jid}")
     else:
         log(f"submit failed for {j['name']}: {jid[-200:]}")
+
+
+def note_oom(jobs: list[dict], st: dict) -> None:
+    """A run whose last Slurm job ended OUT_OF_MEMORY gets double host memory at its next submission."""
+    for j in jobs:
+        rec = st["submitted"].get(j["name"])
+        if not rec or rec.get("oom_checked") == rec["job"]:
+            continue
+        state = (
+            sh(["sacct", "-j", rec["job"], "-X", "-o", "State", "-P", "-n"]).strip().splitlines()
+        )
+        if not state or state[0].startswith(("RUNNING", "PENDING", "COMPLETING")):
+            continue
+        if state[0].startswith("OUT_OF_MEMORY"):
+            rec["oom"] = rec.get("oom", 0) + 1
+            log(
+                f"{j['name']}: job {rec['job']} OUT_OF_MEMORY at {rec.get('mem')} — next submission doubles host memory"
+            )
+        rec["oom_checked"] = rec["job"]
 
 
 def note_bad_nodes(jobs: list[dict]) -> None:
@@ -347,6 +373,7 @@ def alert(msg: str) -> None:
 
 def cycle(jobs: list[dict], st: dict) -> None:
     note_bad_nodes(jobs)
+    note_oom(jobs, st)
     active = our_jobs()
     running = {n for n, s in active.items() if not n.startswith("stats-")}
     pending = [j for j in jobs if not done(j) and j["name"] not in running]
