@@ -111,6 +111,31 @@ def build(layout: pathlib.Path, repo_id: str, version: str) -> dict:
                     "includes": f"data/{tier}/{grp}/*.h5",
                 }
             )
+    # nested download subsets (mini ⊂ lite ⊂ core ⊂ full), defined as shard prefixes per tier (see ampscape/io/sync.py)
+    from ampscape.io.sync import SUBSET_CORE_SHARDS, SUBSET_LITE_SHARDS
+
+    def shard_globs(tier: str, n: int) -> list[str]:
+        pats = [f"data/{tier}/*/shard-{k:04d}?.h5" for k in range(n // 10)]
+        if n % 10:
+            pats.append(f"data/{tier}/*/shard-{n // 10:04d}[0-{n % 10 - 1}].h5")
+        return pats
+
+    for name, spec, size in (
+        ("mini", {"S": 3}, "≈ 0.6 GB, 600 S landscapes"),
+        ("lite", SUBSET_LITE_SHARDS, "≈ 26 GB, 8 000 S + 2 400 M + 800 L landscapes"),
+        ("core", SUBSET_CORE_SHARDS, "≈ 115 GB, 20 000 S + 10 000 M + 5 000 L landscapes"),
+    ):
+        includes = [g for tier_, n in spec.items() for g in shard_globs(tier_, n)]
+        distribution.append(
+            {
+                "@type": "cr:FileSet",
+                "@id": f"subset-{name}",
+                "name": f"subset-{name}",
+                "description": f"Download subset `{name}` ({size}; all task groups; nested mini ⊂ lite ⊂ core ⊂ full; membership also in the index column `subset_{name}` and split lists under splits/{name}/)",
+                "encodingFormat": "application/x-hdf5",
+                "includes": includes,
+            }
+        )
     for f in sorted((layout / "index").glob("*.parquet")):
         distribution.append(
             {

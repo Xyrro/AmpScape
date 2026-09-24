@@ -42,8 +42,8 @@ per-pixel (block 1) Omniscape whose fidelity was measured (≈ 2–5 % relative 
 | XXL | 400 | 2,008 | 210 / 190 | 100.7 | 2 |
 | **total** | **174,400** | **920,372** | | **1157.4** | 25 |
 
-Subsets: `mini` (0.61 GB, the first 3 S shards), `core` (115.49 GB, 3,705 files: 20 000 S + 10 000 M + 5 000 L landscapes),
-`full` (1157.4 GB); auxiliary evaluation sets and results under `aux/` (20.5 GB, `aux/README.md`).
+Subsets (nested shard prefixes per tier; each also a Croissant FileSet, an index column `subset_<name>` and a split-list folder `splits/<name>/`): `mini` (0.6 GB, the first 3 S shards, 600 landscapes), `lite` (≈ 26 GB: 8 000 S + 2 400 M + 800 L landscapes, all tasks — added in 1.0.1 as metadata only), `core` (115.5 GB, 3 705 files: 20 000 S + 10 000 M + 5 000 L landscapes),
+`full` (1 157.4 GB). The prefix subsets are drawn from the synthetic stream, so real tiles and the `ood_region` split appear only in `full`. Auxiliary evaluation sets and results under `aux/` (20.5 GB, `aux/README.md`).
 Every tier and every task group is a self-contained set of HDF5 shards (`data/<tier>/<group>/shard-XXXXX.h5`, inputs
 included), so any tier or task group can be downloaded alone (`snapshot_download(allow_patterns="data/L/T4/*")`).
 The 25 rows failing QC after the precision pass (24 landscapes, all synthetic at contrast ≥ 10⁴) stay in the index
@@ -67,8 +67,8 @@ index column that briefly carried a staging file name. Every affected row was re
   downloaded alone. Schema: `docs/schema.md` in the code repository.
 - `index/<tier>.parquet` — one row per (sample, configuration): identifiers, family, generator or
   resistance table, tile, K, placement, solver, timings, residuals, QC flags, split, OOD flags,
-  subset membership (`subset_mini`, `subset_core`, `subset_full`).
-- `splits/<subset>/<split>.parquet` — sample ids; subsets are nested (mini ⊂ core ⊂ full).
+  subset membership (`subset_mini`, `subset_lite`, `subset_core`, `subset_full`).
+- `splits/<subset>/<split>.parquet` — sample ids; subsets are nested (mini ⊂ lite ⊂ core ⊂ full).
 - `stats/norm_stats.json` — train-only normalisation statistics.
 - `croissant.json` — Croissant 1.0 metadata (core + RAI fields).
 

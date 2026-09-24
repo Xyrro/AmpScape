@@ -29,7 +29,12 @@ SUBSET_CORE_SHARDS = {
     "S": 100,
     "M": 100,
     "L": 250,
-}  # core ≈ 20k S + 10k M + 5k L landscapes (≈ 50 GB)   # HF layout: any tier / task group downloadable alone
+}  # core ≈ 20k S + 10k M + 5k L landscapes (115 GB)   # HF layout: any tier / task group downloadable alone
+SUBSET_LITE_SHARDS = {
+    "S": 40,
+    "M": 24,
+    "L": 40,
+}  # lite (owner 2026-09-24, metadata-only 1.0.1): 8k S + 2.4k M + 0.8k L landscapes, all tasks, ≈ 26 GB; mini ⊂ lite ⊂ core
 
 
 def sha256(path: pathlib.Path) -> str:
@@ -436,12 +441,13 @@ def publish_index(
     # core = the first SUBSET_CORE_SHARDS[tier] shards of S/M/L; full = everything
     shard_no = idx.shard.str.extract(r"(\d+)")[0].astype(int)
     idx["subset_mini"] = (tier == "S") & (shard_no < 3)
-    idx["subset_core"] = idx["subset_mini"] | (shard_no < SUBSET_CORE_SHARDS.get(tier, 0))
+    idx["subset_lite"] = idx["subset_mini"] | (shard_no < SUBSET_LITE_SHARDS.get(tier, 0))
+    idx["subset_core"] = idx["subset_lite"] | (shard_no < SUBSET_CORE_SHARDS.get(tier, 0))
     idx["subset_full"] = True
     (staging / "index").mkdir(parents=True, exist_ok=True)
     idx.to_parquet(staging / "index" / f"{tier}.parquet", index=False)
     idx.to_parquet(build / "index.parquet", index=False)  # refreshed derived copy for local tools
-    for sub in ("mini", "core", "full"):
+    for sub in ("mini", "lite", "core", "full"):
         part = idx[idx[f"subset_{sub}"]]
         if not len(part):
             continue
