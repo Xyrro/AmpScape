@@ -392,10 +392,42 @@ def cycle(jobs: list[dict], st: dict) -> None:
         key = (j["tier"], GROUP[j["task"]])
         if key not in needed:
             needed.append(key)
-    # groups that may be evicted: not used by a running job and not needed by the next EVICT_LOOKAHEAD pending jobs
-    # (re-staging a group takes minutes at the measured 8–10 GB/min, so eviction is cheap)
+    # staging in strict priority order: the data of the highest-priority pending jobs comes first; when it does not fit,
+    # evict staged groups that no RUNNING job uses, those whose next pending use is furthest down the list first
+    # (re-staging a group takes ≈ 3 min at the measured 8–10 GB/min). 2026-09-24: the S groups were pinning 87 GB and
+    # blocking the headline M/L runs.
     running_jobs = [j for j in jobs if j["name"] in running]
-    need_set = {(jj["tier"], GROUP[jj["task"]]) for jj in running_jobs + pending[:EVICT_LOOKAHEAD]}
+    running_groups = {(jj["tier"], GROUP[jj["task"]]) for jj in running_jobs}
+    first_use = {}
+    for k, jj in enumerate(pending):
+        first_use.setdefault((jj["tier"], GROUP[jj["task"]]), k)
+
+    def evict_until(size: float) -> None:
+        cands = []
+        for p_ in sorted((CACHE / "staged").glob("*.json")) if (CACHE / "staged").exists() else []:
+            t_, g_ = p_.stem.split("_", 1)
+            if (t_, g_) in running_groups:
+                continue
+            cands.append((first_use.get((t_, g_), 10**6), t_, g_))
+        for _, t_, g_ in sorted(cands, reverse=True):
+            if quota_gb() + size <= SCRATCH_LIMIT_GB:
+                return
+            subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/slurm/gpu/stage_data.py",
+                    "evict",
+                    "--tier",
+                    t_,
+                    "--group",
+                    g_,
+                ],
+                capture_output=True,
+            )
+            log(
+                f"evicted {t_}/{g_} to make room (next use at pending position {first_use.get((t_, g_), 'none')})"
+            )
+
     for tier, group in needed:
         if staged(tier, group):
             if not stats_ready(tier):
@@ -403,29 +435,12 @@ def cycle(jobs: list[dict], st: dict) -> None:
             continue
         size = GROUP_GB.get((tier, group), 60.0)
         if quota_gb() + size > SCRATCH_LIMIT_GB:
-            for p in (
-                sorted((CACHE / "staged").glob("*.json")) if (CACHE / "staged").exists() else []
-            ):
-                t_, g_ = p.stem.split("_", 1)
-                if (t_, g_) not in need_set:
-                    subprocess.run(
-                        [
-                            sys.executable,
-                            "scripts/slurm/gpu/stage_data.py",
-                            "evict",
-                            "--tier",
-                            t_,
-                            "--group",
-                            g_,
-                        ],
-                        capture_output=True,
-                    )
-                    log(f"evicted {t_}/{g_} (no pending job needs it)")
+            evict_until(size)
             if quota_gb() + size > SCRATCH_LIMIT_GB:
                 log(
-                    f"scratch {quota_gb():.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {SCRATCH_LIMIT_GB:.0f} GB yet"
+                    f"scratch {quota_gb():.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {SCRATCH_LIMIT_GB:.0f} GB even after evictions"
                 )
-                continue  # a smaller group further down the list may fit; jobs keep their priority at submission
+                break  # strict priority: do not stage a later group before this one
         stage(tier, group)
         if staged(tier, group) and not stats_ready(tier):
             submit_stats(tier, group, st)
