@@ -415,7 +415,7 @@ def submit_t4_reference_backfill(jobs: list[dict], st: dict) -> None:
                 "-N1",
                 "-n1",
                 "-c4",
-                "--mem=32G",
+                "--mem=" + ("96G" if tier == "L" else "48G"),  # M used 33 GB at 32G (12:32Z)
                 "-t",
                 "04:00:00",
                 "-J",
