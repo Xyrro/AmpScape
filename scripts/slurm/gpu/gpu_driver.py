@@ -33,9 +33,7 @@ STATE = LOGS / "gpu_driver_state.json"
 
 MAX_GPU = 18  # concurrent jobs of ours on coc-gpu (16 healthy L40S + A100 spill-over; 1 920 GPU-run-minutes per user)
 MAX_QUEUED_TOTAL = 45  # QoS MaxSubmitPU = 50
-SCRATCH_LIMIT_GB = (
-    265.0  # total quota guard (300 GB): base ≈ 117 GB, so ≈ 150 GB of staged groups at most
-)
+SCRATCH_LIMIT_GB = 275.0  # 2026-09-24 09:50Z: 265 → 275 (offloader every 10 min keeps runs/full small; quota 300). total quota guard (300 GB): base ≈ 117 GB, so ≈ 150 GB of staged groups at most
 LOOKAHEAD = 12  # pending jobs whose data is staged ahead
 EVICT_LOOKAHEAD = 12  # a staged group is evictable when none of the next N pending jobs (nor a running job) needs it
 GROUP_GB = {
