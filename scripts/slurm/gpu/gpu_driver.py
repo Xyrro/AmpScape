@@ -411,11 +411,13 @@ def cycle(jobs: list[dict], st: dict) -> None:
     ]  # GB evicted this cycle: pace-quota lags a few minutes behind deletions (09:59Z: read 271 after
     # evicting 30 GB), so the fit test uses quota_gb() - freed
 
-    def evict_until(size: float) -> None:
+    def evict_until(size: float, target_use: int) -> None:
+        # never evict a group whose next pending use comes before the target's (10:18Z: the driver staged M/T4 and
+        # evicted it seconds later to make room for L/T1)
         cands = []
         for p_ in sorted((CACHE / "staged").glob("*.json")) if (CACHE / "staged").exists() else []:
             t_, g_ = p_.stem.split("_", 1)
-            if (t_, g_) in running_groups:
+            if (t_, g_) in running_groups or first_use.get((t_, g_), 10**6) <= target_use:
                 continue
             cands.append((first_use.get((t_, g_), 10**6), t_, g_))
         for _, t_, g_ in sorted(cands, reverse=True):
@@ -445,7 +447,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
             continue
         size = GROUP_GB.get((tier, group), 60.0)
         if quota_gb() - freed[0] + size > SCRATCH_LIMIT_GB:
-            evict_until(size)
+            evict_until(size, first_use.get((tier, group), 10**6))
             if quota_gb() - freed[0] + size > SCRATCH_LIMIT_GB:
                 # mark the pinned groups (furthest next use first) that would free enough space as draining
                 need = quota_gb() - freed[0] + size - SCRATCH_LIMIT_GB
@@ -466,6 +468,8 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 )
                 break  # strict priority: do not stage a later group before this one
         stage(tier, group)
+        if staged(tier, group):
+            freed[0] -= size
         if staged(tier, group) and not stats_ready(tier):
             submit_stats(tier, group, st)
     # submission in priority order
