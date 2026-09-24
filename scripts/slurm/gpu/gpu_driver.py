@@ -114,25 +114,27 @@ def plan() -> list[dict]:
             }
         )
 
-    for model in ("unet", "fno"):  # P1: headline, seed 1
-        for task in ("T1", "T4"):
-            for tier in TIERS:
+    # tier-major inside a priority (docs/phase10_full_schedule.md §2): the small tiers report first and the staged
+    # groups are used up tier by tier — model-major order made the driver wait for L/T1 while M/T4 was still pending
+    for tier in TIERS:  # P1: headline, seed 1
+        for model in ("unet", "fno"):
+            for task in ("T1", "T4"):
                 add(model, task, tier, 1, "P1")
-    for model, task in (("unet", "T3"), ("fno", "T3"), ("vit", "T1"), ("vit", "T4")):  # P2
-        for tier in TIERS:
+    for tier in TIERS:  # P2
+        for model, task in (("unet", "T3"), ("fno", "T3"), ("vit", "T1"), ("vit", "T4")):
             add(model, task, tier, 1, "P2")
-    for seed in (2, 3):  # P3
-        for model, task in (
-            ("unet", "T1"),
-            ("unet", "T4"),
-            ("fno", "T1"),
-            ("fno", "T4"),
-            ("unet", "T3"),
-            ("fno", "T3"),
-            ("vit", "T1"),
-            ("vit", "T4"),
-        ):
-            for tier in TIERS:
+    for tier in TIERS:  # P3: seeds 2 and 3, tier-major
+        for seed in (2, 3):
+            for model, task in (
+                ("unet", "T1"),
+                ("unet", "T4"),
+                ("fno", "T1"),
+                ("fno", "T4"),
+                ("unet", "T3"),
+                ("fno", "T3"),
+                ("vit", "T1"),
+                ("vit", "T4"),
+            ):
                 add(model, task, tier, seed, "P3")
     # WP4: data-scaling ablation at S, U-Net and FNO on T1, seed 1, fixed-epoch (30) and fixed-step (30 epochs of the
     # full set ≈ 118k steps at batch 16) variants; the full-size run is the P1 job itself
