@@ -31,9 +31,7 @@ CACHE = ROOT / "data" / "hfcache"
 RUNS = ROOT / "runs" / "full"
 STATE = LOGS / "gpu_driver_state.json"
 
-MAX_GPU = (
-    10  # concurrent jobs of ours on coc-gpu (56-GPU partition group cap shared with other users)
-)
+MAX_GPU = 18  # concurrent jobs of ours on coc-gpu (16 healthy L40S + A100 spill-over; 1 920 GPU-run-minutes per user)
 MAX_QUEUED_TOTAL = 45  # QoS MaxSubmitPU = 50
 SCRATCH_LIMIT_GB = (
     265.0  # total quota guard (300 GB): base ≈ 117 GB, so ≈ 150 GB of staged groups at most
@@ -55,8 +53,10 @@ GROUP_GB = {
     ("XL", "T4"): 61,
 }
 GRES = "gpu:l40s:1"
+GRES_ALT = "gpu:a100:1"  # used when ≥ ALT_AFTER of our jobs are already pending on L40S
+ALT_AFTER = 4
 PARTITION = "coc-gpu"
-WALL = "16:00:00"
+WALL = "02:00:00"  # 2026-09-24: QoS MaxTRESRunMinsPU gres/gpu=1920 → short jobs + self re-queue give ≈ 16 concurrent GPUs
 TIERS = ["S", "M", "L", "XL"]
 GROUP = {"T1": "T1", "T3": "T3", "T4": "T4"}
 # per-tier resources: (batch, cpus, mem)
@@ -267,10 +267,12 @@ def submit(j: dict, st: dict) -> None:
         "oom"
     ):  # a previous attempt was killed for host memory: double it (node limit 191 GB)
         res["mem"] = f"{min(int(res['mem'].rstrip('G')) * 2 ** prev['oom'], 180)}G"
+    n_pd = sum(1 for n_, s_ in our_jobs().items() if s_ == "PD" and not n_.startswith("stats-"))
+    gres = GRES_ALT if n_pd >= ALT_AFTER else GRES
     export = (
         f"ALL,MODEL={j['model']},TASK={j['task']},TIER={j['tier']},SEED={j['seed']},OUT={out},ROOT={CACHE},"
         f"EPOCHS={j.get('epochs', 30)},BATCH={batch},PATIENCE=8,WORKERS={res['cpus']},MAXTRAIN={j.get('maxtrain', '')},"
-        f"EXTRA=,MEM={res['mem']},GRES={GRES},WALL={WALL}"
+        f"EXTRA=,MEM={res['mem']},GRES={gres},WALL={WALL}"
     )
     bad = (
         LOGS / "gpu_bad_nodes.txt"
@@ -295,7 +297,7 @@ def submit(j: dict, st: dict) -> None:
             "-n1",
             f"-c{res['cpus']}",
             f"--mem={res['mem']}",
-            f"--gres={GRES}",
+            f"--gres={gres}",
             "-t",
             WALL,
             "-J",

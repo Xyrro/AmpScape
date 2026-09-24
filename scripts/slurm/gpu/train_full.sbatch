@@ -12,9 +12,9 @@ ROOT=${ROOT:-data/hfcache}; EPOCHS=${EPOCHS:-30}; BATCH=${BATCH:-16}; PATIENCE=$
 MAXTRAIN=${MAXTRAIN:-}; EXTRA=${EXTRA:-}
 mkdir -p "$OUT"
 echo "host=$(hostname) gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1) model=$MODEL task=$TASK tier=$TIER seed=$SEED start=$(date -u +%FT%TZ) job=$SLURM_JOB_ID"
-# leave 45 min of the walltime for checkpointing + evaluation; the walltime is in $SLURM_JOB_END_TIME
-if [ -n "${SLURM_JOB_END_TIME:-}" ]; then BUDGET=$(( ( SLURM_JOB_END_TIME - $(date +%s) ) / 60 - 45 )); else BUDGET=${BUDGET_MIN:-900}; fi
-[ "$BUDGET" -lt 30 ] && BUDGET=30
+# leave 15 min of the walltime for the checkpoint + (on the final leg) evaluation; the walltime is in $SLURM_JOB_END_TIME
+if [ -n "${SLURM_JOB_END_TIME:-}" ]; then BUDGET=$(( ( SLURM_JOB_END_TIME - $(date +%s) ) / 60 - 15 )); else BUDGET=${BUDGET_MIN:-100}; fi
+[ "$BUDGET" -lt 20 ] && BUDGET=20
 ARGS=(--model "$MODEL" --task "$TASK" --tier "$TIER" --root "$ROOT" --out "$OUT" --seed "$SEED" --epochs "$EPOCHS" --batch "$BATCH" \
       --patience "$PATIENCE" --workers "$WORKERS" --time-budget-min "$BUDGET" --resume --pause-exit \
       --eval-splits test_id,test_ood,ood_region --published-root data/builds/published --published-tiers "$TIER")
@@ -22,11 +22,11 @@ ARGS=(--model "$MODEL" --task "$TASK" --tier "$TIER" --root "$ROOT" --out "$OUT"
 [ -n "$EXTRA" ] && ARGS+=($EXTRA)
 python scripts/train.py "${ARGS[@]}" 2>&1 | grep -v Warning | tee -a "$OUT/train.log" | tail -40
 # re-queue only when THIS job paused on its time budget (paused.json carries the job id): a job that crashed (bad GPU,
-# missing file) must not re-queue itself — the driver re-submits it elsewhere. Cap: 40 re-queues per run.
+# missing file) must not re-queue itself — the driver re-submits it elsewhere. Cap: 120 re-queues per run (2-h legs).
 PJ=$(python -c "import json,sys; print(json.load(open('$OUT/paused.json')).get('job',''))" 2>/dev/null || echo "")
 NRQ=$(cat "$OUT/requeues.txt" 2>/dev/null || echo 0)
 EXCL=""; [ -s logs/gpu_bad_nodes.txt ] && EXCL="--exclude=$(tr '\n' ',' < logs/gpu_bad_nodes.txt | sed 's/,$//')"
-if [ -f "$OUT/paused.json" ] && [ ! -f "$OUT/done.json" ] && [ "$PJ" = "$SLURM_JOB_ID" ] && [ "$NRQ" -lt 40 ]; then
+if [ -f "$OUT/paused.json" ] && [ ! -f "$OUT/done.json" ] && [ "$PJ" = "$SLURM_JOB_ID" ] && [ "$NRQ" -lt 120 ]; then
   echo $((NRQ + 1)) > "$OUT/requeues.txt"
   echo "paused at $(cat "$OUT/paused.json"); re-queueing with --resume (re-queue $((NRQ + 1)), $EXCL)"
   sbatch --parsable $EXCL -A coc -q coc-ice -p "${SLURM_JOB_PARTITION}" -N1 -n1 -c "${SLURM_CPUS_PER_TASK:-6}" --mem="${MEM:-48G}" \
