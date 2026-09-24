@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.1] — 2026-09-24 (metadata only; the v1.0 data revision is unchanged)
+
+- Nested download subset `lite` (S shards 0–39, M 0–23, L 0–39: 8 000 + 2 400 + 800 landscapes, all tasks, ≈ 26 GB;
+  mini ⊂ lite ⊂ core ⊂ full) as index column `subset_lite`, split lists `splits/lite/`, Croissant FileSet
+  `subset-lite` (mini and core also gained FileSets); indexes and Croissant republished; card and loader docs updated.
+
 ## [1.0.0] — 2026-09-23
 
 v1.0 data release: 174 400 landscapes / 902 904 rows / 1 157 GB on `Xirro/AmpScape` (revision `v1.0`), five audited tiers,

@@ -32,7 +32,7 @@ julia --project=julia/AmpScapeSolve.jl -e 'using Pkg; Pkg.instantiate()'
 
 ```python
 from ampscape.data import load_from_hub
-ds = load_from_hub("T1", "S", split="train", subset="mini")   # ≈ 0.4 GB: 3 shards, all tasks
+ds = load_from_hub("T1", "S", split="train", subset="mini")   # ≈ 0.6 GB: 3 shards, all tasks; subset="lite" ≈ 26 GB (S+M+L), "core" ≈ 115 GB, "full" ≈ 1.16 TB
 x = ds[0]                                                      # dict of numpy arrays + metadata
 print(x["resistance"].shape, x["cum_current"].shape, x["meta"]["generator"])
 ```
