@@ -406,6 +406,11 @@ def cycle(jobs: list[dict], st: dict) -> None:
     # legs finish; otherwise the P3 S seeds kept the S groups pinned indefinitely (2026-09-24 08:20Z).
     draining: set[tuple[str, str]] = set()
 
+    freed = [
+        0.0
+    ]  # GB evicted this cycle: pace-quota lags a few minutes behind deletions (09:59Z: read 271 after
+    # evicting 30 GB), so the fit test uses quota_gb() - freed
+
     def evict_until(size: float) -> None:
         cands = []
         for p_ in sorted((CACHE / "staged").glob("*.json")) if (CACHE / "staged").exists() else []:
@@ -414,7 +419,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 continue
             cands.append((first_use.get((t_, g_), 10**6), t_, g_))
         for _, t_, g_ in sorted(cands, reverse=True):
-            if quota_gb() + size <= SCRATCH_LIMIT_GB:
+            if quota_gb() - freed[0] + size <= SCRATCH_LIMIT_GB:
                 return
             subprocess.run(
                 [
@@ -428,6 +433,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 ],
                 capture_output=True,
             )
+            freed[0] += GROUP_GB.get((t_, g_), 60.0)
             log(
                 f"evicted {t_}/{g_} to make room (next use at pending position {first_use.get((t_, g_), 'none')})"
             )
@@ -438,11 +444,11 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 submit_stats(tier, group, st)
             continue
         size = GROUP_GB.get((tier, group), 60.0)
-        if quota_gb() + size > SCRATCH_LIMIT_GB:
+        if quota_gb() - freed[0] + size > SCRATCH_LIMIT_GB:
             evict_until(size)
-            if quota_gb() + size > SCRATCH_LIMIT_GB:
+            if quota_gb() - freed[0] + size > SCRATCH_LIMIT_GB:
                 # mark the pinned groups (furthest next use first) that would free enough space as draining
-                need = quota_gb() + size - SCRATCH_LIMIT_GB
+                need = quota_gb() - freed[0] + size - SCRATCH_LIMIT_GB
                 # small tiers first (their legs end within 2 h; an M/L group stays pinned for hours), then the
                 # group whose next pending use is furthest away
                 pinned = sorted(
@@ -456,7 +462,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
                     draining.add(g_)
                     need -= GROUP_GB.get(g_, 60.0)
                 log(
-                    f"scratch {quota_gb():.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {SCRATCH_LIMIT_GB:.0f} GB even after evictions; draining {sorted(draining)}"
+                    f"scratch {quota_gb() - freed[0]:.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {SCRATCH_LIMIT_GB:.0f} GB even after evictions; draining {sorted(draining)}"
                 )
                 break  # strict priority: do not stage a later group before this one
         stage(tier, group)
