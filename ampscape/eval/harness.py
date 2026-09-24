@@ -48,8 +48,11 @@ def _mask(nodata: np.ndarray, focal: np.ndarray | None, kind: str) -> np.ndarray
     return m
 
 
-def load_t4_reference(ref_dir: str | pathlib.Path | None) -> dict[str, np.ndarray]:
-    """{sample_id: block-1 cum_current} from an aux block-1 reference build (docs/t4_fidelity.md); {} if None."""
+def load_t4_reference(
+    ref_dir: str | pathlib.Path | None, only: set[str] | None = None
+) -> dict[str, np.ndarray]:
+    """{sample_id: block-1 cum_current} from an aux block-1 reference build (docs/t4_fidelity.md); {} if None.
+    `only` restricts the load to those sample ids (parallel workers load just their chunk)."""
     if not ref_dir:
         return {}
     import h5py
@@ -58,6 +61,8 @@ def load_t4_reference(ref_dir: str | pathlib.Path | None) -> dict[str, np.ndarra
     for o in sorted((pathlib.Path(ref_dir) / "outputs").glob("shard-*.outputs.h5")):
         with h5py.File(o, "r") as f:
             for sid in f["samples"]:
+                if only is not None and sid not in only:
+                    continue
                 g = f["samples"][sid]
                 if "outputs" in g and "omniscape" in g["outputs"]:
                     out[sid] = g["outputs"]["omniscape"]["cum_current"][...]
@@ -170,6 +175,58 @@ def evaluate_sample(
     return out
 
 
+_OOD_FLAGS = (
+    "test_ood_region",
+    "test_ood_scale",
+    "test_ood_table",
+    "test_ood_contrast",
+    "test_ood_synth2real",
+)
+
+
+def _evaluate_rows(
+    pred_path: str, rows: list[dict], t4_reference: str | None, flags: list[str]
+) -> list[dict]:
+    """Metrics for a chunk of index rows (one process): opens the predictions file and each shard itself."""
+    t4_ref = load_t4_reference(t4_reference, only={r["sample_id"] for r in rows})
+    out = []
+    with h5py.File(pred_path, "r") as fp:
+        for r in rows:
+            if r["sample_id"] not in fp or r["config"] not in fp[r["sample_id"]]:
+                continue
+            with h5py.File(r["path"], "r") as f:
+                gs = f[r["sample_id"]]
+                gc = gs["configs"][r["config"]]
+                R = gs["inputs"]["resistance"][...]
+                nd = gs["inputs"]["nodata_mask"][...]
+                m = evaluate_sample(
+                    r["kind"],
+                    gs,
+                    gc,
+                    fp[r["sample_id"]][r["config"]],
+                    R,
+                    nd,
+                    t4_reference=t4_ref,
+                    sid=r["sample_id"],
+                )
+            m.update(
+                {
+                    "sample_id": r["sample_id"],
+                    "config": r["config"],
+                    "kind": r["kind"],
+                    "task": KIND_TASK[r["kind"]],
+                    "family": r["family"],
+                    "split": r["split"],
+                    "solve_time_s": r["solve_time_s"],
+                    "speedup": efficiency.speedup(r["solve_time_s"], m["inference_time_s"]),
+                }
+            )
+            for c in flags:
+                m[c] = bool(r[c])
+            out.append(m)
+    return out
+
+
 def evaluate(
     pred_dir: str | pathlib.Path,
     split: str | list[str],
@@ -180,7 +237,10 @@ def evaluate(
     acceleration: bool = False,
     t4_reference: str | pathlib.Path | None = None,
     t4_blocks: list[str] | None = None,
+    workers: int = 1,
 ) -> dict:
+    """`workers` > 1 evaluates the samples in that many processes (2026-09-24: the single-process metrics at XL took
+    > 1.75 h for one split and exceeded the GPU leg); results are identical, rows are returned in index order."""
     pred_dir = pathlib.Path(pred_dir)
     meta = (
         json.loads((pred_dir / "meta.json").read_text())
@@ -188,53 +248,40 @@ def evaluate(
         else {}
     )
     idx = _load_index(pathlib.Path(root), tier)
-    t4_ref = load_t4_reference(t4_reference)
     splits = [split] if isinstance(split, str) else list(split)
     idx = idx[idx.split.isin(splits) & idx.qc_pass]
     if subset and f"subset_{subset}" in idx:
         idx = idx[idx[f"subset_{subset}"]]
-    rows = []
+    flags = [c for c in _OOD_FLAGS if c in idx]
+    cols = ["sample_id", "config", "kind", "family", "split", "solve_time_s", "path", *flags]
+    idx = idx.sort_values(["sample_id", "config"])
     with h5py.File(pred_dir / "predictions.h5", "r") as fp:
-        for r in idx.sort_values(["sample_id", "config"]).itertuples():
-            if r.sample_id not in fp or r.config not in fp[r.sample_id]:
-                continue
-            with h5py.File(r.path, "r") as f:
-                gs = f[r.sample_id]
-                gc = gs["configs"][r.config]
-                R = gs["inputs"]["resistance"][...]
-                nd = gs["inputs"]["nodata_mask"][...]
-                m = evaluate_sample(
-                    r.kind,
-                    gs,
-                    gc,
-                    fp[r.sample_id][r.config],
-                    R,
-                    nd,
-                    t4_reference=t4_ref,
-                    sid=r.sample_id,
-                )
-            m.update(
-                {
-                    "sample_id": r.sample_id,
-                    "config": r.config,
-                    "kind": r.kind,
-                    "task": KIND_TASK[r.kind],
-                    "family": r.family,
-                    "split": r.split,
-                    "solve_time_s": r.solve_time_s,
-                    "speedup": efficiency.speedup(r.solve_time_s, m["inference_time_s"]),
-                }
-            )
-            for c in (
-                "test_ood_region",
-                "test_ood_scale",
-                "test_ood_table",
-                "test_ood_contrast",
-                "test_ood_synth2real",
+        have = set(fp.keys())
+    idx = idx[idx.sample_id.isin(have)]
+    all_rows = idx[cols].to_dict("records")
+    t4_ref_dir = str(t4_reference) if t4_reference else None
+    workers = max(1, min(int(workers), len(all_rows) or 1))
+    if workers == 1:
+        rows = _evaluate_rows(str(pred_dir / "predictions.h5"), all_rows, t4_ref_dir, flags)
+    else:
+        import concurrent.futures as cf
+        import multiprocessing as mp
+
+        # chunk by shard path so each worker opens few files; one chunk per worker (each loads its T4 reference once)
+        by_path = sorted(all_rows, key=lambda r: (r["path"], r["sample_id"], r["config"]))
+        chunks = [by_path[i::workers] for i in range(workers)]
+        rows = []
+        with cf.ProcessPoolExecutor(max_workers=workers, mp_context=mp.get_context("fork")) as ex:
+            for part in ex.map(
+                _evaluate_rows,
+                [str(pred_dir / "predictions.h5")] * workers,
+                chunks,
+                [t4_ref_dir] * workers,
+                [flags] * workers,
             ):
-                if c in idx:
-                    m[c] = bool(getattr(r, c))
-            rows.append(m)
+                rows.extend(part)
+        order = {(r["sample_id"], r["config"]): i for i, r in enumerate(all_rows)}
+        rows.sort(key=lambda m: order[(m["sample_id"], m["config"])])
     df = pd.DataFrame(rows)
     result = {
         "model": meta.get("model", pred_dir.name),

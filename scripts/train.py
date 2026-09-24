@@ -215,6 +215,7 @@ def evaluate_group(
         None,
         pred_dir / ("eval_" + "+".join(splits)),
         acceleration=acceleration,
+        workers=int(os.environ.get("SLURM_CPUS_PER_TASK", "1")),
     )
     return {
         t: {k: v.get("mean") for k, v in agg.items() if isinstance(v, dict) and "mean" in v}
