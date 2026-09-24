@@ -6,11 +6,11 @@
 |---|---|
 | partitions | `coc-gpu` (QoS `coc-ice`): L40S 32 (4 nodes × 8), A100 8, V100 22, A40 4, RTX 6000 8, MI210 4; `ice-gpu` (H100/H200) allowed by QoS but 26-h estimated wait |
 | walltime | 16 h per job (`coc-gpu` MaxTime) |
-| GPU cap | partition group cap 56 GPUs shared by all `coc` users; no per-user GPU TRES limit; 50 queued jobs per user (QoS `MaxSubmitPU`, changed from 500 on 09-22) |
+| GPU cap | partition group cap 56 GPUs shared by all `coc` users; **per-user `MaxTRESRunMinsPU` gres/gpu = 1 920** (32 GPU-hours of *remaining* walltime across running jobs: with 16-h jobs only 2 run at once, with 2-h legs up to 16 — found in practice 06:00Z, `MaxGRESRunMinsPerUser` pending reason); 50 queued jobs per user |
 | queue wait now | L40S and V100: ≈ 10 min (`sbatch --test-only`); A100: ≈ 1 h; H100 (`ice-gpu`): ≈ 26 h. Dev runs on 09-14 started within 1–17 min |
 | chosen pool | L40S (bf16, 48 GB; 16 healthy GPUs on 2 nodes, 2 nodes excluded for ECC errors) with A100 spill-over; **2-hour legs** that checkpoint and re-queue themselves (`train.py --resume --pause-exit`), ≤ 18 concurrent jobs of ours |
 | data | the trainer reads the Hub layout directly; groups are staged to `data/hfcache` on the login node per (tier, task group) and evicted when no pending job needs them (sizes: S 32/25/30 GB for T1/T3/T4, M 57/43/54, L 84/64/82, XL 61/47/61; scratch guard 230 GB) |
-| bad nodes | `atl1-1-03-004-21-0` (uncorrectable ECC error in the smoke test) excluded; the driver adds any node that throws a CUDA/ECC error |
+| bad nodes | `atl1-1-03-004-21-0` and `atl1-1-03-004-23-0` (uncorrectable ECC errors on one GPU each, probed 04:40Z) excluded; the driver adds any node that throws a CUDA/ECC error |
 
 ## 2. Plan (132 jobs, ≈ 949 GPU-hours; `scripts/slurm/gpu/gpu_driver.py --plan`)
 
