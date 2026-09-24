@@ -36,10 +36,11 @@ if [ -f "$OUT/paused.json" ] && [ ! -f "$OUT/results.json" ] && [ "$PJ" = "$SLUR
   exit 0
 fi
 # T4 at M / L: the official evaluation surface is the exact block-1 reference (docs/t4_fidelity.md) + block-size rows
-if [ "$TASK" = "T4" ] && [ -f "$OUT/predictions/T4/predictions.h5" ] && { [ "$TIER" = "M" ] || [ "$TIER" = "L" ]; }; then
+PRED="$OUT/predictions/hfcache_${TIER}_test_id"
+if [ "$TASK" = "T4" ] && [ -f "$PRED/predictions.h5" ] && { [ "$TIER" = "M" ] || [ "$TIER" = "L" ]; }; then
   REF=aux/t4_bs1_reference/${TIER}_bs1
   BLOCKS=$(ls -d aux/t4_blocksize_baselines/${TIER}_* 2>/dev/null | tr '\n' ' ')
-  python scripts/evaluate.py --predictions "$OUT/predictions/T4" --root "$ROOT" --tier "$TIER" --split test_id \
+  python scripts/evaluate.py --predictions "$PRED" --root "$ROOT" --tier "$TIER" --split test_id \
       --t4-reference "$REF" --t4-blocks $BLOCKS --out "$OUT/eval_t4_reference" 2>&1 | grep -v Warning | tail -5
 fi
 echo "end=$(date -u +%FT%TZ)"

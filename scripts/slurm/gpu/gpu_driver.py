@@ -379,11 +379,64 @@ def alert(msg: str) -> None:
     log("ALERT: " + msg)
 
 
+def submit_t4_reference_backfill(jobs: list[dict], st: dict) -> None:
+    """T4 at M/L: the exact block-1 reference evaluation runs at the end of the training job; legs submitted before
+    2026-09-24 12:30Z looked for predictions under the wrong path and skipped it. Any finished run without
+    eval_t4_reference/ gets a CPU job that runs the same evaluate.py command (the offloader waits for it)."""
+    st.setdefault("t4ref_jobs", {})
+    for j in jobs:
+        if j["task"] != "T4" or j["tier"] not in ("M", "L") or not done(j):
+            continue
+        run = RUNS / j["name"]
+        if (run / "eval_t4_reference").exists():
+            continue
+        job = st["t4ref_jobs"].get(j["name"])
+        if job and sh(["squeue", "-h", "-j", job]):
+            continue
+        pred = run / "predictions" / f"hfcache_{j['tier']}_test_id"
+        if not (pred / "predictions.h5").exists():
+            continue
+        tier = j["tier"]
+        cmd = (
+            f"source scripts/env.sh; python scripts/evaluate.py --predictions {pred} --root data/hfcache --tier {tier} "
+            f"--split test_id --t4-reference aux/t4_bs1_reference/{tier}_bs1 "
+            f"--t4-blocks aux/t4_blocksize_baselines/{tier}_* --out {run}/eval_t4_reference"
+        )
+        jid = sh(
+            [
+                "sbatch",
+                "--parsable",
+                "-A",
+                "coc",
+                "-q",
+                "coc-ice",
+                "-p",
+                "coc-cpu",
+                "-N1",
+                "-n1",
+                "-c4",
+                "--mem=32G",
+                "-t",
+                "04:00:00",
+                "-J",
+                f"phase10-t4ref-{j['name']}",
+                "-o",
+                f"{run}/t4ref_%j.out",
+                "--wrap",
+                cmd,
+            ]
+        )
+        if jid.isdigit():
+            st["t4ref_jobs"][j["name"]] = jid
+            log(f"T4 reference evaluation backfill for {j['name']}: job {jid}")
+
+
 def cycle(jobs: list[dict], st: dict) -> None:
     note_bad_nodes(jobs)
     note_oom(jobs, st)
+    submit_t4_reference_backfill(jobs, st)
     active = our_jobs()
-    running = {n for n, s in active.items() if not n.startswith("stats-")}
+    running = {n for n, s in active.items() if not n.startswith(("stats-", "t4ref-"))}
     pending = [j for j in jobs if not done(j) and j["name"] not in running]
     # staging: data of the next pending jobs, in priority order, only when the group fits under the quota guard
     # (2026-09-24: an unguarded staging chain hit the 300 GB quota); groups no pending job needs are evicted first
