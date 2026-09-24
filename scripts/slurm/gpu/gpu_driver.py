@@ -267,8 +267,14 @@ def submit(j: dict, st: dict) -> None:
         "oom"
     ):  # a previous attempt was killed for host memory: double it (node limit 191 GB)
         res["mem"] = f"{min(int(res['mem'].rstrip('G')) * 2 ** prev['oom'], 180)}G"
-    n_pd = sum(1 for n_, s_ in our_jobs().items() if s_ == "PD" and not n_.startswith("stats-"))
-    gres = GRES_ALT if n_pd >= ALT_AFTER else GRES
+    # GPU type: keep the L40S pool (16 healthy GPUs) as the default and spill to A100 (8 GPUs) only while ≥ ALT_AFTER
+    # of our jobs are pending on L40S and fewer than 4 are pending on A100
+    pend = sh(
+        ["squeue", "-u", os.environ.get("USER", "yxiao413"), "-h", "-t", "PD", "-o", "%j|%b"]
+    ).splitlines()
+    pd_l40s = sum(1 for x in pend if x.startswith("phase10-") and "l40s" in x)
+    pd_a100 = sum(1 for x in pend if x.startswith("phase10-") and "a100" in x)
+    gres = GRES_ALT if (pd_l40s >= ALT_AFTER and pd_a100 < 4) else GRES
     export = (
         f"ALL,MODEL={j['model']},TASK={j['task']},TIER={j['tier']},SEED={j['seed']},OUT={out},ROOT={CACHE},"
         f"EPOCHS={j.get('epochs', 30)},BATCH={batch},PATIENCE=8,WORKERS={res['cpus']},MAXTRAIN={j.get('maxtrain', '')},"

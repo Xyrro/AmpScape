@@ -8,7 +8,7 @@
 | walltime | 16 h per job (`coc-gpu` MaxTime) |
 | GPU cap | partition group cap 56 GPUs shared by all `coc` users; no per-user GPU TRES limit; 50 queued jobs per user (QoS `MaxSubmitPU`, changed from 500 on 09-22) |
 | queue wait now | L40S and V100: ≈ 10 min (`sbatch --test-only`); A100: ≈ 1 h; H100 (`ice-gpu`): ≈ 26 h. Dev runs on 09-14 started within 1–17 min |
-| chosen pool | L40S (bf16, 48 GB), ≤ 10 concurrent jobs of ours (≈ a third of the L40S pool), self re-queue across the walltime; A100 as fallback if L40S waits exceed 2 h |
+| chosen pool | L40S (bf16, 48 GB; 16 healthy GPUs on 2 nodes, 2 nodes excluded for ECC errors) with A100 spill-over; **2-hour legs** that checkpoint and re-queue themselves (`train.py --resume --pause-exit`), ≤ 18 concurrent jobs of ours |
 | data | the trainer reads the Hub layout directly; groups are staged to `data/hfcache` on the login node per (tier, task group) and evicted when no pending job needs them (sizes: S 32/25/30 GB for T1/T3/T4, M 57/43/54, L 84/64/82, XL 61/47/61; scratch guard 230 GB) |
 | bad nodes | `atl1-1-03-004-21-0` (uncorrectable ECC error in the smoke test) excluded; the driver adds any node that throws a CUDA/ECC error |
 
