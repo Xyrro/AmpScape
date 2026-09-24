@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased] — Phase 10-full (GPU baselines)
+- Scratch: tile rasters under `data/tiles/v1.0/{tiles,resistance,quicklooks}` deleted with owner approval (metadata parquets kept); T4 M/L exact-reference evaluation path fixed and backfilled; WP7 demo job template (2026-09-24).
 - GPU driver: strict-priority staging with eviction by furthest next use, draining of pinned groups, tier-major priority order; `offload_loop.sh` starter (2026-09-24).
 
 ## [1.0.1] — 2026-09-24 (metadata only; the v1.0 data revision is unchanged)
