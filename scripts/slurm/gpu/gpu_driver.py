@@ -33,7 +33,7 @@ STATE = LOGS / "gpu_driver_state.json"
 
 MAX_GPU = 18  # concurrent jobs of ours on coc-gpu (16 healthy L40S + A100 spill-over; 1 920 GPU-run-minutes per user)
 MAX_QUEUED_TOTAL = 45  # QoS MaxSubmitPU = 50
-SCRATCH_LIMIT_GB = 275.0  # 2026-09-24 09:50Z: 265 → 275 (offloader every 10 min keeps runs/full small; quota 300). total quota guard (300 GB): base ≈ 117 GB, so ≈ 150 GB of staged groups at most
+SCRATCH_LIMIT_GB = 280.0  # 2026-09-24 10:30Z: 265 → 275 → 280 (M/T4 missed the 275 guard by 1 GB; offloader every 10 min keeps runs/full small; submissions hold above 290). total quota guard (300 GB): base ≈ 117 GB, so ≈ 150 GB of staged groups at most
 LOOKAHEAD = 12  # pending jobs whose data is staged ahead
 EVICT_LOOKAHEAD = 12  # a staged group is evictable when none of the next N pending jobs (nor a running job) needs it
 GROUP_GB = {
@@ -472,8 +472,12 @@ def cycle(jobs: list[dict], st: dict) -> None:
             freed[0] -= size
         if staged(tier, group) and not stats_ready(tier):
             submit_stats(tier, group, st)
-    # submission in priority order
+    # submission in priority order; none while scratch is within 10 GB of the quota (predictions of finishing runs
+    # land before the offloader frees them)
     slots = MAX_GPU - len(running)
+    if quota_gb() > 290.0:
+        log(f"scratch {quota_gb():.0f} GB > 290: no submissions this cycle")
+        slots = 0
     for j in pending:
         if slots <= 0 or n_queued_total() >= MAX_QUEUED_TOTAL:
             break
