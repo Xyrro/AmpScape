@@ -1,4 +1,4 @@
-# Status — 2026-09-24 15:40Z: Phase 10-full — headline S, M and L results in (T1); L/T4 next
+# Status — 2026-09-24 23:15Z: Phase 10-full — headline S/M/L T1 in, L/T4 running; XL/XXL rows by scale transfer
 
 ## Headline rel-L2 on test_id (seed 1, 30 epochs, official configs)
 
@@ -6,7 +6,7 @@
 |---|---|---|---|
 | T1 U-Net | 0.111 | 0.238 | 0.392 |
 | T1 FNO | 0.198 | 0.266 | 0.364 |
-| T1 ViT | 0.238 | — | running |
+| T1 ViT | 0.238 | 0.238 | 0.644 (structural, see DECISIONS) |
 | T4 U-Net | 0.040 | 0.051 | staging |
 | T4 FNO | 0.070 | 0.079 | staging |
 | T4 ViT | 0.071 | 0.099 | staging |
@@ -21,6 +21,14 @@
   (`runs/full/<run>/eval_t4_reference/results.md`, backfilled by CPU jobs where the training job skipped it).
 - 53 of 132 runs finished; 4 legs queued or running. Running table: `docs/tables/baselines_full.md`.
 
+## Schedule change (22:40Z): XL and XXL rows by scale transfer
+- XL is a held-out-scale tier (card; 228 train / 0 val landscapes): the first XL training legs were degenerate and
+  their single-process metrics at 1024² exceeded a 2-h leg. All XL training was cancelled; every L-trained run is
+  instead evaluated at XL and XXL (`scripts/transfer_eval.py`, 42 jobs ≈ 66 GPU-h, after P3 / after the GNNs).
+  Plan now 144 jobs ≈ 933 GPU-h. Harness metrics run in parallel processes (identical results, verified).
+- Owner items done: tile rasters deleted (scratch 285 → 251 GB); T4-at-S finding recorded; ViT L checked (no
+  divergence, resolution-inappropriate official config) — all in DECISIONS.md.
+
 ## Operation
 - Fixed today: the in-job T4 reference evaluation looked for predictions under the wrong path and the M reference
   was not local — path fixed in the job template, M reference fetched, and the driver backfills any finished T4 M/L
@@ -30,11 +38,4 @@
   be staged together. L/T4 waits for the last L/T1 legs (ViT seeds, ≈ 1–2 h), during which only 4 of 18 GPU slots
   are used. XL groups (61 + 61 GB) fit together.
 
-## For the owner (no action taken)
-- Deleting from scratch `data/sources` (20 GB) and `data/tiles/v1.0` (37 GB) — both regenerable/re-downloadable,
-  WP7 keeps its 20 tiles under `aux/wp7/tiles` — would let both L groups stay staged and remove the idle time at L
-  (and at any re-run). Smaller candidates: `.uv_cache` (12 GB, package cache), `aux/wp7/v1` (4.5 GB, v1.0 T4 shards
-  re-fetchable from the Hub), `data/dev` (12 GB, dev subset; on the Hub under aux/). I will not delete any of these
-  without approval.
-
-Next: L/T4 (U-Net, FNO, ViT × 3 seeds) → XL → WP4 completes → GNN; WP7 demo after the best T4 model at L.
+Next: L/T4 and L/T3 finish → transfer evaluations at XL/XXL → GNN (S, M, L) → GNN transfers; WP7 demo as soon as the best T4 model at L is known.

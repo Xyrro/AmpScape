@@ -55,3 +55,20 @@ T4-reference evaluation) to `aux/results/runs_full/<run>/` on the Hub with sha25
 local `predictions/*.h5` and `last.pt`; results, config, log and best.pt stay local. Tables are built from the local
 `results.json` files; predictions are re-downloadable per run for figures.
 
+
+## 5. XL and XXL rows: scale transfer, not training (2026-09-24 22:40Z)
+
+The card defines XL and XXL as held-out-scale tiers ("XL/XXL for models trained ≤ L"); their v1.0 splits hold 228
+(XL) and 0 (XXL) training landscapes and no validation split, so the first XL training legs were degenerate (228
+samples, `val_loss` 0, early stop at epoch 9) and their single-process metrics at 1024² exceeded the 2-h leg. The
+nine XL training jobs were cancelled and moved to `runs/abandoned_xl_training/`; nothing is trained at XL.
+
+Instead every L-trained run is evaluated at XL and at XXL (fully convolutional models only: U-Net, FNO, GNN; the
+ViT's interpolated positional embedding stops at XL) on `test_id`, `test_ood`, `ood_region` at batch 1 with the
+training tier's normalisation statistics — `scripts/transfer_eval.py`, job template
+`scripts/slurm/gpu/transfer_eval.sbatch` (4-h legs, 8 cores, resumable per split). The harness metrics now run in
+parallel processes (`evaluate.py --workers`, `ampscape.eval.harness.evaluate(workers=…)`; identical per-sample
+results, verified on the smoke predictions). Results: `<run>/results_transfer.json` (`eval["hfcache_<tier>_<split>"]`)
+and `<run>/eval_transfer/<tag>/`, pushed to the same Hub folder as the run and listed in the baselines table as
+`<run> → XL`. Plan: 144 jobs ≈ 933 GPU-h (XF 30 jobs after P3, XF4 12 GNN transfers after P4). XXL groups: T1 22 GB,
+T4 23 GB.
