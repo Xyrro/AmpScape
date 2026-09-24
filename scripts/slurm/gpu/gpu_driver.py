@@ -470,6 +470,10 @@ def cycle(jobs: list[dict], st: dict) -> None:
         if slots <= 0 or n_queued_total() >= MAX_QUEUED_TOTAL:
             break
         key = (j["tier"], GROUP[j["task"]])
+        if j["tag"] == "P4" and any(
+            jj["tag"] != "P4" for jj in pending if jj["name"] not in running
+        ):
+            continue  # GNN strictly last: never ahead of a P1–P3/WP4 job that is only waiting for its data
         if not (staged(*key) and stats_ready(j["tier"])):
             continue
         if key in draining and not (RUNS / j["name"] / "done.json").exists():
