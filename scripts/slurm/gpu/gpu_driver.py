@@ -622,12 +622,20 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 need = quota_gb() - freed[0] + size - SCRATCH_LIMIT_GB
                 # small tiers first (their legs end within 2 h; an M/L group stays pinned for hours), then the
                 # group whose next pending use is furthest away
+                # cost-free first: groups with no unsubmitted job (draining them blocks nothing), then small tiers
+                # (legs end sooner), then the furthest next use (00:15Z: M/T3 was drained — stalling six seeds —
+                # while L/T4 had every job already submitted)
                 pinned = sorted(
-                    (TIERS.index(g_[0]), -first_use.get(g_, 10**6), g_)
+                    (
+                        0 if first_use.get(g_, 10**6) >= 10**6 else 1,
+                        TIERS.index(g_[0]),
+                        -first_use.get(g_, 10**6),
+                        g_,
+                    )
                     for g_ in running_groups
                     if g_ != (tier, group)
                 )
-                for _, _, g_ in pinned:
+                for _, _, _, g_ in pinned:
                     if need <= 0:
                         break
                     draining.add(g_)
