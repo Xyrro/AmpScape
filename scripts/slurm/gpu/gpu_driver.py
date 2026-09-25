@@ -144,8 +144,8 @@ def plan() -> list[dict]:
 
     # scale transfer (§5): every L-trained run evaluated at XL and XXL (XXL only for the fully convolutional models);
     # seed 1 first, XL before XXL; the GNN transfers follow the GNN training (last)
-    def add_xfer(model, task, seed, tier, tag):
-        src = f"{model}_{task}_L_s{seed}"
+    def add_xfer(model, task, seed, tier, tag, suffix=""):
+        src = f"{model}_{task}_L_s{seed}" + (f"_{suffix}" if suffix else "")
         jobs.append(
             {
                 "name": f"xfer_{src}_{tier}",
@@ -159,19 +159,30 @@ def plan() -> list[dict]:
             }
         )
 
-    for seed in (1, 2, 3):
+    for task in ("T1", "T4"):  # task-major: the T4 groups are evictable while the T1 transfers run
         for tier in ("XL", "XXL"):
-            for model, task in (
-                ("unet", "T1"),
-                ("unet", "T4"),
-                ("fno", "T1"),
-                ("fno", "T4"),
-                ("vit", "T1"),
-                ("vit", "T4"),
-            ):
-                if tier == "XXL" and model == "vit":
-                    continue
-                add_xfer(model, task, seed, tier, "XF")
+            for seed in (1, 2, 3):
+                for model in ("unet", "fno", "vit"):
+                    if tier == "XXL" and model == "vit":
+                        continue
+                    add_xfer(model, task, seed, tier, "XF")
+    # SN (owner 2026-09-25): one documented scale-aware-target variant per model, trained at L (seed 1, official
+    # config otherwise; ampscape.models.common.target_scale), then the same zero-shot XL/XXL transfer
+    pairs = (
+        ("unet", "T1"),
+        ("unet", "T4"),
+        ("fno", "T1"),
+        ("fno", "T4"),
+        ("vit", "T1"),
+        ("vit", "T4"),
+    )
+    for model, task in pairs:
+        add(model, task, "L", 1, "SN", suffix="scalenorm", extra="--target-norm scale")
+    for tier in ("XL", "XXL"):
+        for model, task in pairs:
+            if tier == "XXL" and model == "vit":
+                continue
+            add_xfer(model, task, 1, tier, "SNX", suffix="scalenorm")
     # WP4: data-scaling ablation at S, U-Net and FNO on T1, seed 1, fixed-epoch (30) and fixed-step (30 epochs of the
     # full set ≈ 118k steps at batch 16) variants; the full-size run is the P1 job itself
     for model in ("unet", "fno"):
@@ -188,6 +199,11 @@ def plan() -> list[dict]:
         for tier in ("XL", "XXL"):
             for task in ("T1", "T4"):
                 add_xfer("gnn", task, seed, tier, "XF4")
+    for task in ("T1", "T4"):  # GNN scale-aware variant, last
+        add("gnn", task, "L", 1, "SN4", suffix="scalenorm", extra="--target-norm scale")
+    for tier in ("XL", "XXL"):
+        for task in ("T1", "T4"):
+            add_xfer("gnn", task, 1, tier, "SNX4", suffix="scalenorm")
     return jobs
 
 
@@ -307,7 +323,7 @@ def submit_stats(tier: str, group: str, st: dict) -> None:
 XFER_RES = {"XL": {"cpus": 8, "mem": "96G"}, "XXL": {"cpus": 8, "mem": "160G"}}
 XFER_WALL = "04:00:00"
 MAX_XFER = 4  # concurrent transfer legs: each writes up to ≈ 13 GB of XL predictions before its metrics run
-XFER_QUOTA_GB = 255.0  # no transfer submission above this scratch level (quota 300; ≤ 4 bursts of ≤ 13 GB in flight)
+XFER_QUOTA_GB = 245.0  # no transfer submission above this scratch level (quota 300; ≤ 4 bursts of ≤ 13 GB in flight)
 
 
 def submit_transfer(j: dict, st: dict, gres: str, exclude: list[str]) -> None:
@@ -381,7 +397,7 @@ def submit(j: dict, st: dict) -> None:
     export = (
         f"ALL,MODEL={j['model']},TASK={j['task']},TIER={j['tier']},SEED={j['seed']},OUT={out},ROOT={CACHE},"
         f"EPOCHS={j.get('epochs', 30)},BATCH={batch},PATIENCE=8,WORKERS={res['cpus']},MAXTRAIN={j.get('maxtrain', '')},"
-        f"EXTRA=,MEM={res['mem']},GRES={gres},WALL={WALL}"
+        f"EXTRA={j.get('extra', '')},MEM={res['mem']},GRES={gres},WALL={WALL}"
     )
     bad = (
         LOGS / "gpu_bad_nodes.txt"
@@ -481,7 +497,10 @@ def xfer_done(j: dict) -> bool:
     p = RUNS / j["src"] / "results_transfer.json"
     if not p.exists():
         return False
-    ev = json.loads(p.read_text()).get("eval", {})
+    try:
+        ev = json.loads(p.read_text()).get("eval", {})
+    except (OSError, json.JSONDecodeError):
+        return False  # being written by a leg (the driver died on this at ≈ 10:00Z 2026-09-25, 12 h idle)
     return all(f"hfcache_{j['tier']}_{sp}" in ev for sp in XFER_SPLITS)
 
 
@@ -574,7 +593,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
     first_use_soon = {}  # ignoring the GNN phase (P4/XF4), which cannot start before everything else anyway
     for k, jj in enumerate(pending):
         first_use.setdefault((jj["tier"], GROUP[jj["task"]]), k)
-        if jj["tag"] not in ("P4", "XF4"):
+        if jj["tag"] not in ("P4", "XF4", "SN4", "SNX4"):
             first_use_soon.setdefault((jj["tier"], GROUP[jj["task"]]), k)
     # draining: when the highest-priority unstaged group does not fit because RUNNING jobs pin the groups that would
     # be evicted, those groups stop receiving new jobs (their later seeds wait) so the pin dissolves as the running
@@ -659,6 +678,25 @@ def cycle(jobs: list[dict], st: dict) -> None:
     # land before the offloader frees them)
     slots = MAX_GPU - len(running)
     n_xfer_running = sum(1 for n in running if n.startswith("xfer_"))
+    first_xfer = next(
+        (
+            k
+            for k, jj in enumerate(pending)
+            if jj.get("kind") == "transfer" and done({"name": jj["src"]})
+        ),
+        None,
+    )
+    if first_xfer is not None and quota_gb() > XFER_QUOTA_GB:
+        # 12 h idle on 2026-09-25: all four XL/XXL groups (166 GB) kept the scratch above the transfer threshold and
+        # nothing triggered an eviction — free the groups whose next use is later than the first runnable transfer
+        before = quota_gb()
+        evict_until(
+            SCRATCH_LIMIT_GB - XFER_QUOTA_GB, first_xfer
+        )  # until quota - freed <= XFER_QUOTA_GB
+        log(
+            f"transfer legs held by scratch {before:.0f} GB > {XFER_QUOTA_GB:.0f}: evicted later-use groups "
+            f"({freed[0]:.0f} GB)"
+        )
     if quota_gb() > 290.0:
         log(f"scratch {quota_gb():.0f} GB > 290: no submissions this cycle")
         slots = 0
@@ -667,13 +705,15 @@ def cycle(jobs: list[dict], st: dict) -> None:
             break
         key = (j["tier"], GROUP[j["task"]])
         if j["tag"] == "P4" and any(
-            jj["tag"] not in ("P4", "XF4") for jj in pending if jj["name"] not in running
+            jj["tag"] not in ("P4", "XF4", "SN4", "SNX4")
+            for jj in pending
+            if jj["name"] not in running
         ):
             continue  # GNN strictly last: never ahead of a P1–P3/WP4/XF job that is only waiting for its data
         if j.get("kind") == "transfer":
             if not done({"name": j["src"]}) or not staged(*key):
                 continue  # the L-trained source run is not finished, or its XL/XXL data is not staged
-            if n_xfer_running >= MAX_XFER or quota_gb() > XFER_QUOTA_GB:
+            if n_xfer_running >= MAX_XFER or quota_gb() - freed[0] > XFER_QUOTA_GB:
                 continue  # scratch: bounded number of prediction bursts in flight
         elif not (staged(*key) and stats_ready(j["tier"])):
             continue
