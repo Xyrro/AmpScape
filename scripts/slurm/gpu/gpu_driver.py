@@ -708,8 +708,8 @@ def cycle(jobs: list[dict], st: dict) -> None:
         # nothing triggered an eviction — free the groups whose next use is later than the first runnable transfer
         before = quota_gb()
         evict_until(
-            SCRATCH_LIMIT_GB - XFER_QUOTA_GB, first_xfer
-        )  # until quota - freed <= XFER_QUOTA_GB
+            SCRATCH_LIMIT_GB - XFER_QUOTA_GB, max(first_xfer, LOOKAHEAD)
+        )  # until quota - freed <= XFER_QUOTA_GB; only groups outside the lookahead (23:22Z: a 1 GB overshoot evicted XXL/T1 four jobs ahead of its use)
         log(
             f"transfer legs held by scratch {before:.0f} GB > {XFER_QUOTA_GB:.0f}: evicted later-use groups "
             f"({freed[0]:.0f} GB)"
