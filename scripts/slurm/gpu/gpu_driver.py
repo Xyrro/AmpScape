@@ -381,7 +381,7 @@ def submit(j: dict, st: dict) -> None:
     if j.get("kind") != "transfer":
         out.mkdir(parents=True, exist_ok=True)
     res = dict(RES.get(j["tier"], RES["L"]))
-    batch = GNN_BATCH[j["tier"]] if j["model"] == "gnn" else res["batch"]
+    batch = GNN_BATCH.get(j["tier"], 1) if j["model"] == "gnn" else res["batch"]
     prev = st["submitted"].get(j["name"], {})
     if prev.get(
         "oom"
@@ -670,7 +670,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 pinned = sorted(
                     (
                         0 if first_use_soon.get(g_, 10**6) >= 10**6 else 1,
-                        TIERS.index(g_[0]),
+                        (TIERS + ["XXL"]).index(g_[0]),
                         -first_use.get(g_, 10**6),
                         g_,
                     )
