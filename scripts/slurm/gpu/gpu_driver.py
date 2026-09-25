@@ -322,6 +322,7 @@ def submit_stats(tier: str, group: str, st: dict) -> None:
 
 XFER_RES = {"XL": {"cpus": 8, "mem": "96G"}, "XXL": {"cpus": 8, "mem": "160G"}}
 XFER_WALL = "04:00:00"
+XFER_BURST_GB = 13.0  # largest prediction burst of one transfer leg (FNO at XL, one split)
 MAX_XFER = 4  # concurrent transfer legs: each writes up to ≈ 13 GB of XL predictions before its metrics run
 XFER_QUOTA_GB = 245.0  # no transfer submission above this scratch level (quota 300; ≤ 4 bursts of ≤ 13 GB in flight)
 
@@ -579,10 +580,17 @@ def cycle(jobs: list[dict], st: dict) -> None:
     # staging: data of the next pending jobs, in priority order, only when the group fits under the quota guard
     # (2026-09-24: an unguarded staging chain hit the 300 GB quota); groups no pending job needs are evicted first
     needed = []
+    xfer_only: set[tuple[str, str]] = (
+        set()
+    )  # groups wanted only by transfer legs within the lookahead
     for j in pending[:LOOKAHEAD]:
         key = (j["tier"], GROUP[j["task"]])
         if key not in needed:
             needed.append(key)
+            if j.get("kind") == "transfer":
+                xfer_only.add(key)
+        elif key in xfer_only and j.get("kind") != "transfer":
+            xfer_only.discard(key)
     # staging in strict priority order: the data of the highest-priority pending jobs comes first; when it does not fit,
     # evict staged groups that no RUNNING job uses, those whose next pending use is furthest down the list first
     # (re-staging a group takes ≈ 3 min at the measured 8–10 GB/min). 2026-09-24: the S groups were pinning 87 GB and
@@ -640,11 +648,18 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 submit_stats(tier, group, st)
             continue
         size = GROUP_GB.get((tier, group), 60.0)
-        if quota_gb() - freed[0] + size > SCRATCH_LIMIT_GB:
+        # a group staged for transfer legs must leave room for their prediction bursts below the transfer threshold
+        # (22:45Z: XL/T4 was re-staged into the hold band and would have been evicted again next cycle)
+        limit = (
+            (XFER_QUOTA_GB - XFER_BURST_GB * MAX_XFER)
+            if (tier, group) in xfer_only
+            else SCRATCH_LIMIT_GB
+        )
+        if quota_gb() - freed[0] + size > limit:
             evict_until(size, first_use.get((tier, group), 10**6))
-            if quota_gb() - freed[0] + size > SCRATCH_LIMIT_GB:
+            if quota_gb() - freed[0] + size > limit:
                 # mark the pinned groups (furthest next use first) that would free enough space as draining
-                need = quota_gb() - freed[0] + size - SCRATCH_LIMIT_GB
+                need = quota_gb() - freed[0] + size - limit
                 # small tiers first (their legs end within 2 h; an M/L group stays pinned for hours), then the
                 # group whose next pending use is furthest away
                 # cost-free first: groups with no unsubmitted job (draining them blocks nothing), then small tiers
@@ -666,7 +681,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
                     draining.add(g_)
                     need -= GROUP_GB.get(g_, 60.0)
                 log(
-                    f"scratch {quota_gb() - freed[0]:.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {SCRATCH_LIMIT_GB:.0f} GB even after evictions; draining {sorted(draining)}"
+                    f"scratch {quota_gb() - freed[0]:.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {limit:.0f} GB even after evictions; draining {sorted(draining)}"
                 )
                 break  # strict priority: do not stage a later group before this one
         stage(tier, group)
