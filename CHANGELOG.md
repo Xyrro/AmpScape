@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased] — Phase 10-full (GPU baselines)
+- Scale-aware target variant (`train.py --target-norm scale`; `ampscape.models.common.target_scale`) and its zero-shot XL/XXL transfer rows; XL/XXL Omniscape geometry verified from the data (2026-09-25).
 - WP7 many-query demonstration completed with U-Net T4 L (`docs/wp7_demo.md`; results under `aux/wp7/` on the Hub) (2026-09-25).
 - Scale-transfer evaluation (`scripts/transfer_eval.py`): XL/XXL rows from the L-trained runs; harness metrics parallelised (`--workers`); XL training jobs abandoned (2026-09-24).
 - Scratch: tile rasters under `data/tiles/v1.0/{tiles,resistance,quicklooks}` deleted with owner approval (metadata parquets kept); T4 M/L exact-reference evaluation path fixed and backfilled; WP7 demo job template (2026-09-24).

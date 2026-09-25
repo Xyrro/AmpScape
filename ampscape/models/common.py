@@ -102,9 +102,42 @@ def coarse_graph(resistance: np.ndarray, nodata: np.ndarray, f: int = 4):
     return idx_c, ei_c, w_c, f2c
 
 
-def make_target(d: dict, task: str) -> tuple[np.ndarray, np.ndarray]:
+# Omniscape moving-window radius per tier (configs/solver/omniscape_reference.yaml; verified on the v1.0 rows)
+TIER_RADIUS = {"S": 16, "M": 32, "L": 64, "XL": 128, "XXL": 256}
+REF_TIER = "L"  # the scale-aware target equals the absolute one at the reference tier
+
+
+def target_scale(d: dict, task: str, tier: str | None, norm: str = "abs") -> float:
+    """Multiplier k applied to the current map before the log transform (target = log10(k·C + ε·max)).
+
+    norm = "abs": k = 1 (official protocol, absolute currents).
+    norm = "scale" (owner request 2026-09-25, scale-aware variant for zero-shot transfer to XL/XXL, no calibration
+    on those tiers): the target is made scale-free with the quantity that sets the current magnitude at each tier —
+      T1/T3: k = sqrt(N_valid / N_ref). Under a uniform rescaling of a landscape by s per axis with the same injected
+        current (T1's injection does not change with tier by construction), current per pixel column scales as 1/s
+        and the valid pixel count as s²; N_ref = 512² (tier L).
+      T4: k = r_ref / r_tier. Omniscape currents accumulate over windows of radius r with block ≈ r/10: each window
+        injects ∝ r²·s̄ and spreads it over ∝ r, and a pixel sits in ∝ (r/b)² windows, so C ∝ r·s̄; r_ref = 64 (L).
+        (s̄, the mean source strength, is an input the model sees; it is not divided out.)
+    Both factors are computable from the inputs / the evaluation tier alone; the inverse divides the prediction by k.
+    """
+    if norm == "abs":
+        return 1.0
+    if norm != "scale":
+        raise ValueError(norm)
+    if task == "T4":
+        return TIER_RADIUS[REF_TIER] / float(TIER_RADIUS[tier or REF_TIER])
+    nd = d["nodata"][0] > 0
+    n_valid = max(int((~nd).sum()), 1)
+    return float(np.sqrt(n_valid / float(512 * 512)))
+
+
+def make_target(
+    d: dict, task: str, tier: str | None = None, norm: str = "abs"
+) -> tuple[np.ndarray, np.ndarray]:
     """(target log-map (1, H, W), loss mask (1, H, W)) — NoData excluded, T1W strips excluded."""
-    c = d[TASK_TARGET[task]][0].astype(np.float64)
+    k = target_scale(d, task, tier, norm)
+    c = d[TASK_TARGET[task]][0].astype(np.float64) * k
     m = np.where(np.isfinite(c), c, 0.0)
     y = np.log10(np.maximum(m, 0.0) + EPS * max(float(m.max()), 1e-30)).astype(np.float32)
     mask = (d["nodata"][0] == 0) & np.isfinite(c)
@@ -113,10 +146,10 @@ def make_target(d: dict, task: str) -> tuple[np.ndarray, np.ndarray]:
     return y[None], mask[None].astype(np.float32)
 
 
-def inverse_target(y: np.ndarray) -> np.ndarray:
-    """Back to current units: C = 10^y − ε·max(10^y), clipped at 0 (the floor is negligible; kept for symmetry)."""
+def inverse_target(y: np.ndarray, scale: float = 1.0) -> np.ndarray:
+    """Back to current units: C = (10^y − ε·max(10^y)) / k, clipped at 0 (the floor is negligible; kept for symmetry)."""
     c = np.power(10.0, y.astype(np.float64))
-    return np.maximum(c - EPS * c.max(), 0.0).astype(np.float32)
+    return (np.maximum(c - EPS * c.max(), 0.0) / float(scale)).astype(np.float32)
 
 
 def masked_mse(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:

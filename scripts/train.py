@@ -41,6 +41,7 @@ from ampscape.models.common import (  # noqa: E402
     make_target,
     masked_mse,
     n_channels,
+    target_scale,
 )
 
 DEFAULT_LR = {"unet": 1e-3, "fno": 1e-3, "vit": 3e-4, "gnn": 1e-3}
@@ -55,6 +56,8 @@ class Items(torch.utils.data.Dataset):
         graph: bool,
         extra: tuple[str, ...] = (),
         multiscale: bool = False,
+        tier: str | None = None,
+        target_norm: str = "abs",
     ):
         self.ds, self.task, self.stats, self.graph, self.extra, self.multiscale = (
             ds,
@@ -64,6 +67,7 @@ class Items(torch.utils.data.Dataset):
             extra,
             multiscale,
         )
+        self.tier, self.target_norm = tier, target_norm
 
     def __len__(self):
         return len(self.ds)
@@ -71,8 +75,15 @@ class Items(torch.utils.data.Dataset):
     def __getitem__(self, i):
         d = self.ds[i]
         x = make_inputs(d, self.task, self.stats, self.extra)
-        y, m = make_target(d, self.task)
-        out = {"x": x, "y": y, "mask": m, "sample_id": d["sample_id"], "config": d["config"]}
+        y, m = make_target(d, self.task, self.tier, self.target_norm)
+        out = {
+            "x": x,
+            "y": y,
+            "mask": m,
+            "sample_id": d["sample_id"],
+            "config": d["config"],
+            "scale": target_scale(d, self.task, self.tier, self.target_norm),
+        }
         if self.graph:
             idx, ei, w = grid_graph(d["resistance"][0], d["nodata"][0] > 0)
             out.update({"node_index": idx, "edge_index": ei, "edge_weight": w})
@@ -93,6 +104,7 @@ def collate(batch):
     out = {k: torch.from_numpy(np.stack([b[k] for b in batch])) for k in ("x", "y", "mask")}
     out["sample_id"] = [b["sample_id"] for b in batch]
     out["config"] = [b["config"] for b in batch]
+    out["scale"] = [float(b.get("scale", 1.0)) for b in batch]
     if "node_index" in batch[0]:
         idxs, eis, ws, off = [], [], [], 0
         for b in batch:
@@ -186,7 +198,9 @@ def predict(model, name, loader, device, task, out_h5, amp=True):
             dt = (time.perf_counter() - t0) / pred.shape[0]
             pred = pred.cpu().numpy()
             for i, (sid, cfg) in enumerate(zip(batch["sample_id"], batch["config"], strict=True)):
-                c = inverse_target(pred[i, 0])
+                c = inverse_target(
+                    pred[i, 0], batch.get("scale", [1.0] * len(batch["sample_id"]))[i]
+                )
                 c[batch["mask"][i, 0].numpy() == 0] = np.where(
                     batch["x"][i, 1].numpy() > 0, np.nan, c
                 )[batch["mask"][i, 0].numpy() == 0]
@@ -243,6 +257,13 @@ def main():
         "--max-train", type=int, default=None, help="subsample the training set (smoke tests)"
     )
     ap.add_argument("--eval-splits", default="test_id,test_ood,ood_region")
+    ap.add_argument(
+        "--target-norm",
+        default="abs",
+        choices=["abs", "scale"],
+        help="target normalisation: abs = official (absolute currents); scale = scale-aware variant "
+        "(ampscape.models.common.target_scale), for the documented zero-shot transfer variant",
+    )
     ap.add_argument("--published-root", default="data/builds/published")
     ap.add_argument(
         "--published-tiers", default="S", help="comma list; XXL only for fully convolutional models"
@@ -302,6 +323,7 @@ def main():
         "model_config": mcfg,
         "variant": a.variant,
         "extra_channels": list(extra),
+        "target_norm": a.target_norm,
         "lr": lr,
         "batch": a.batch,
         "epochs": a.epochs,
@@ -331,7 +353,7 @@ def main():
             tr.index = tr.index.iloc[: a.max_train].reset_index(drop=True)
         va = AmpScapeDataset(a.task, "val", a.tier, a.root)
         dl_tr = torch.utils.data.DataLoader(
-            Items(tr, a.task, stats, graph, extra, multiscale),
+            Items(tr, a.task, stats, graph, extra, multiscale, a.tier, a.target_norm),
             batch_size=a.batch,
             shuffle=True,
             num_workers=a.workers,
@@ -341,7 +363,7 @@ def main():
             persistent_workers=a.workers > 0,
         )
         dl_va = torch.utils.data.DataLoader(
-            Items(va, a.task, stats, graph, extra, multiscale),
+            Items(va, a.task, stats, graph, extra, multiscale, a.tier, a.target_norm),
             batch_size=a.batch,
             shuffle=False,
             num_workers=a.workers,
@@ -497,7 +519,7 @@ def main():
             continue
         bs = 1 if tier in ("XL", "XXL") else a.batch
         dl = torch.utils.data.DataLoader(
-            Items(ds, a.task, stats, graph, extra, multiscale),
+            Items(ds, a.task, stats, graph, extra, multiscale, tier, a.target_norm),
             batch_size=bs,
             shuffle=False,
             num_workers=min(a.workers, 2),

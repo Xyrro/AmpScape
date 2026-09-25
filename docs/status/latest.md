@@ -1,4 +1,4 @@
-# Status — 2026-09-25 10:00Z: Phase 10-full — S/M/L headline done, WP7 done; scale transfer running after a scratch-quota incident
+# Status — 2026-09-25 12:30Z: owner checks 1–3 answered; scale-aware variant queued; transfer phase running
 
 ## Headline rel-L2 on test_id (seed 1, 30 epochs, official configs)
 
@@ -43,11 +43,53 @@
   at XL carry the wrong total current (throughput error 0.5–0.9; the target is absolute log-current and the injected
   current per pixel changes with landscape size), while FNO keeps the pixel ranking (Spearman 0.93). For T4 the
   three models agree at rel-L2 ≈ 0.5 with Spearman ≥ 0.93 — consistent with a near-constant magnitude factor, and
-  note that the XL Omniscape target uses a different window geometry (block 33 vs block 9 at L), so T4 transfer is
-  transfer across operators as well as scales. Both are benchmark findings, reported as measured (official protocol,
+  note that the XL Omniscape target uses a window twice as large (radius 128 vs 64 at L; block 11 vs 5), so T4
+  transfer is transfer across operators as well as scales (verified on every XL/XXL row, see check 1). Both are benchmark findings, reported as measured (official protocol,
   no re-calibration). The transfer script was cross-checked on training-tier data where possible; the pattern is
   consistent across seeds and models.
 - Remaining splits (test_ood, ood_region) and XXL follow as the transfer jobs run.
+
+## Owner checks (2026-09-25)
+
+**1. Omniscape geometry, read from the data** (`solver_stats.solver_params` on every T4 output group on the Hub, staged
+copies): XL — all 4,000 rows `block_size 11, radius 128`; XXL — all 400 rows `block_size 25, radius 256`; L (the 100
+WP7 v1 rows as a spot check) `block_size 5, radius 64`; all `solver cholmod`, `correct_artifacts true`,
+`fallback_used false`. The adopted rule block ≤ radius/10 holds (XL 11 ≤ 12.8, XXL 25 ≤ 25.6); the card's fidelity
+statement is correct and no target needs regenerating. (My 10:00Z note quoting "block 33" came from an early
+DECISIONS row about the *cost probe*, not from the data; corrected above.)
+
+**2. XL train/val vs amendment C3.** C3 is implemented in `ampscape/splits/assign.py` as: apply the base split
+(train 0.8 / val 0.1 / test_id 0.1 by seed family), then keep an XL landscape in train/val only if
+`stable_unit(f"{block_id}|{seed}") < 0.25`. `block_id` exists only for real tiles (macro-cell of the tile); synthetic
+landscapes carry `block_id = None`, and `stable_unit("None|20260906") = 0.348 ≥ 0.25`, so **every synthetic XL
+train/val landscape (2,165 of 2,400) was moved to test_id**, and of the real tiles only the 25 % of macro-cells that
+hash below the share kept their rows: 228 train, and the real val cells all hashed out (val = 0). Result: XL train
+228 / val 0 / test_id 3,118 / test_ood 254 / ood_region 400 instead of ≈ 1,000 train+val. XXL is test-only by design
+(unchanged). Nothing in the v1.0 *data* is affected; the released model results are unaffected too (nothing was
+trained at XL; the XL/XXL rows are zero-shot transfers evaluated on test_id).
+
+*Proposed metadata fix (1.0.2, index `split` column + `splits/full/*.parquet` + Croissant; data revision unchanged):*
+for synthetic XL landscapes apply the C3 share per seed family, `stable_unit(f"{seed_family}|{seed}|xl") < share`,
+with share = 0.278 so that synthetic train+val ≈ 600 (25 % of the 2,400 synthetic landscapes; simulated with 0.25:
+470 train / 77 val); for real tiles keep the macro-cell rule but draw val cells among the kept cells at the base
+10 % ratio (today 0). Expected XL: ≈ 830–1,000 train+val (≈ 21–25 %), test_id ≈ 2,300 (still ≥ 5× the XXL test).
+Consequences: the transfer rows on XL test_id are re-aggregated from the stored per-sample metrics (no recompute);
+mini/lite/core are unaffected (XL is full-only); the datasheet split table and the card's XL sentence change.
+Not applied — awaiting your go-ahead.
+
+**3. Scale-aware target variant** (`--target-norm scale`, `ampscape.models.common.target_scale`; documented in the
+code): T1/T3 target = log10(k·C + ε·max) with k = sqrt(N_valid / 512²) — under a uniform rescaling by s per axis
+with the same injected current (T1's injection does not change with tier by construction) current per pixel column
+∝ 1/s and N_valid ∝ s²; T4: k = 64 / r_tier — Omniscape currents accumulate ∝ r·s̄ (window injects ∝ r²·s̄, spreads
+over ∝ r, a pixel sits in ∝ (r/b)² windows with b ≈ r/10), which is exactly the ×2 seen at XL. k is computed from the
+inputs / the evaluation tier only; the prediction is divided by k before the harness, so metrics stay in absolute
+current units and no XL/XXL data enters the training or the inverse. At L the variant's target equals the official
+one numerically (k = 1 at 512², r = 64), so any difference is the transfer.
+Runs: `<model>_<task>_L_s1_scalenorm` for U-Net, FNO, ViT × T1, T4 (official configs otherwise), then the same
+zero-shot XL/XXL transfer (tags SN/SNX, after the current transfer phase); GNN variant after the GNN phase (SN4/SNX4).
+*GPU cost estimate* (measured L seed-1 times): training 17.5 GPU-h (U-Net 1.5+1.6, FNO 2.7+2.8, ViT 4.4+4.6) +
+evaluation legs ≈ 4.5 + transfers ≈ 7.5 (XL 6 × ≈ 0.6 h, XXL 4 × ≈ 1 h) ≈ **30 GPU-h**; GNN variant ≈ 15–35 GPU-h
+more (its official L runs are not measured yet). Smoke-tested on the mini build before queueing.
 
 ## Incident 09:09Z: scratch quota reached (300 GB)
 - Nine concurrent XL transfer legs each wrote up to 13 GB of predictions (FNO at 1024²) before their metrics ran;
@@ -75,4 +117,4 @@ core IoU 0.825, table-effect ranking Spearman 0.991 with the same most-influenti
 pinch-point recall 0.94 (precision 0.66 at 3 px); per-map rel-L2 0.054 mean, 0.100 worst table. Cost: 36.3 CPU-h for
 the solver route vs 11.8 s on one GPU (≈ ×11,000 after training once).
 
-Next: L/T3 finishes → transfer evaluations at XL/XXL → GNN (S, M, L) → GNN transfers; weekly report or on schedule changes.
+Next: transfer evaluations at XL/XXL → scale-aware variants at L + their transfers → GNN (S, M, L) → GNN transfers and variant; weekly report or on schedule changes.
