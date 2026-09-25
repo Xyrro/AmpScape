@@ -1,4 +1,4 @@
-# Status — 2026-09-25 05:10Z: Phase 10-full — headline S/M/L for T1 and T4 in; WP7 demo done
+# Status — 2026-09-25 10:00Z: Phase 10-full — S/M/L headline done, WP7 done; scale transfer running after a scratch-quota incident
 
 ## Headline rel-L2 on test_id (seed 1, 30 epochs, official configs)
 
@@ -29,6 +29,35 @@
   Plan now 144 jobs ≈ 933 GPU-h. Harness metrics run in parallel processes (identical results, verified).
 - Owner items done: tile rasters deleted (scratch 285 → 251 GB); T4-at-S finding recorded; ViT L checked (no
   divergence, resolution-inappropriate official config) — all in DECISIONS.md.
+
+## Scale transfer (L-trained models at XL, first rows; `<run>/results_transfer.json`)
+
+| trained at L → XL, test_id | rel-L2 | throughput error | Spearman | top-5 % IoU |
+|---|---|---|---|---|
+| T1 U-Net (s1 / s3) | 1.70 / 1.03 | 0.94 / 0.93 | 0.70 / 0.74 | 0.42 |
+| T1 FNO (s1 / s3) | 0.75 / 0.74 | 0.62 / 0.71 | 0.93 / 0.92 | 0.56 |
+| T1 ViT (s3) | 0.77 | 0.53 | 0.66 | 0.14 |
+| T4 U-Net / FNO / ViT (s1) | 0.51 / 0.53 / 0.54 | — | 0.94 / 0.95 / 0.93 | 0.60 / 0.66 / 0.56 |
+
+- Zero-shot scale transfer of the official baselines fails on magnitude and partly survives on ranking: T1 predictions
+  at XL carry the wrong total current (throughput error 0.5–0.9; the target is absolute log-current and the injected
+  current per pixel changes with landscape size), while FNO keeps the pixel ranking (Spearman 0.93). For T4 the
+  three models agree at rel-L2 ≈ 0.5 with Spearman ≥ 0.93 — consistent with a near-constant magnitude factor, and
+  note that the XL Omniscape target uses a different window geometry (block 33 vs block 9 at L), so T4 transfer is
+  transfer across operators as well as scales. Both are benchmark findings, reported as measured (official protocol,
+  no re-calibration). The transfer script was cross-checked on training-tier data where possible; the pattern is
+  consistent across seeds and models.
+- Remaining splits (test_ood, ood_region) and XXL follow as the transfer jobs run.
+
+## Incident 09:09Z: scratch quota reached (300 GB)
+- Nine concurrent XL transfer legs each wrote up to 13 GB of predictions (FNO at 1024²) before their metrics ran;
+  the 280 GB guard only governs staging. Effects: transfer legs died on write errors (resumable, no metrics lost),
+  the offloader could not push (the Hub client needs local temp space), one config file was caught mid-rewrite.
+- Fixes (committed): transfer legs drop predictions after their metrics except seed-1 test_id; the offloader pushes
+  per split; ≤ 2 transfer legs in flight below 265 GB (4 once the quota breathes); robust JSON reads. To recover
+  I deleted transfer predictions whose metrics were already stored (seed 2/3, 19 GB — exactly what the new policy
+  drops) and incomplete prediction files of the killed legs (15 GB, no metrics, re-predicted on resume); paths are in
+  the session log. Scratch 300 → 220 GB; driver and offloader restarted 09:42Z.
 
 ## Operation
 - Fixed today: the in-job T4 reference evaluation looked for predictions under the wrong path and the M reference
