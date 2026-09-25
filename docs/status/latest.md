@@ -1,4 +1,4 @@
-# Status — 2026-09-24 23:15Z: Phase 10-full — headline S/M/L T1 in, L/T4 running; XL/XXL rows by scale transfer
+# Status — 2026-09-25 04:50Z: Phase 10-full — headline S/M/L for T1 and T4 in; WP7 demo launched
 
 ## Headline rel-L2 on test_id (seed 1, 30 epochs, official configs)
 
@@ -7,19 +7,20 @@
 | T1 U-Net | 0.111 | 0.238 | 0.392 |
 | T1 FNO | 0.198 | 0.266 | 0.364 |
 | T1 ViT | 0.238 | 0.533 | 0.644 (structural, see DECISIONS) |
-| T4 U-Net | 0.040 | 0.051 | staging |
-| T4 FNO | 0.070 | 0.079 | staging |
-| T4 ViT | 0.071 | 0.099 | staging |
+| T4 U-Net | 0.040 | 0.051 | 0.080 |
+| T4 FNO | 0.070 | 0.079 | 0.120 |
+| T4 ViT | 0.071 | 0.099 | running |
 
 - T1 error grows with tier for both U-Net and FNO (S → L: ×3.5 and ×1.8). Two effects are confounded in the
   official configs: larger landscapes (longer-range flow) and a smaller fixed-epoch training set (100 k / 30.7 k /
   12.3 k landscapes at S / M / L, 30 epochs each; U-Net L trains in 1.5 GPU-h and its validation loss is still
   falling at epoch 30). WP4 (data-scaling at S, running) and the fixed-step variants separate these; a longer-epoch
   L run is a candidate addition once the plan is through.
-- T4 at M against the exact block-1 map (test_id): U-Net 0.051 at 1 ms/landscape, FNO 0.079 at 1.5 ms; the
-  production block-3 solver is 0.029 at 111 s, block 7 with artifact correction 0.098 at 25 s
+- T4 against the exact block-1 map (test_id): at M U-Net 0.051 at 1 ms/landscape, FNO 0.079 at 1.5 ms vs the
+  production block-3 solver 0.029 at 111 s and block 7 with artifact correction 0.098 at 25 s; at L U-Net 0.080 at
+  5 ms, FNO 0.120 at 7 ms vs production block 5 at 0.032 and 566 s. U-Net T4 L seeds 1–3: 0.080 / 0.082 / 0.081
   (`runs/full/<run>/eval_t4_reference/results.md`, backfilled by CPU jobs where the training job skipped it).
-- 53 of 132 runs finished; 4 legs queued or running. Running table: `docs/tables/baselines_full.md`.
+- 70 of 144 jobs finished (training runs); L/T3 running, transfer evaluations and GNN next. Running table: `docs/tables/baselines_full.md`.
 
 ## Schedule change (22:40Z): XL and XXL rows by scale transfer
 - XL is a held-out-scale tier (card; 228 train / 0 val landscapes): the first XL training legs were degenerate and
@@ -38,4 +39,6 @@
   be staged together. L/T4 waits for the last L/T1 legs (ViT seeds, ≈ 1–2 h), during which only 4 of 18 GPU slots
   are used. XL groups (61 + 61 GB) fit together.
 
-Next: L/T4 and L/T3 finish → transfer evaluations at XL/XXL → GNN (S, M, L) → GNN transfers; WP7 demo as soon as the best T4 model at L is known.
+WP7 demo launched 04:48Z with U-Net T4 L seed 1 (the best T4 model at L; job 5934206, ≈ 4 h cap).
+
+Next: L/T3 finishes → transfer evaluations at XL/XXL → GNN (S, M, L) → GNN transfers; WP7 report when the demo job ends.
