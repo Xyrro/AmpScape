@@ -568,8 +568,11 @@ def cycle(jobs: list[dict], st: dict) -> None:
     running_jobs = [j for j in jobs if j["name"] in running]
     running_groups = {(jj["tier"], GROUP[jj["task"]]) for jj in running_jobs}
     first_use = {}
+    first_use_soon = {}  # ignoring the GNN phase (P4/XF4), which cannot start before everything else anyway
     for k, jj in enumerate(pending):
         first_use.setdefault((jj["tier"], GROUP[jj["task"]]), k)
+        if jj["tag"] not in ("P4", "XF4"):
+            first_use_soon.setdefault((jj["tier"], GROUP[jj["task"]]), k)
     # draining: when the highest-priority unstaged group does not fit because RUNNING jobs pin the groups that would
     # be evicted, those groups stop receiving new jobs (their later seeds wait) so the pin dissolves as the running
     # legs finish; otherwise the P3 S seeds kept the S groups pinned indefinitely (2026-09-24 08:20Z).
@@ -627,7 +630,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 # while L/T4 had every job already submitted)
                 pinned = sorted(
                     (
-                        0 if first_use.get(g_, 10**6) >= 10**6 else 1,
+                        0 if first_use_soon.get(g_, 10**6) >= 10**6 else 1,
                         TIERS.index(g_[0]),
                         -first_use.get(g_, 10**6),
                         g_,
