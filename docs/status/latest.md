@@ -1,4 +1,4 @@
-# Status — 2026-09-25 04:50Z: Phase 10-full — headline S/M/L for T1 and T4 in; WP7 demo launched
+# Status — 2026-09-25 05:10Z: Phase 10-full — headline S/M/L for T1 and T4 in; WP7 demo done
 
 ## Headline rel-L2 on test_id (seed 1, 30 epochs, official configs)
 
@@ -39,6 +39,11 @@
   be staged together. L/T4 waits for the last L/T1 legs (ViT seeds, ≈ 1–2 h), during which only 4 of 18 GPU slots
   are used. XL groups (61 + 61 GB) fit together.
 
-WP7 demo launched 04:48Z with U-Net T4 L seed 1 (the best T4 model at L; job 5934206, ≈ 4 h cap).
+## WP7 many-query demonstration — done (`docs/wp7_demo.md`, `aux/wp7/demo_summary.md` on the Hub)
+U-Net T4 L seed 1 on 20 held-out real L tiles × 8 tables (160 maps): the surrogate reproduces the study-level
+conclusions of the solver — top-5 % stability across tables 0.458 vs 0.463 (IoU matrices differ by 0.019), consensus
+core IoU 0.825, table-effect ranking Spearman 0.991 with the same most-influential table on every tile, persistent
+pinch-point recall 0.94 (precision 0.66 at 3 px); per-map rel-L2 0.054 mean, 0.100 worst table. Cost: 36.3 CPU-h for
+the solver route vs 11.8 s on one GPU (≈ ×11,000 after training once).
 
-Next: L/T3 finishes → transfer evaluations at XL/XXL → GNN (S, M, L) → GNN transfers; WP7 report when the demo job ends.
+Next: L/T3 finishes → transfer evaluations at XL/XXL → GNN (S, M, L) → GNN transfers; weekly report or on schedule changes.
