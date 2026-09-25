@@ -658,8 +658,10 @@ def cycle(jobs: list[dict], st: dict) -> None:
         if quota_gb() - freed[0] + size > limit:
             evict_until(size, first_use.get((tier, group), 10**6))
             if quota_gb() - freed[0] + size > limit:
-                # mark the pinned groups (furthest next use first) that would free enough space as draining
-                need = quota_gb() - freed[0] + size - limit
+                # mark the pinned groups (furthest next use first) that would free enough space as draining —
+                # not for a transfer-only group: its predecessors' transfer legs must simply finish first (22:49Z:
+                # draining XL/T1 would have blocked the very T1 transfer legs the T4 group was waiting behind)
+                need = 0.0 if (tier, group) in xfer_only else quota_gb() - freed[0] + size - limit
                 # small tiers first (their legs end within 2 h; an M/L group stays pinned for hours), then the
                 # group whose next pending use is furthest away
                 # cost-free first: groups with no unsubmitted job (draining them blocks nothing), then small tiers
