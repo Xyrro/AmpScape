@@ -306,6 +306,8 @@ def submit_stats(tier: str, group: str, st: dict) -> None:
 
 XFER_RES = {"XL": {"cpus": 8, "mem": "96G"}, "XXL": {"cpus": 8, "mem": "160G"}}
 XFER_WALL = "04:00:00"
+MAX_XFER = 4  # concurrent transfer legs: each writes up to ≈ 13 GB of XL predictions before its metrics run
+XFER_QUOTA_GB = 250.0  # no transfer submission above this scratch level (quota 300)
 
 
 def submit_transfer(j: dict, st: dict, gres: str, exclude: list[str]) -> None:
@@ -337,7 +339,8 @@ def submit_transfer(j: dict, st: dict, gres: str, exclude: list[str]) -> None:
             "-o",
             f"{src}/xfer_{j['tier']}_%j.out",
             "--export",
-            f"ALL,RUN={src},TIER={j['tier']},SPLITS={'+'.join(XFER_SPLITS)},MEM={res['mem']},GRES={gres},WALL={XFER_WALL}",
+            f"ALL,RUN={src},TIER={j['tier']},SPLITS={'+'.join(XFER_SPLITS)},KEEP={'test_id' if j['seed'] == 1 else 'none'},"
+            f"MEM={res['mem']},GRES={gres},WALL={XFER_WALL}",
             "scripts/slurm/gpu/transfer_eval.sbatch",
         ]
     )
@@ -655,6 +658,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
     # submission in priority order; none while scratch is within 10 GB of the quota (predictions of finishing runs
     # land before the offloader frees them)
     slots = MAX_GPU - len(running)
+    n_xfer_running = sum(1 for n in running if n.startswith("xfer_"))
     if quota_gb() > 290.0:
         log(f"scratch {quota_gb():.0f} GB > 290: no submissions this cycle")
         slots = 0
@@ -669,6 +673,8 @@ def cycle(jobs: list[dict], st: dict) -> None:
         if j.get("kind") == "transfer":
             if not done({"name": j["src"]}) or not staged(*key):
                 continue  # the L-trained source run is not finished, or its XL/XXL data is not staged
+            if n_xfer_running >= MAX_XFER or quota_gb() > XFER_QUOTA_GB:
+                continue  # scratch: bounded number of prediction bursts in flight
         elif not (staged(*key) and stats_ready(j["tier"])):
             continue
         if key in draining and not (RUNS / j["name"] / "done.json").exists():
@@ -677,6 +683,8 @@ def cycle(jobs: list[dict], st: dict) -> None:
         # for 20 h on 2026-09-25) is simply submitted again: train.py --resume continues from last.pt / done.json
         submit(j, st)
         slots -= 1
+        if j.get("kind") == "transfer":
+            n_xfer_running += 1
     save_state(st)
 
 

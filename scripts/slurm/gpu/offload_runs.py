@@ -31,7 +31,11 @@ INCLUDE = [
 def finished(run: pathlib.Path) -> bool:
     if not (run / "results.json").exists() or not (run / "done.json").exists():
         return False
-    cfg = json.loads((run / "config.json").read_text())
+    try:
+        cfg = json.loads((run / "config.json").read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"{run.name}: config.json unreadable ({e}); skipped", flush=True)
+        return False
     if (
         cfg["task"] == "T4"
         and cfg["tier"] in ("M", "L")
@@ -81,21 +85,22 @@ XFER_SPLITS = ("test_id", "test_ood", "ood_region")
 
 
 def offload_transfer(run: pathlib.Path) -> None:
-    """Scale-transfer outputs (transfer_eval.py) land in an already-offloaded run: push each completed tier's
-    predictions + metrics + results_transfer.json to the same Hub folder and free the predictions locally."""
+    """Scale-transfer outputs (transfer_eval.py) land in an already-offloaded run: push each finished split's
+    predictions (if kept) + metrics + results_transfer.json to the same Hub folder and free the predictions locally.
+    Per split, not per tier (2026-09-25: waiting for all three splits let ≈ 80 GB of XL predictions pile up)."""
     p = run / "results_transfer.json"
     if not p.exists():
         return
-    ev = json.loads(p.read_text()).get("eval", {})
-    for tier in ("XL", "XXL"):
-        mark = run / f".offloaded_transfer_{tier}"
-        if mark.exists() or not all(f"hfcache_{tier}_{sp}" in ev for sp in XFER_SPLITS):
+    try:
+        ev = json.loads(p.read_text()).get("eval", {})
+    except json.JSONDecodeError as e:
+        print(f"{run.name}: results_transfer.json unreadable ({e}); skipped", flush=True)
+        return
+    for tag in sorted(ev):
+        mark = run / f".offloaded_transfer_{tag}"
+        if mark.exists() or not (run / "eval_transfer" / tag / "results.json").exists():
             continue
-        include = ["results_transfer.json"] + [
-            f"{sub}/hfcache_{tier}_{sp}"
-            for sp in XFER_SPLITS
-            for sub in ("predictions", "eval_transfer")
-        ]
+        include = ["results_transfer.json", f"eval_transfer/{tag}", f"predictions/{tag}"]
         r = subprocess.run(
             [
                 sys.executable,
@@ -113,20 +118,23 @@ def offload_transfer(run: pathlib.Path) -> None:
         )
         if r.returncode != 0 or "MISMATCH" in r.stdout:
             print(
-                f"{run.name} transfer {tier}: push failed\n{r.stdout[-400:]}\n{r.stderr[-400:]}",
+                f"{run.name} transfer {tag}: push failed\n{r.stdout[-400:]}\n{r.stderr[-400:]}",
                 flush=True,
             )
             continue
-        rec = json.loads((run / ".hub_pushed.json").read_text())
+        try:
+            rec = json.loads((run / ".hub_pushed.json").read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            print(f"{run.name}: .hub_pushed.json unreadable ({e}); predictions kept", flush=True)
+            continue
         freed = 0
-        for sp in XFER_SPLITS:
-            for h5 in (run / "predictions" / f"hfcache_{tier}_{sp}").glob("*.h5"):
-                if str(h5.relative_to(run)) in rec:
-                    freed += h5.stat().st_size
-                    h5.unlink()
+        for h5 in (run / "predictions" / tag).glob("*.h5"):
+            if str(h5.relative_to(run)) in rec:
+                freed += h5.stat().st_size
+                h5.unlink()
         mark.write_text(json.dumps({"freed_gb": round(freed / 1e9, 2)}))
         print(
-            f"{run.name} transfer {tier}: offloaded, freed {freed / 1e9:.1f} GB locally", flush=True
+            f"{run.name} transfer {tag}: offloaded, freed {freed / 1e9:.1f} GB locally", flush=True
         )
 
 
