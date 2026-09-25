@@ -306,8 +306,8 @@ def submit_stats(tier: str, group: str, st: dict) -> None:
 
 XFER_RES = {"XL": {"cpus": 8, "mem": "96G"}, "XXL": {"cpus": 8, "mem": "160G"}}
 XFER_WALL = "04:00:00"
-MAX_XFER = 4  # concurrent transfer legs: each writes up to ≈ 13 GB of XL predictions before its metrics run
-XFER_QUOTA_GB = 250.0  # no transfer submission above this scratch level (quota 300)
+MAX_XFER = 2  # concurrent transfer legs (4 once the quota breathes): each writes up to ≈ 13 GB of XL predictions before its metrics run
+XFER_QUOTA_GB = 265.0  # no transfer submission above this scratch level (quota 300; ≤ 2 bursts of ≤ 13 GB in flight)
 
 
 def submit_transfer(j: dict, st: dict, gres: str, exclude: list[str]) -> None:
