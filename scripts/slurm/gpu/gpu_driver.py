@@ -337,7 +337,7 @@ def submit_transfer(j: dict, st: dict, gres: str, exclude: list[str]) -> None:
             "-o",
             f"{src}/xfer_{j['tier']}_%j.out",
             "--export",
-            f"ALL,RUN={src},TIER={j['tier']},SPLITS={','.join(XFER_SPLITS)},MEM={res['mem']},GRES={gres},WALL={XFER_WALL}",
+            f"ALL,RUN={src},TIER={j['tier']},SPLITS={'+'.join(XFER_SPLITS)},MEM={res['mem']},GRES={gres},WALL={XFER_WALL}",
             "scripts/slurm/gpu/transfer_eval.sbatch",
         ]
     )
