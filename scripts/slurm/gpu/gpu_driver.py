@@ -673,8 +673,8 @@ def cycle(jobs: list[dict], st: dict) -> None:
             continue
         if key in draining and not (RUNS / j["name"] / "done.json").exists():
             continue  # its group is about to be evicted for a higher-priority group (evaluation-only legs still go)
-        if (RUNS / j["name"] / "paused.json").exists():
-            continue  # the job re-queues itself with --resume
+        # a paused run whose leg is no longer in the queue (self re-queue failed, e.g. at the submit cap; six runs sat
+        # for 20 h on 2026-09-25) is simply submitted again: train.py --resume continues from last.pt / done.json
         submit(j, st)
         slots -= 1
     save_state(st)
