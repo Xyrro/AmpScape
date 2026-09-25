@@ -1,4 +1,4 @@
-# Status — 2026-09-25 12:30Z: owner checks 1–3 answered; scale-aware variant queued; transfer phase running
+# Status — 2026-09-25 22:45Z: owner checks 1–3 answered; scale-aware variant queued; transfer phase running again after a 12-h hold
 
 ## Headline rel-L2 on test_id (seed 1, 30 epochs, official configs)
 
@@ -90,6 +90,15 @@ zero-shot XL/XXL transfer (tags SN/SNX, after the current transfer phase); GNN v
 *GPU cost estimate* (measured L seed-1 times): training 17.5 GPU-h (U-Net 1.5+1.6, FNO 2.7+2.8, ViT 4.4+4.6) +
 evaluation legs ≈ 4.5 + transfers ≈ 7.5 (XL 6 × ≈ 0.6 h, XXL 4 × ≈ 1 h) ≈ **30 GPU-h**; GNN variant ≈ 15–35 GPU-h
 more (its official L runs are not measured yet). Smoke-tested on the mini build before queueing.
+
+## Incident 10:00Z–22:35Z: transfer phase silently held for 12 h
+- After the quota recovery the driver refused transfer legs while scratch was above the 255 GB threshold, but the
+  four staged XL/XXL groups (166 GB) plus the floor kept scratch at 272 GB, nothing triggered an eviction, and the
+  hold was silent. Fix (22:35Z): when transfer legs are held by scratch the driver evicts staged groups whose next
+  use is later than the first runnable transfer; the hold is logged; transfer jobs are ordered task-major (T1 then
+  T4) so only one task's XL/XXL groups need to stay staged; the threshold is 245 GB with 4 legs in flight. The
+  first XL T1 legs went out at 22:35Z. Plan: 166 jobs ≈ 1,081 GPU-h nominal (the scale-aware variants added 46 nominal;
+  measured rates are 3–7× lower).
 
 ## Incident 09:09Z: scratch quota reached (300 GB)
 - Nine concurrent XL transfer legs each wrote up to 13 GB of predictions (FNO at 1024²) before their metrics ran;
