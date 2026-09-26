@@ -613,7 +613,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
     ]  # GB evicted this cycle: pace-quota lags a few minutes behind deletions (09:59Z: read 271 after
     # evicting 30 GB), so the fit test uses quota_gb() - freed
 
-    def evict_until(size: float, target_use: int) -> None:
+    def evict_until(size: float, target_use: int, limit: float = SCRATCH_LIMIT_GB) -> None:
         # never evict a group whose next pending use comes before the target's (10:18Z: the driver staged M/T4 and
         # evicted it seconds later to make room for L/T1)
         cands = []
@@ -623,8 +623,8 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 continue
             cands.append((first_use.get((t_, g_), 10**6), t_, g_))
         for _, t_, g_ in sorted(cands, reverse=True):
-            if quota_gb() - freed[0] + size <= SCRATCH_LIMIT_GB:
-                return
+            if quota_gb() - freed[0] + size <= limit:
+                return  # (02:50Z 2026-09-26: this compared against the 280 GB guard while the caller wanted 193)
             subprocess.run(
                 [
                     sys.executable,
@@ -656,7 +656,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
             else SCRATCH_LIMIT_GB
         )
         if quota_gb() - freed[0] + size > limit:
-            evict_until(size, first_use.get((tier, group), 10**6))
+            evict_until(size, first_use.get((tier, group), 10**6), limit)
             if quota_gb() - freed[0] + size > limit:
                 # mark the pinned groups (furthest next use first) that would free enough space as draining —
                 # not for a transfer-only group: its predecessors' transfer legs must simply finish first (22:49Z:
@@ -708,7 +708,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
         # nothing triggered an eviction — free the groups whose next use is later than the first runnable transfer
         before = quota_gb()
         evict_until(
-            SCRATCH_LIMIT_GB - XFER_QUOTA_GB, max(first_xfer, LOOKAHEAD)
+            0.0, max(first_xfer, LOOKAHEAD), XFER_QUOTA_GB
         )  # until quota - freed <= XFER_QUOTA_GB; only groups outside the lookahead (23:22Z: a 1 GB overshoot evicted XXL/T1 four jobs ahead of its use)
         log(
             f"transfer legs held by scratch {before:.0f} GB > {XFER_QUOTA_GB:.0f}: evicted later-use groups "
