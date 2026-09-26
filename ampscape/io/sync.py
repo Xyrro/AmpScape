@@ -382,6 +382,36 @@ def hub_gb(repo_id: str, prefix: str = "data/") -> float:
     return tot / 1e9
 
 
+def build_split_lists(indexes: dict, out: pathlib.Path) -> dict:
+    """splits/<subset>/<split>.parquet as the union over tier indexes (subset columns; QC-failing samples excluded)."""
+    import pandas as pd
+
+    counts: dict = {}
+    for sub in ("mini", "lite", "core", "full"):
+        parts = []
+        for idx in indexes.values():
+            col = f"subset_{sub}"
+            if col not in idx:
+                continue
+            part = idx[idx[col].astype(bool)]
+            bad = (
+                set(part.loc[~part.qc_pass.astype(bool), "sample_id"])
+                if "qc_pass" in part
+                else set()
+            )
+            parts.append(part[~part.sample_id.isin(bad)][["sample_id", "split"]])
+        if not parts:
+            continue
+        allp = pd.concat(parts, ignore_index=True).drop_duplicates("sample_id")
+        d = out / "splits" / sub
+        d.mkdir(parents=True, exist_ok=True)
+        counts[sub] = {}
+        for split, g in allp.groupby("split"):
+            g[["sample_id"]].to_parquet(d / f"{split}.parquet", index=False)
+            counts[sub][split] = int(len(g))
+    return counts
+
+
 def publish_index(
     build: pathlib.Path, repo_id: str, tier: str, staging: pathlib.Path, push: bool = True
 ) -> dict:
@@ -447,17 +477,22 @@ def publish_index(
     (staging / "index").mkdir(parents=True, exist_ok=True)
     idx.to_parquet(staging / "index" / f"{tier}.parquet", index=False)
     idx.to_parquet(build / "index.parquet", index=False)  # refreshed derived copy for local tools
-    for sub in ("mini", "lite", "core", "full"):
-        part = idx[idx[f"subset_{sub}"]]
-        if not len(part):
+    # split lists are cross-tier unions (v1.0.2): the per-tier lists written here until 2026-09-26 overwrote each
+    # other on the Hub (the last published tier won). Build them from this tier's new index + the other tiers' Hub
+    # indexes. Owner 2026-09-21: a sample with any QC-failing row is excluded from the lists, never silently kept.
+    others = {}
+    for t in ("S", "M", "L", "XL", "XXL"):
+        if t == tier:
             continue
-        d = staging / "splits" / sub
-        d.mkdir(parents=True, exist_ok=True)
-        # owner 2026-09-21: a sample with any row failing QC (e.g. residual_high after the precision pass) is excluded
-        # from the split lists — never silently kept; its rows stay in the index with qc_pass = False
-        bad = set(part.loc[~part.qc_pass.astype(bool), "sample_id"]) if "qc_pass" in part else set()
-        for split, g in part[~part.sample_id.isin(bad)].groupby("split"):
-            g[["sample_id"]].drop_duplicates().to_parquet(d / f"{split}.parquet", index=False)
+        try:
+            from huggingface_hub import hf_hub_download
+
+            others[t] = pd.read_parquet(
+                hf_hub_download(repo_id, f"index/{t}.parquet", repo_type="dataset")
+            )
+        except Exception:  # noqa: BLE001 — a tier not published yet
+            pass
+    build_split_lists({tier: idx, **others}, staging)
     if push:
         from huggingface_hub import HfApi
 
