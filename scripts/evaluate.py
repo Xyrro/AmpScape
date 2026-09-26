@@ -7,6 +7,7 @@ Writes <out>/results.json and <out>/results.md (default out = <predictions>/eval
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 
 from ampscape.eval import evaluate
@@ -36,6 +37,12 @@ def main() -> None:
         default=None,
         help="aux block-size builds scored against the reference (vs_bs1.parquet): printed beside the model (WP2)",
     )
+    ap.add_argument(
+        "--workers",
+        type=int,
+        default=int(os.environ.get("SLURM_CPUS_PER_TASK", "1")),
+        help="metric processes (default: the job's cores)",
+    )
     a = ap.parse_args()
     splits = a.split.split(",")
     out = a.out or str(pathlib.Path(a.predictions) / f"eval_{'+'.join(splits)}")
@@ -49,6 +56,7 @@ def main() -> None:
         acceleration=a.acceleration,
         t4_reference=a.t4_reference,
         t4_blocks=a.t4_blocks,
+        workers=a.workers,
     )
     print(f"{r['n_rows']} rows -> {out}/results.json, results.md")
     for task, agg in r["per_task"].items():

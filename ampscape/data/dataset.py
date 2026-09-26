@@ -32,8 +32,14 @@ import h5py
 import numpy as np
 import pandas as pd
 
-TASK_CONFIGS = {"T1": ["points"], "T2": ["points"], "T1W": ["wall_to_wall_NS", "wall_to_wall_EW"], "T1R": ["regions"],
-                "T3": ["advanced"], "T4": ["omniscape"]}
+TASK_CONFIGS = {
+    "T1": ["points"],
+    "T2": ["points"],
+    "T1W": ["wall_to_wall_NS", "wall_to_wall_EW"],
+    "T1R": ["regions"],
+    "T3": ["advanced"],
+    "T4": ["omniscape"],
+}
 K_MAX = 8
 
 
@@ -42,7 +48,11 @@ def _load_index(root: pathlib.Path, tier: str | None) -> pd.DataFrame:
         idx = pd.read_parquet(root / "index.parquet")
         idx["path"] = [str(root / "shards" / s) for s in idx.shard]
     elif (root / "index").exists():
-        files = sorted((root / "index").glob("*.parquet")) if tier is None else [root / "index" / f"{tier}.parquet"]
+        files = (
+            sorted((root / "index").glob("*.parquet"))
+            if tier is None
+            else [root / "index" / f"{tier}.parquet"]
+        )
         idx = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
         idx["path"] = [str(root / p) for p in idx.hf_path]
     else:
@@ -53,9 +63,19 @@ def _load_index(root: pathlib.Path, tier: str | None) -> pd.DataFrame:
 class AmpScapeDataset:
     """Indexable dataset of (sample, config) items for one task; framework-agnostic (numpy) with a torch adapter."""
 
-    def __init__(self, task: str, split: str | list[str] | None = "train", tier: str | None = "S", root: str | pathlib.Path = "data/builds/mini",
-                 subset: str | None = None, qc_pass_only: bool = True, trainval_only: bool | None = None,
-                 normalize: bool = False, transform: Callable | None = None, ood: str | None = None):
+    def __init__(
+        self,
+        task: str,
+        split: str | list[str] | None = "train",
+        tier: str | None = "S",
+        root: str | pathlib.Path = "data/builds/mini",
+        subset: str | None = None,
+        qc_pass_only: bool = True,
+        trainval_only: bool | None = None,
+        normalize: bool = False,
+        transform: Callable | None = None,
+        ood: str | None = None,
+    ):
         if task not in TASK_CONFIGS:
             raise ValueError(f"unknown task {task}; one of {list(TASK_CONFIGS)}")
         self.task, self.root, self.tier = task, pathlib.Path(root), tier
@@ -87,10 +107,22 @@ class AmpScapeDataset:
     def __len__(self) -> int:
         return len(self.index)
 
+    MAX_OPEN_FILES = 16  # 2026-09-24: an unbounded per-process cache of 500 open shards grew to 50 GB of host memory
+    # (HDF5 metadata caches) in a 6-worker DataLoader over the full S training set; keep a small LRU instead
+
     def _file(self, path: str) -> h5py.File:
         f = self._files.get(path)
         if f is None:
+            if len(self._files) >= self.MAX_OPEN_FILES:
+                oldest = next(iter(self._files))
+                try:
+                    self._files.pop(oldest).close()
+                except Exception:  # noqa: BLE001
+                    pass
             f = h5py.File(path, "r")
+            self._files[path] = f
+        else:  # refresh LRU order
+            self._files.pop(path)
             self._files[path] = f
         return f
 
@@ -105,8 +137,14 @@ class AmpScapeDataset:
         gc = gs["configs"][r.config]
         R = gs["inputs"]["resistance"][...]
         nd = gs["inputs"]["nodata_mask"][...].astype(np.float32)
-        out = {"sample_id": r.sample_id, "config": r.config, "resistance": R[None], "log_resistance": np.log(R)[None].astype(np.float32),
-               "nodata": nd[None], "meta": json.loads(gs.attrs["meta"])}
+        out = {
+            "sample_id": r.sample_id,
+            "config": r.config,
+            "resistance": R[None],
+            "log_resistance": np.log(R)[None].astype(np.float32),
+            "nodata": nd[None],
+            "meta": json.loads(gs.attrs["meta"]),
+        }
         if "covariates" in gs["inputs"]:
             out["covariates"] = gs["inputs"]["covariates"][...]
         o = gc["outputs"]
@@ -117,7 +155,10 @@ class AmpScapeDataset:
             for k in range(1, K_MAX + 1):
                 oh[k - 1] = focal == k
             out["focal_onehot"] = oh
-            out["focal_table"] = np.array([[t["label"], t["row"], t["col"]] for t in json.loads(gc.attrs["focal_table"])], dtype=np.int32).reshape(-1, 3)
+            out["focal_table"] = np.array(
+                [[t["label"], t["row"], t["col"]] for t in json.loads(gc.attrs["focal_table"])],
+                dtype=np.int32,
+            ).reshape(-1, 3)
             out["cum_current"] = o["cum_current"][...][None]
             reff = o["reff"][...]
             K = reff.shape[0]
@@ -139,7 +180,9 @@ class AmpScapeDataset:
                 out[k] = o[k][...][None]
         if self.normalize and self.stats:
             s = self.stats["log_resistance"]
-            out["log_resistance"] = ((out["log_resistance"] - s["mean"]) / s["std"]).astype(np.float32)
+            out["log_resistance"] = ((out["log_resistance"] - s["mean"]) / s["std"]).astype(
+                np.float32
+            )
         if self.transform:
             out = self.transform(out)
         return out
@@ -156,7 +199,14 @@ class AmpScapeDataset:
 
             def __getitem__(self, i):
                 d = parent[i]
-                return {k: (torch.from_numpy(np.ascontiguousarray(v)) if isinstance(v, np.ndarray) else v) for k, v in d.items()}
+                return {
+                    k: (
+                        torch.from_numpy(np.ascontiguousarray(v))
+                        if isinstance(v, np.ndarray)
+                        else v
+                    )
+                    for k, v in d.items()
+                }
 
         return _Torch()
 
@@ -168,11 +218,18 @@ def log_targets(x: np.ndarray) -> np.ndarray:
     return log10_eps(x)
 
 
-def log1p_targets(x: np.ndarray) -> np.ndarray:  # kept for backwards compatibility of early notebooks
+def log1p_targets(
+    x: np.ndarray,
+) -> np.ndarray:  # kept for backwards compatibility of early notebooks
     return np.log1p(np.maximum(x, 0.0))
 
 
-def compute_norm_stats(root: str | pathlib.Path, tier: str | None = "S", task: str = "T1", out: str | pathlib.Path | None = None) -> dict:
+def compute_norm_stats(
+    root: str | pathlib.Path,
+    tier: str | None = "S",
+    task: str = "T1",
+    out: str | pathlib.Path | None = None,
+) -> dict:
     """Train-only input statistics (log-resistance mean/std over valid pixels, per-channel covariate stats)."""
     ds = AmpScapeDataset(task, split="train", tier=tier, root=root, normalize=False)
     s = n = 0.0
@@ -199,11 +256,19 @@ def compute_norm_stats(root: str | pathlib.Path, tier: str | None = "S", task: s
     std = float(np.sqrt(max(s2 / max(n, 1) - mean**2, 1e-12)))
     from ampscape.metrics.transforms import EPS
 
-    stats = {"tier": tier, "task": task, "n_train_items": len(ds), "log_resistance": {"mean": float(mean), "std": std, "n_pixels": int(n)},
-             "target_transform": {"name": "log10_eps", "eps": EPS, "formula": "log10(C + eps * max(C))"}}
+    stats = {
+        "tier": tier,
+        "task": task,
+        "n_train_items": len(ds),
+        "log_resistance": {"mean": float(mean), "std": std, "n_pixels": int(n)},
+        "target_transform": {"name": "log10_eps", "eps": EPS, "formula": "log10(C + eps * max(C))"},
+    }
     if cov_s is not None:
         cm = cov_s / np.maximum(cov_n, 1)
-        stats["covariates"] = {"mean": cm.tolist(), "std": np.sqrt(np.maximum(cov_s2 / np.maximum(cov_n, 1) - cm**2, 1e-12)).tolist()}
+        stats["covariates"] = {
+            "mean": cm.tolist(),
+            "std": np.sqrt(np.maximum(cov_s2 / np.maximum(cov_n, 1) - cm**2, 1e-12)).tolist(),
+        }
     out = pathlib.Path(out) if out else pathlib.Path(root) / "stats" / "norm_stats.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     existing = json.loads(out.read_text()) if out.exists() else {}
@@ -220,8 +285,15 @@ def load_norm_stats(root: str | pathlib.Path, tier: str | None) -> dict | None:
     return d.get(str(tier)) or next(iter(d.values()), None)
 
 
-def load_from_hub(task: str, tier: str, split: str = "test_id", repo_id: str = "Xirro/AmpScape", cache_dir: str | None = None,
-                  revision: str | None = None, **kw) -> AmpScapeDataset:
+def load_from_hub(
+    task: str,
+    tier: str,
+    split: str = "test_id",
+    repo_id: str = "Xirro/AmpScape",
+    cache_dir: str | None = None,
+    revision: str | None = None,
+    **kw,
+) -> AmpScapeDataset:
     """Download only the shards of one (tier, task group) from the Hub and open them as a dataset."""
     from huggingface_hub import snapshot_download
 
@@ -229,6 +301,11 @@ def load_from_hub(task: str, tier: str, split: str = "test_id", repo_id: str = "
 
     group = {"T2": "T1"}.get(task, task)
     assert group in TASK_GROUPS, task
-    local = snapshot_download(repo_id, repo_type="dataset", cache_dir=cache_dir, revision=revision,
-                              allow_patterns=[f"data/{tier}/{group}/*", f"index/{tier}.parquet", "splits/*", "stats/*"])
+    local = snapshot_download(
+        repo_id,
+        repo_type="dataset",
+        cache_dir=cache_dir,
+        revision=revision,
+        allow_patterns=[f"data/{tier}/{group}/*", f"index/{tier}.parquet", "splits/*", "stats/*"],
+    )
     return AmpScapeDataset(task, split=split, tier=tier, root=local, **kw)

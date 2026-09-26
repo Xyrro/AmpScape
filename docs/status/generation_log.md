@@ -522,3 +522,13 @@ rows anywhere; ≈ 245 CPU-h of solves; five clean audits; indexes and split lis
 (`docs/tables/precision_pass.md`).
 **20:50Z — final publish redone:** the first end-of-pass publish (20:41Z) had read each tier's stale `index.parquet` (a derived copy written at the boundary) instead of the per-shard rows the pass updates, so the Hub indexes briefly carried pre-pass QC and no `solver_original` column. `publish_index` now always builds from the per-shard rows and refreshes the derived copy; all five tiers republished and verified (see the final report).
 
+## 2026-09-24 — WP7 solver side complete (CPU)
+
+20 held-out real L tiles (test_id; 5 per realm: Afrotropic, Nearctic, Neotropic, Palearctic) × 3 extra random
+resistance tables (`random_lm2..4`, perturbed `large_mammal`, seeds sha1(table|tile)) = 60 Omniscape (T4) maps solved
+with the production pipeline (CHOLMOD, block 5, radius 64): QC pass 100 %, median 756 s per map, ≈ 13 CPU-h. With the
+five v1.0 tables (exact T4 targets on the Hub) every tile has 8 solver maps for the many-query demo
+(`scripts/wp7_demo.py`, run once the best T4 model at L exists). Build and rasters published under `aux/wp7/`.
+Note: a `--configs`-restricted solve does not write the completion marker (by design: partial run); the marker-only
+re-run without the filter took minutes.
+
