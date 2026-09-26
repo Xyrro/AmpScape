@@ -322,7 +322,7 @@ def submit_stats(tier: str, group: str, st: dict) -> None:
 
 XFER_RES = {"XL": {"cpus": 8, "mem": "96G"}, "XXL": {"cpus": 8, "mem": "160G"}}
 XFER_WALL = "04:00:00"
-XFER_BURST_GB = 13.0  # largest prediction burst of one transfer leg (FNO at XL, one split)
+XFER_BURST_GB = 11.0  # largest prediction burst of one transfer leg (FNO at XL test_id measured 10.7 GB)
 MAX_XFER = 4  # concurrent transfer legs: each writes up to ≈ 13 GB of XL predictions before its metrics run
 XFER_QUOTA_GB = 245.0  # no transfer submission above this scratch level (quota 300; ≤ 4 bursts of ≤ 13 GB in flight)
 
