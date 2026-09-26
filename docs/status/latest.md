@@ -1,4 +1,4 @@
-# Status — 2026-09-25 22:45Z: owner checks 1–3 answered; scale-aware variant queued; transfer phase running again after a 12-h hold
+# Status — 2026-09-26 02:50Z: v1.0.2 (metadata) published and tagged; transfer phase running
 
 ## Headline rel-L2 on test_id (seed 1, 30 epochs, official configs)
 
@@ -48,6 +48,22 @@
   no re-calibration). The transfer script was cross-checked on training-tier data where possible; the pattern is
   consistent across seeds and models.
 - Remaining splits (test_ood, ood_region) and XXL follow as the transfer jobs run.
+
+## v1.0.2 (metadata only) — done 2026-09-26 02:40Z (owner approval)
+- Audit of every hashed share: only the C3 macro-cell hash had a None key (synthetic XL). The block-order hash
+  (real tiles, seed|stratum|block), the synthetic seed-family hash and the strict-XXL geometric check use defined keys;
+  real-tile val cells at L are assigned by the block rule and were never subject to C3.
+- Second defect found during the audit and fixed in the same release: the Hub split lists `splits/<subset>/<split>.parquet`
+  held only the last published tier's ids (per-tier uploads overwrote each other; `splits/full/train.parquet` had L's
+  12,613 ids). Rebuilt as cross-tier unions (full: train 108,291 / val 18,934 / test_id 19,206 / test_ood 11,225 /
+  ood_region 16,720); `publish_index` now builds them from every tier's index. The per-tier index `split` column was
+  always complete, so loaders were unaffected.
+- XL after the correction: train 880 / val 131 / test_id 2,335 / test_ood 254 / ood_region 400 (25.3 % train+val;
+  synthetic share 0.3635 of the moved landscapes; 28 real val landscapes drawn among the kept cells).
+- Published: `index/XL.parquet`, `splits/**`, card, Croissant 1.0.2 (validated, 0 warnings); local caches refreshed;
+  13 transfer runs re-aggregated on the new XL test_id (`scripts/reaggregate_transfer.py`, per-sample metrics kept);
+  CITATION 1.0.2; tags `v1.0.2` on GitHub and the Hub. CI: `tests/test_scripts_parse.py` (every script non-empty and
+  parseable, shell syntax-checked) — 75 files.
 
 ## Owner checks (2026-09-25)
 

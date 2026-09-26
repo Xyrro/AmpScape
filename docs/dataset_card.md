@@ -31,6 +31,10 @@ come from neutral landscape models and random fields with documented priors. (4)
 with `block_size = largest odd ≤ radius/10`, a deliberate, documented approximation of the
 per-pixel (block 1) Omniscape whose fidelity was measured (≈ 2–5 % relative L2 at coarser blocks).
 
+## Versions
+
+- **v1.0** (2026-09-23) data revision. **v1.0.1** (2026-09-24) metadata: nested `lite` subset. **v1.0.2** (2026-09-26) metadata: XL amendment C3 corrected (synthetic XL train/val restored) and split lists rebuilt as cross-tier unions. Data files are identical across the three tags.
+
 ## Final counts (v1.0)
 
 | tier | landscapes | configuration rows | synthetic / real | GB on the Hub | rows failing QC |
@@ -68,7 +72,7 @@ index column that briefly carried a staging file name. Every affected row was re
 - `index/<tier>.parquet` — one row per (sample, configuration): identifiers, family, generator or
   resistance table, tile, K, placement, solver, timings, residuals, QC flags, split, OOD flags,
   subset membership (`subset_mini`, `subset_lite`, `subset_core`, `subset_full`).
-- `splits/<subset>/<split>.parquet` — sample ids; subsets are nested (mini ⊂ lite ⊂ core ⊂ full).
+- `splits/<subset>/<split>.parquet` — sample ids across all tiers; subsets are nested (mini ⊂ lite ⊂ core ⊂ full). (v1.0.2: rebuilt as cross-tier unions — the v1.0/1.0.1 files held only the last published tier's ids; the per-tier `index/<tier>.parquet` `split` column was always complete.)
 - `stats/norm_stats.json` — train-only normalisation statistics.
 - `croissant.json` — Croissant 1.0 metadata (core + RAI fields).
 
@@ -86,7 +90,7 @@ subset, `test_ood_scale_strict` (≈ 6 XXL real tiles placed entirely inside non
 with any training tile at any tier, verified geometrically), isolates both. Region hold-outs are
 tile-level: a tile is `ood_region` when its own biome (Montane Grasslands & Shrublands, Mangroves) or
 realm (Australasia) is held out. Other OOD sets: held-out resistance table (`forest_bird`), held-out
-contrast (10⁶), held-out scale (XL/XXL for models trained ≤ L), and a synthetic→real flag. **Pilot caveat:** the mini's 50 real tiles over-represent the held-out regions
+contrast (10⁶), held-out scale (XL/XXL for models trained ≤ L), and a synthetic→real flag. **XL train/val (amendment C3, corrected in v1.0.2):** 25 % of the XL landscapes are train/val so that models can also be trained at XL — real tiles by macro-cell, synthetic landscapes by seed family (XL: train 880, val 131, test_id 2,335, test_ood 254, ood_region 400). In v1.0/1.0.1 the seed-family rule was not applied (synthetic XL landscapes had no macro-cell and were all placed in test_id: train 228, val 0); v1.0.2 is a metadata-only correction of the XL index `split` column and the split lists — no data file changed. **Pilot caveat:** the mini's 50 real tiles over-represent the held-out regions
 (20 of 50) because the Phase 2 pilot sampled those strata for coverage; this is not a v1.0 property.
 
 ## T4 targets: block-centred Omniscape with a measured approximation

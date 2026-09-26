@@ -7,6 +7,12 @@
 - Scratch: tile rasters under `data/tiles/v1.0/{tiles,resistance,quicklooks}` deleted with owner approval (metadata parquets kept); T4 M/L exact-reference evaluation path fixed and backfilled; WP7 demo job template (2026-09-24).
 - GPU driver: strict-priority staging with eviction by furthest next use, draining of pinned groups, tier-major priority order; `offload_loop.sh` starter (2026-09-24).
 
+## [1.0.2] — 2026-09-26 (metadata only; the v1.0 data revision is unchanged)
+- XL amendment C3 corrected: the 25 % train/val share was applied by macro-cell hash, which synthetic landscapes do not have (they hashed the literal `None` and were all moved to test_id). Synthetic XL landscapes now keep their base train/val label with a per-seed-family share (0.3635 of the moved ones) so that XL train+val = 1,011 (25.3 %): train 880, val 131, test_id 2,335, test_ood 254, ood_region 400 (was 228 / 0 / 3,118 / 254 / 400). Real tiles keep the macro-cell rule; 28 val landscapes are drawn among the kept cells.
+- Split lists `splits/<subset>/<split>.parquet` rebuilt as unions over all tiers (v1.0/1.0.1 held only the last published tier's ids); `publish_index` now builds them from every tier's index.
+- Scale-transfer rows at XL re-aggregated on the corrected test_id (`scripts/reaggregate_transfer.py`); Croissant regenerated and validated.
+- Tooling: `scripts/release_1_0_2.py`; CI test `tests/test_scripts_parse.py` (every script must be non-empty and parse).
+
 ## [1.0.1] — 2026-09-24 (metadata only; the v1.0 data revision is unchanged)
 
 - Nested download subset `lite` (S shards 0–39, M 0–23, L 0–39: 8 000 + 2 400 + 800 landscapes, all tasks, ≈ 26 GB;
