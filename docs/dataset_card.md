@@ -77,7 +77,7 @@ index column that briefly carried a staging file name. Every affected row was re
 - `croissant.json` — Croissant 1.0 metadata (core + RAI fields).
 
 Tiers: S 128² (100 m), M 256² (100 m), L 512² (200 m), XL 1024² (500 m), XXL 2048² (1 km).
-This mini release: tier S only, 250 landscapes (200 synthetic, 50 real), 1 270 solved configurations.
+(The Phase 5 pilot mini release — tier S only, 250 landscapes — is superseded by the nested `mini` subset of v1.0: the first 3 S shards, 600 landscapes, all task groups.)
 
 ## Splits and leakage
 

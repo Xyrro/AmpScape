@@ -144,7 +144,8 @@
     "real": 1600
    },
    "core_samples": 0,
-   "mini_samples": 0
+   "mini_samples": 0,
+   "splits_note": "v1.0.2 (XL amendment C3 corrected, 2026-09-26)"
   },
   "XXL": {
    "samples": 400,
