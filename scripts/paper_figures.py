@@ -191,8 +191,9 @@ def error_vs_tier(out: pathlib.Path) -> None:
             y = [float(g[g.tier == t][("rel_l2", "mean")].iloc[0]) for t in tiers]
             e = [float(np.nan_to_num(g[g.tier == t][("rel_l2", "std")].iloc[0])) for t in tiers]
             ax.errorbar(x, y, yerr=e, marker="o", capsize=3, label=MODEL_LABEL[base])
-        ax.set_xticks(range(len(TIER_ORDER)))
-        ax.set_xticklabels(TIER_ORDER)
+        present = [t for t in TIER_ORDER if t in set(sub.tier)]
+        ax.set_xticks([TIER_ORDER.index(t) for t in present])
+        ax.set_xticklabels(present)
         ax.set_title(f"{task}: rel-L2 on test_id (mean ± std over seeds)")
         ax.set_xlabel("tier")
         ax.set_ylabel("relative L2")
@@ -326,6 +327,9 @@ def scale_transfer(out: pathlib.Path) -> None:
                     )
         ax.set_xticks([0, 1, 2])
         ax.set_xticklabels(["L (trained)", "XL", "XXL"])
+        vals = sub[("rel_l2", "mean")].astype(float)
+        if len(vals) and np.nanmax(vals) / max(np.nanmin(vals), 1e-9) > 8:
+            ax.set_yscale("log")
         ax.set_ylabel("relative L2 (test_id)")
         ax.set_title(f"{task}: trained at L, evaluated across scales")
         ax.grid(alpha=0.3, axis="y")

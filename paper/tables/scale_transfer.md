@@ -30,7 +30,7 @@
 | T4 | FNO | zero-shot | L | test_id | 3 | 0.120 ± 0.001 | 0.973 ± 0.000 | 0.713 ± 0.002 | – |
 | T4 | FNO | zero-shot | L | test_ood | 3 | 0.127 ± 0.002 | 0.958 ± 0.000 | 0.592 ± 0.002 | – |
 | T4 | FNO | zero-shot | XL | ood_region | 3 | 0.517 ± 0.000 | 0.986 ± 0.000 | 0.711 ± 0.002 | – |
-| T4 | FNO | zero-shot | XL | test_id | 3 | 0.533 ± 0.000 | 0.955 ± 0.001 | 0.665 ± 0.005 | – |
+| T4 | FNO | zero-shot | XL | test_id | 3 | 0.532 ± 0.000 | 0.956 ± 0.000 | 0.668 ± 0.002 | – |
 | T4 | FNO | zero-shot | XL | test_ood | 3 | 0.525 ± 0.002 | 0.962 ± 0.001 | 0.578 ± 0.001 | – |
 | T4 | FNO | zero-shot | XXL | ood_region | 1 | 0.766 | 0.976 | 0.618 | – |
 | T4 | FNO | zero-shot | XXL | test_id | 1 | 0.765 | 0.940 | 0.627 | – |
@@ -39,7 +39,7 @@
 | T4 | U-Net | zero-shot | L | test_id | 3 | 0.081 ± 0.001 | 0.992 ± 0.000 | 0.812 ± 0.005 | – |
 | T4 | U-Net | zero-shot | L | test_ood | 3 | 0.089 ± 0.001 | 0.983 ± 0.001 | 0.708 ± 0.008 | – |
 | T4 | U-Net | zero-shot | XL | ood_region | 3 | 0.508 ± 0.002 | 0.973 ± 0.001 | 0.587 ± 0.004 | – |
-| T4 | U-Net | zero-shot | XL | test_id | 3 | 0.515 ± 0.003 | 0.945 ± 0.001 | 0.596 ± 0.002 | – |
+| T4 | U-Net | zero-shot | XL | test_id | 3 | 0.515 ± 0.002 | 0.946 ± 0.000 | 0.596 ± 0.002 | – |
 | T4 | U-Net | zero-shot | XL | test_ood | 3 | 0.516 ± 0.005 | 0.939 ± 0.001 | 0.491 ± 0.004 | – |
 | T4 | U-Net | zero-shot | XXL | ood_region | 1 | 0.754 | 0.948 | 0.447 | – |
 | T4 | U-Net | zero-shot | XXL | test_id | 1 | 0.749 | 0.905 | 0.507 | – |
@@ -48,5 +48,5 @@
 | T4 | ViT | zero-shot | L | test_id | 3 | 0.159 ± 0.004 | 0.953 ± 0.002 | 0.605 ± 0.009 | – |
 | T4 | ViT | zero-shot | L | test_ood | 3 | 0.152 ± 0.003 | 0.914 ± 0.005 | 0.449 ± 0.009 | – |
 | T4 | ViT | zero-shot | XL | ood_region | 3 | 0.518 ± 0.001 | 0.976 ± 0.002 | 0.601 ± 0.013 | – |
-| T4 | ViT | zero-shot | XL | test_id | 3 | 0.540 ± 0.001 | 0.934 ± 0.002 | 0.569 ± 0.008 | – |
+| T4 | ViT | zero-shot | XL | test_id | 3 | 0.538 ± 0.000 | 0.937 ± 0.002 | 0.573 ± 0.008 | – |
 | T4 | ViT | zero-shot | XL | test_ood | 3 | 0.523 ± 0.002 | 0.941 ± 0.004 | 0.463 ± 0.013 | – |
