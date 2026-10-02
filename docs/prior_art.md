@@ -207,3 +207,89 @@ submission.
 - [22]'s *Genetics* citation was not independently confirmed beyond the bioRxiv/PMC records; treat the journal details as provisional.
 - [31] author list is from the ICML proceedings listing; verify before citing in the paper.
 - [39] author list was not retrieved; cite by arXiv ID only until confirmed.
+
+---
+
+## 7 (continued). Searches performed — 2026-10-02 re-run before Phase 12 drafting
+
+Appended 2026-10-02 (append-only; the §1–§7 text above is left as written on 2026-09-05). Belongs to §7.
+
+**Protocol.** Engine: Claude Code `WebSearch` (single web engine, US-only index; no Google Scholar, CNKI or arXiv
+full-text search available) plus direct `WebFetch` of candidate pages and of the Circuitscape.jl / Omniscape.jl
+repositories, docs and issue trackers. Date: 2026-10-02. Each query run once, verbatim:
+
+| # | Query |
+|---|---|
+| 1 | neural surrogate Circuitscape |
+| 2 | learned emulator Omniscape |
+| 3 | deep learning current density landscape connectivity |
+| 4 | GPU Circuitscape |
+| 5 | neural operator landscape connectivity |
+| 6 | machine learning circuit theory conservation current map prediction |
+| 7 | Omniscape acceleration |
+| 8 | surrogate model resistance surface connectivity |
+| 9 | Circuitscape emulator neural network |
+| 10 | Omniscape GPU CUDA |
+| 11 | effective resistance prediction neural network raster |
+| 12 | convolutional neural network predict connectivity current flow landscape |
+| 13 | arxiv Circuitscape PyTorch JAX differentiable connectivity |
+| 14 | bioRxiv "Circuitscape" "surrogate" OR "emulator" deep learning |
+| 15 | Circuitscape.jl Omniscape.jl GPU CUDA support github issue |
+| 16 | jaxscape Boussange connectivity JAX paper arXiv |
+| 17 | "Circuitscape" "neural network" surrogate OR emulator current density raster 2025 OR 2026 |
+| 18 | U-Net predict Circuitscape current map from resistance raster |
+| 19 | Boussange differentiable connectivity modelling preprint JAXScape "Nature Communications" OR bioRxiv OR arXiv |
+
+Direct fetches: `github.com/Circuitscape/Circuitscape.jl` (README; issues matching "GPU OR CUDA"),
+`github.com/Circuitscape/Omniscape.jl` (README; issues matching "GPU OR CUDA"),
+`docs.circuitscape.org/Circuitscape.jl/latest/`, `github.com/vboussange/jaxscape`, Semantic Scholar / Europe PMC
+records for candidate papers.
+
+**Result.** No learned surrogate or emulator of Circuitscape or Omniscape, and no public ML benchmark of
+solver-computed circuit-theory outputs, was found other than this project's own repository
+(https://github.com/Xyrro/AmpScape, which already surfaces for query 2 — relevant for double-blind submission).
+No GPU port of Circuitscape.jl or Omniscape.jl exists: neither README, the docs, nor the issue trackers mention
+GPU/CUDA (the only "GPU OR CUDA" hit in Circuitscape.jl is PR #448, "Replace IterativeSolvers.jl with Krylov.jl",
+merged 2026-04-04, which is not GPU work); solvers remain CG+AMG, CHOLMOD, and the Accelerate/Pardiso extensions,
+with parallelism via Julia threads.
+
+Borderline item: **JAXScape** (https://github.com/vboussange/jaxscape, V. Boussange, MIT, v0.0.6, Zenodo
+doi:10.5281/zenodo.15267703) — a "differentiable and GPU-accelerated" *direct numerical* implementation in JAX of
+least-cost, resistance-distance and randomized-shortest-path metrics, reporting "74x faster than Circuitscape.jl with
+cg+amg solver and 17x faster than Circuitscape.jl with cholmod solver" on a 1000×1000 grid. It is not a learned
+surrogate, not a port of Circuitscape/Omniscape, has no moving-window (Omniscape) mode and no dedicated paper; it is
+the closest "fast exact solver" prior work and the natural GPU comparison point. Its author is a co-author of the
+ConScape analytical-sensitivity preprint (bioRxiv 10.64898/2026.01.05.697654), confirming that exact connectivity
+solvers are differentiable — the paper must not claim otherwise.
+
+Adjacent, non-overlapping hits (all previously known): Equihua et al. 2024 (DRL over graph connectivity indices),
+Pless et al. 2021 PNAS 118(9):e2003201118 (random forest predicting genetic distance, no circuit theory),
+ResistanceGA (GA over resistance surfaces with exact solvers as the forward model), generic Darcy/porous-media
+CNN and neural-operator surrogates, the SyncroSim `omniscape` workflow wrapper (apexrms.github.io/omniscape). All
+remaining hits for queries 1, 6, 9–11 were electronics, neuroscience or loss-landscape name collisions.
+
+Caveat: single-engine web search; a very recent preprint could be missed. Recommend a final Google Scholar /
+Semantic Scholar pass by the owner at submission time.
+
+### Verification addendum 2026-10-02 (corrections to the reference list above; original entries left unchanged)
+
+All 42 references and the inline links were re-verified on 2026-10-02 (full table with quotes and status:
+`paper/sections/related_work_sources.md`). All resolve. Corrections to carry into any future citation:
+- [4] the Julia port reports "speed improvements of up to 1800%" (≈ 18×); the "2–4×" figure in §1 is not in the paper.
+- [3] the "computational cost at large extents" sentence is not in the abstract and was not confirmed in the full text.
+- [6] full author list: McRae, Popper, Jones, Schindel, Buttrick, Hall, Unnasch, Platt (2016), 47 pp.; no DOI; cite via
+  https://www.sciencebase.gov/catalog/item/5807ba6de4b0841e59e3a494.
+- [8] the Zenodo data record (10.5281/zenodo.6473366) confirms effective-resistance and current-density outputs; the
+  attribution to Omniscape specifically was not confirmed from any fetched text.
+- [21] authors Hamonic, Vaxès, Couëtoux, Albert; *MEE* 16(9):1914–1922 (2025).
+- [22] journal DOI 10.1093/genetics/iyad068 (confirmed).
+- [26] pages 205–218; publisher year 2023.
+- [27] also published in TMLR 2023; "very strong U-Net" wording is supported in substance but not quotable verbatim.
+- [30] author list is wrong: Lan, K. W., Gueidon, E., Kaneda, A., Panetta, J., & Teran, J.; PMLR 235:25976–25994.
+- [31] authors confirmed (Li, Chen, Du, Matusik); PMLR 202:19425–19439.
+- [32] does not use effective resistance as a positional encoding — misattributed; effective-resistance PE is in
+  Velingker et al. 2023 (arXiv:2206.11941) and Black et al. 2024 (arXiv:2402.14202).
+- [39] authors: Trifonov, Rudikov, Iliev, Laevsky, Oseledets, Muravleva.
+- HANO is now *J. Comput. Phys.* 506:112944 (2024); MgNO is ICLR 2024; DCNO is arXiv:2408.00775 (2024); LOD-MSNO is
+  arXiv:2607.12570 (Haltmayer et al., 14 Jul 2026).
+- [41] still resolves; no NeurIPS 2027 call exists yet (neurips.cc/Conferences/2027 → 404 on 2026-10-02).
