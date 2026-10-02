@@ -322,9 +322,11 @@ def submit_stats(tier: str, group: str, st: dict) -> None:
 
 XFER_RES = {"XL": {"cpus": 8, "mem": "96G"}, "XXL": {"cpus": 8, "mem": "160G"}}
 XFER_WALL = "04:00:00"
-XFER_BURST_GB = 11.0  # largest prediction burst of one transfer leg (FNO at XL test_id measured 10.7 GB)
-MAX_XFER = 4  # concurrent transfer legs: each writes up to ≈ 13 GB of XL predictions before its metrics run
-XFER_QUOTA_GB = 245.0  # no transfer submission above this scratch level (quota 300; ≤ 4 bursts of ≤ 13 GB in flight)
+XFER_BURST_GB = (
+    11.0  # largest prediction burst of one transfer leg (FNO at XL test_id measured 10.7 GB)
+)
+MAX_XFER = 3  # concurrent transfer legs: each writes up to ≈ 13 GB of XL predictions before its metrics run
+XFER_QUOTA_GB = 255.0  # no transfer submission above this scratch level (quota 300; ≤ 4 bursts of ≤ 13 GB in flight)
 
 
 def submit_transfer(j: dict, st: dict, gres: str, exclude: list[str]) -> None:
@@ -651,10 +653,11 @@ def cycle(jobs: list[dict], st: dict) -> None:
         # a group staged for transfer legs must leave room for their prediction bursts below the transfer threshold
         # (22:45Z: XL/T4 was re-staged into the hold band and would have been evicted again next cycle)
         limit = (
-            (XFER_QUOTA_GB - XFER_BURST_GB * MAX_XFER)
+            (SCRATCH_LIMIT_GB - XFER_BURST_GB * MAX_XFER)
             if (tier, group) in xfer_only
             else SCRATCH_LIMIT_GB
-        )
+        )  # 2026-10-02: measured against the hard guard, not the transfer threshold — the old limit (201) sat
+        # below the scratch floor + one XL group (156 + 61) and the driver idled for six days with an empty queue
         if quota_gb() - freed[0] + size > limit:
             evict_until(size, first_use.get((tier, group), 10**6), limit)
             if quota_gb() - freed[0] + size > limit:

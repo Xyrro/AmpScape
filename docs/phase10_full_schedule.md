@@ -46,6 +46,12 @@ S runs; GNN last because it is two thirds of the budget and its receptive field,
   jobs stop receiving new jobs ("draining") until their legs finish and they can be evicted. Without this the P3 S
   seeds kept the S groups pinned and the headline M/L runs waited.
 - Offloader: `bash scripts/slurm/gpu/offload_loop.sh 600` (starts `offload_runs.py --loop 600` once; see §4).
+- **Restart after a dead session or a login-node reboot (runbook, 2026-10-02)** — one line, idempotent, detached:
+  `setsid nohup bash scripts/slurm/gpu/keepalive.sh > /dev/null 2>&1 < /dev/null &`
+  The keepalive (pid in `logs/keepalive.pid`, log `logs/keepalive.log`) restarts the driver whenever its lease pid is
+  dead and the offloader whenever no copy runs, every 5 min; both are resumable, nothing is lost by a restart. It
+  survives the session that launched it; a login-node reboot kills it (no cron/systemd for users on PACE login
+  nodes) — run the line again. Health check: `tail logs/keepalive.log logs/gpu_driver.log; squeue -u $USER`.
 
 ## 4. Storage rule for runs (2026-09-24)
 
