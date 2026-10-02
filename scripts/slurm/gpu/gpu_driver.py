@@ -325,7 +325,7 @@ XFER_WALL = "04:00:00"
 XFER_BURST_GB = (
     11.0  # largest prediction burst of one transfer leg (FNO at XL test_id measured 10.7 GB)
 )
-MAX_XFER = 3  # concurrent transfer legs: each writes up to ≈ 13 GB of XL predictions before its metrics run
+MAX_XFER = 4  # concurrent transfer legs (scratch floor ≈ 70 GB after the 2026-10-02 deletions): each writes up to ≈ 13 GB of XL predictions before its metrics run
 XFER_QUOTA_GB = 255.0  # no transfer submission above this scratch level (quota 300; ≤ 4 bursts of ≤ 13 GB in flight)
 
 
@@ -724,7 +724,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
         if slots <= 0 or n_queued_total() >= MAX_QUEUED_TOTAL:
             break
         key = (j["tier"], GROUP[j["task"]])
-        if j["tag"] == "P4" and any(
+        if j["tag"] in ("P4", "SN4", "SNX4") and any(
             jj["tag"] not in ("P4", "XF4", "SN4", "SNX4")
             for jj in pending
             if jj["name"] not in running

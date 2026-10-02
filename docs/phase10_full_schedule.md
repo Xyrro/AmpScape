@@ -67,7 +67,7 @@ local `predictions/*.h5` and `last.pt`; results, config, log and best.pt stay lo
 The card defines XL and XXL as held-out-scale tiers ("XL/XXL for models trained ≤ L"); their v1.0 splits hold 228
 (XL) and 0 (XXL) training landscapes and no validation split, so the first XL training legs were degenerate (228
 samples, `val_loss` 0, early stop at epoch 9) and their single-process metrics at 1024² exceeded the 2-h leg. The
-nine XL training jobs were cancelled and moved to `runs/abandoned_xl_training/`; nothing is trained at XL.
+nine XL training jobs were cancelled and moved to `runs/abandoned_xl_training/` (deleted 2026-10-02 with owner approval); nothing is trained at XL.
 
 Instead every L-trained run is evaluated at XL and at XXL (fully convolutional models only: U-Net, FNO, GNN; the
 ViT's interpolated positional embedding stops at XL) on `test_id`, `test_ood`, `ood_region` at batch 1 with the
