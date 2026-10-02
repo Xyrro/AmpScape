@@ -1,4 +1,4 @@
-# Status — 2026-09-26 02:50Z: v1.0.2 (metadata) published and tagged; transfer phase running
+# Status — 2026-10-02 14:10Z: driver idle for six days (staging deadlock) — restarted under a keepalive; 84 training runs done, transfer/variant/GNN phases remain
 
 ## Headline rel-L2 on test_id (seed 1, 30 epochs, official configs)
 
@@ -48,6 +48,31 @@
   no re-calibration). The transfer script was cross-checked on training-tier data where possible; the pattern is
   consistent across seeds and models.
 - Remaining splits (test_ood, ood_region) and XXL follow as the transfer jobs run.
+
+## 2026-10-02 reconnect: inventory, incident, restart
+
+**Inventory (from disk and the Hub, `aux/results/runs_full/`):** all 84 training runs of P1–P3 and WP4 are complete
+and on the Hub with results (every T4 M/L run also has its exact-reference evaluation). Scale transfer: 18 of 30
+legs done (all T1 at XL and XXL, 3 seeds; T4 seed-1 at XL for U-Net/FNO/ViT) — remaining 12: T4 XL seeds 2–3 (6)
+and T4 XXL (6). Not started: scale-aware variants (6 L runs + 10 transfers), GNN (18 runs), GNN transfers (12),
+GNN variant (2 + 4). Nominal remaining 772 GPU-h (GNN 578 of it); at the measured 3–7× faster training the realistic
+remainder is ≈ 200–300 GPU-h.
+
+**Incident:** the driver and the offloader never died — both ran through the week — but the driver was deadlocked
+since 26 Sep 03:30Z: after the XXL/T1 group was released it refused to stage XL/T4 because the transfer-group staging
+limit (201 GB = 245 − 4 × 11) sat below the scratch floor plus one XL group (156 + 61 GB), so nothing could be staged
+and the queue stayed empty for six days. Silent because the hold was logged only as "does not fit". Fix: the limit
+is now measured against the hard 280 GB guard (280 − 3 × 11 = 247; three transfer legs in flight), and the monitor
+has a watchdog that reports an empty queue while jobs are pending. Six calendar days lost; no results lost.
+
+**Restart (detached):** `scripts/slurm/gpu/keepalive.sh` under `setsid nohup` restarts the driver whenever its lease
+pid is dead and the offloader whenever none runs (every 5 min; `logs/keepalive.log`). One-line runbook entry in
+`docs/phase10_full_schedule.md` §3. It survives a dead session; a login-node reboot still needs the line re-run
+(PACE login nodes allow no user cron/systemd). Driver restarted 13:54Z; XL/T4 staging; T4 transfer legs next.
+
+**Calendar estimate at the measured rates:** transfers ≈ 1 day (12 legs + the variants' 10), scale-aware L runs
+≈ 0.5 day in parallel, GNN 18 runs ≈ 2–3 days (L/T4 GNN is the long pole, 2-h legs re-queued), GNN transfers and
+variant ≈ 1 day → **≈ 4–5 calendar days** if nothing stalls. Weekly report, or on failures.
 
 ## v1.0.2 (metadata only) — done 2026-09-26 02:40Z (owner approval)
 - Audit of every hashed share: only the C3 macro-cell hash had a None key (synthetic XL). The block-order hash
