@@ -21,7 +21,7 @@
 
 ## [1.0.0] — 2026-09-23
 
-v1.0 data release: 174 400 landscapes / 902 904 rows / 1 157 GB on `Xirro/AmpScape` (revision `v1.0`), five audited tiers,
+v1.0 data release: 174 400 landscapes / 920 372 rows (corrected 2026-10-02 from the index; 902 904 was stale) / 1 157 GB on `Xirro/AmpScape` (revision `v1.0`), five audited tiers,
 post-run precision pass, validated Croissant, final card, statistics figures, generation post-mortem.
 
 ### Post-run precision pass — 2026-09-22/23

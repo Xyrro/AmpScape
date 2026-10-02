@@ -1,7 +1,7 @@
 # AmpScape v1.0 generation — post-mortem
 
 Scope: the v1.0 run on Georgia Tech PACE-ICE (Slurm, account `coc`, QoS `coc-ice`), 2026-09-16 → 2026-09-23: five
-tiers (S 128² … XXL 2048²), 174 400 landscapes, 902 904 configuration rows, 1 157 GB on `Xirro/AmpScape`, followed by
+tiers (S 128² … XXL 2048²), 174 400 landscapes, 920 372 configuration rows (the 902 904 quoted at tag time was a stale pre-audit count; the v1.0 index holds 920 372 rows, 920 347 QC-pass), 1 157 GB on `Xirro/AmpScape`, followed by
 the post-run precision pass. Sources: `docs/status/generation_log.md` (every entry), `DECISIONS.md`, `logs/driver.log`.
 
 ## 1. Timeline
@@ -54,7 +54,7 @@ the post-run precision pass. Sources: `docs/status/generation_log.md` (every ent
 | wall-clock, precision pass | 29 h |
 | data on the Hub | 1 157 GB (S 142, M 252, L 381, XL 282, XXL 101) + 20.5 GB `aux/`; core subset 115 GB, mini 0.6 GB |
 | scratch peak | 215 GB (quota 300); base 114 GB without in-flight data |
-| QC | 25 of 902 904 rows fail QC after the pass (24 samples excluded from split lists); 3 861 rows carry a residual between 1e-9 and 1e-6 (double-precision floor, recorded) |
+| QC | 25 of 920 372 rows fail QC after the pass (24 samples excluded from split lists); 3 861 rows carry a residual between 1e-9 and 1e-6 (double-precision floor, recorded) |
 
 ## 4. Runbook changes anyone reproducing this needs
 

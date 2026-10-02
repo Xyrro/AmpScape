@@ -8,8 +8,8 @@
 | T1 FNO | 0.198 | 0.266 | 0.364 |
 | T1 ViT | 0.238 | 0.533 | 0.644 (structural, see DECISIONS) |
 | T4 U-Net | 0.040 | 0.051 | 0.080 |
-| T4 FNO | 0.070 | 0.079 | 0.120 |
-| T4 ViT | 0.071 | 0.099 | running |
+| T4 FNO | 0.051 | 0.079 | 0.120 |
+| T4 ViT | 0.052 | 0.099 | 0.159 |
 
 - T1 error grows with tier for both U-Net and FNO (S → L: ×3.5 and ×1.8). Two effects are confounded in the
   official configs: larger landscapes (longer-range flow) and a smaller fixed-epoch training set (100 k / 30.7 k /
