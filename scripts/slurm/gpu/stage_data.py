@@ -25,7 +25,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 REPO = "Xirro/AmpScape"
-REVISION = "v1.0"
+REVISION = "v1.0.2"  # data files identical to v1.0; index/splits carry the 1.0.2 split correction
 
 
 def gb(path: pathlib.Path) -> float:

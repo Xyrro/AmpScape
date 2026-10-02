@@ -134,10 +134,11 @@
    "qc_fail_samples": 7,
    "resolved_rows": 4774,
    "splits": {
-    "test_id": 3118,
+    "test_id": 2335,
+    "train": 880,
     "ood_region": 400,
     "test_ood": 254,
-    "train": 228
+    "val": 131
    },
    "family": {
     "synthetic": 2400,
