@@ -713,10 +713,11 @@ def cycle(jobs: list[dict], st: dict) -> None:
         evict_until(
             0.0, max(first_xfer, LOOKAHEAD), XFER_QUOTA_GB
         )  # until quota - freed <= XFER_QUOTA_GB; only groups outside the lookahead (23:22Z: a 1 GB overshoot evicted XXL/T1 four jobs ahead of its use)
-        log(
-            f"transfer legs held by scratch {before:.0f} GB > {XFER_QUOTA_GB:.0f}: evicted later-use groups "
-            f"({freed[0]:.0f} GB)"
-        )
+        if freed[0] > 0:
+            log(
+                f"transfer legs held by scratch {before:.0f} GB > {XFER_QUOTA_GB:.0f}: evicted later-use groups "
+                f"({freed[0]:.0f} GB)"
+            )
     if quota_gb() > 290.0:
         log(f"scratch {quota_gb():.0f} GB > 290: no submissions this cycle")
         slots = 0
