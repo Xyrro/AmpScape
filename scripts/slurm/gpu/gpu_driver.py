@@ -585,7 +585,14 @@ def cycle(jobs: list[dict], st: dict) -> None:
     xfer_only: set[tuple[str, str]] = (
         set()
     )  # groups wanted only by transfer legs within the lookahead
-    for j in pending[:LOOKAHEAD]:
+    # the GNN phase (P4/XF4/SN4/SNX4) cannot be submitted while an earlier-phase job is pending, so its groups are
+    # not staged ahead either (2026-10-03 02:00Z: pre-staged S/M groups pushed scratch over the transfer threshold
+    # and blocked the very transfer legs the GNN phase was waiting for)
+    earlier_pending = any(jj["tag"] not in ("P4", "XF4", "SN4", "SNX4") for jj in pending)
+    stageable = [
+        jj for jj in pending if not (earlier_pending and jj["tag"] in ("P4", "XF4", "SN4", "SNX4"))
+    ]
+    for j in stageable[:LOOKAHEAD]:
         key = (j["tier"], GROUP[j["task"]])
         if key not in needed:
             needed.append(key)
@@ -711,7 +718,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
         # nothing triggered an eviction — free the groups whose next use is later than the first runnable transfer
         before = quota_gb()
         evict_until(
-            0.0, max(first_xfer, LOOKAHEAD), XFER_QUOTA_GB
+            0.0, first_xfer, XFER_QUOTA_GB
         )  # until quota - freed <= XFER_QUOTA_GB; only groups outside the lookahead (23:22Z: a 1 GB overshoot evicted XXL/T1 four jobs ahead of its use)
         if freed[0] > 0:
             log(
