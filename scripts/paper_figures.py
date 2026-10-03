@@ -13,6 +13,8 @@ Outputs (all under paper/):
                                          F4  L-trained models evaluated at L / XL / XXL (zero-shot; scale-aware variants when present)
   figures/wp7_agreement.png, tables/wp7_per_tile.md
                                          F5  many-query demonstration: surrogate vs solver conclusions per tile
+  figures/wp4_data_scaling.png, tables/wp4_data_scaling.md
+                                         F6  WP4 data-scaling ablation at S (fixed-epoch vs fixed-step)
 Every number comes from docs/tables/*.md, runs/full/*/results*.json or aux/wp7/demo_results.parquet; the script
 never recomputes metrics. Missing inputs are reported and skipped, never fabricated.
 """
@@ -422,6 +424,76 @@ def refresh_baselines_table() -> None:
     )
 
 
+# ----------------------------------------------------------------------------------------------------------------- F6
+def wp4_data_scaling(out: pathlib.Path) -> None:
+    """WP4: rel-L2 on test_id vs number of training landscapes at S (U-Net, FNO; fixed-epoch and fixed-step)."""
+    src = ROOT / "docs" / "tables" / "baselines_full.md"
+    if not src.exists():
+        return
+    df = read_markdown_table(src)
+    df = df[(df.split == "test_id") & (df.tier == "S") & (df.task == "T1")].copy()
+    rows = []
+    for _, r in df.iterrows():
+        m = re.match(r"^(unet|fno)_T1_S_s1(?:_n(\d+)_(ep30|steps))?$", r.model)
+        if not m:
+            continue
+        n = int(m.group(2)) if m.group(2) else None
+        rows.append(
+            {
+                "model": m.group(1),
+                "n_train": n,
+                "regime": m.group(3) or "full",
+                "rel_l2": r.rel_l2,
+                "mae": r.mae_log10eps,
+                "top5_iou": r.top5_iou,
+                "epochs": r.epochs,
+                "gpu_h": r["train GPU-h"],
+            }
+        )
+    if not rows:
+        log("F6 WP4: no rows — skipped")
+        return
+    d = pd.DataFrame(rows)
+    full_n = 61577  # S train landscapes with QC pass (train split of the S index; docs/tables/final_counts.json: 63,303 train samples)
+    d.loc[d.regime == "full", "n_train"] = full_n
+    lines = [
+        "# WP4 data-scaling ablation at S, task T1, seed 1 (from docs/tables/baselines_full.md)",
+        "",
+        "fixed-epoch = 30 epochs on the subset; fixed-step ≈ the full run's optimisation steps; full = the official run (all train landscapes).",
+        "",
+        "| model | n train | regime | rel-L2 | MAE log10 | top-5 % IoU | epochs | train GPU-h |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for _, r in d.sort_values(["model", "n_train", "regime"]).iterrows():
+        lines.append(
+            f"| {MODEL_LABEL[r.model]} | {int(r.n_train):,} | {r.regime} | {r.rel_l2:.3f} | {r.mae:.3f} | {r.top5_iou:.3f} | {int(r.epochs)} | {r.gpu_h:.2f} |"
+        )
+    (out / "tables" / "wp4_data_scaling.md").write_text("\n".join(lines) + "\n")
+    fig, ax = plt.subplots(figsize=(5.2, 3.8))
+    for model, ls in (("unet", "-"), ("fno", "--")):
+        for regime, mk in (("ep30", "o"), ("steps", "s")):
+            g = d[(d.model == model) & (d.regime.isin([regime, "full"]))].sort_values("n_train")
+            if len(g):
+                ax.plot(
+                    g.n_train,
+                    g.rel_l2,
+                    marker=mk,
+                    linestyle=ls,
+                    label=f"{MODEL_LABEL[model]} ({'fixed epochs' if regime == 'ep30' else 'fixed steps'})",
+                )
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("training landscapes (tier S)")
+    ax.set_ylabel("relative L2 on test_id (T1)")
+    ax.set_title("WP4: data scaling at S")
+    ax.grid(alpha=0.3, which="both")
+    ax.legend(fontsize=7)
+    fig.tight_layout()
+    fig.savefig(out / "figures" / "wp4_data_scaling.png", dpi=150)
+    plt.close(fig)
+    log(f"F6 WP4: {len(d)} rows")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -442,6 +514,7 @@ def main() -> None:
     error_vs_tier(out)
     scale_transfer(out)
     wp7(out)
+    wp4_data_scaling(out)
     log("done")
 
 
