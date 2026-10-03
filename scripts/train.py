@@ -465,7 +465,9 @@ def main():
                     finished = True
                     print(f"stop at epoch {ep} ({'patience' if bad >= a.patience else 'epochs'})")
                     break
-                if (time.time() - t_start) / 60 > a.time_budget_min:
+                # predictive (2026-10-03): stop when the NEXT epoch would not fit — a GNN T4 L epoch is 30 min and a
+                # leg that starts one at minute 90 of a 105-min budget hits the walltime mid-epoch
+                if (time.time() - t_start) / 60 + 1.1 * dt / 60 > a.time_budget_min:
                     print(f"pause at epoch {ep} (time budget; resume with --resume)")
                     break
             if (
