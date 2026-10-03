@@ -1,4 +1,4 @@
-# Status — 2026-10-02 14:10Z: driver idle for six days (staging deadlock) — restarted under a keepalive; 84 training runs done, transfer/variant/GNN phases remain
+# Status — 2026-10-03 03:00Z: transfer phase and scale-aware variants complete; GNN phase started
 
 ## Headline rel-L2 on test_id (seed 1, 30 epochs, official configs)
 
@@ -48,6 +48,30 @@
   no re-calibration). The transfer script was cross-checked on training-tier data where possible; the pattern is
   consistent across seeds and models.
 - Remaining splits (test_ood, ood_region) and XXL follow as the transfer jobs run.
+
+## 2026-10-03: scale-aware target variant — result (seed 1, trained at L, zero-shot at XL/XXL; `paper/tables/scale_transfer.md`)
+
+| task / model | L (trained) | XL zero-shot → scale-aware | XXL zero-shot → scale-aware |
+|---|---|---|---|
+| T4 U-Net | 0.080 | 0.515 → **0.189** | 0.749 → **0.312** |
+| T4 FNO | 0.120 | 0.532 → **0.162** | 0.765 → **0.201** |
+| T4 ViT | 0.161 | 0.538 → **0.203** | — |
+| T1 U-Net | 0.369 | 1.250 → 0.957 | 4.43 → 0.987 |
+| T1 FNO | 0.411 | 0.707 → **0.572** | 1.502 → **0.671** |
+| T1 ViT | 0.617 | 0.768 → 0.656 | — |
+
+(rel-L2 on test_id; zero-shot values are the 3-seed means of the official configs.) Making the target scale-free with
+the quantity that sets the current magnitude — the Omniscape radius for T4, the valid-pixel count for T1 — removes most
+of the zero-shot transfer error for T4 (the radius factor is exactly the 1 − 1/2 and 1 − 1/4 seen before) and for the
+FNO on T1; the U-Net on T1 stays near rel-L2 1 at XL/XXL (its receptive field, not the magnitude, is the limit) and
+the ViT's structural problem is unchanged. Rankings (Spearman) are the same as zero-shot in every case. No XL/XXL data
+entered training or the inverse transform. At L the variant equals the official run for T4 (k = 1) and differs within
+seed noise for T1. Figure: `paper/figures/scale_transfer.png`.
+
+**Incident 2026-10-03 01:00–02:15Z (caught by the watchdog in an hour):** pre-staging the S/M groups for the gated GNN
+phase pushed scratch over the transfer threshold and held the last five variant transfer legs, which in turn gated the
+GNN phase. Fixed: no pre-staging for a gated phase; the hold may evict any group whose next use is later than the held
+leg. GNN phase started 02:50Z (18 runs + 12 transfers + variant).
 
 ## 2026-10-02 reconnect: inventory, incident, restart
 
