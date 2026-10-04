@@ -38,7 +38,7 @@ Numbers below are rel-L2 on the training tier's splits for the official configur
 | L | ood_region | 1,945 | 1.00 | 497 | 1,000 |
 
 `test_ood` holds the held-out table and the 10⁶-contrast landscapes (hence its p90 contrast); `ood_region` is
-real-tile only by construction; `test_ood_published` exists at S.
+real-tile only by construction; the published-tile set (`test_ood_published`, S only) is a separate build and is not in the per-tier index, hence absent from this table.
 
 ## Table
 
