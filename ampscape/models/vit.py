@@ -4,6 +4,8 @@ other grid sizes), a convolutional decoder that upsamples back to pixel resoluti
 
 from __future__ import annotations
 
+import math
+
 import torch
 from torch import nn
 
@@ -48,7 +50,11 @@ class ViTUNet(nn.Module):
         self.norm = nn.LayerNorm(dim)
         ups, c = [], dim
         while patch > 1:
-            ups += [nn.ConvTranspose2d(c, c // 2, 2, stride=2), nn.GroupNorm(8, c // 2), nn.GELU()]
+            ups += [
+                nn.ConvTranspose2d(c, c // 2, 2, stride=2),
+                nn.GroupNorm(math.gcd(8, c // 2), c // 2),
+                nn.GELU(),
+            ]  # patch 16 reaches 12 channels
             c, patch = c // 2, patch // 2
         self.decoder = nn.Sequential(*ups)
         self.head = nn.Sequential(
