@@ -67,25 +67,33 @@ The T4 training targets are production Omniscape maps computed with a block size
 block 5 at L). For the reference subsets we also computed the exact block-1 maps, so solver approximations and
 learned models can be placed on the same error-versus-cost axes (F2). Table 7.2 lists the solver rows from
 [paper/tables/t4_pareto_M.md] and [paper/tables/t4_pareto_L.md] (test_id subset; `ns_rel_l2` is the non-source-pixel
-variant) and the learned models' seed-1 errors against the same block-1 maps from [docs/status/latest.md,
-"Phase 10-full — final summary"].
+variant) and the learned rows of the same files (3-seed means; cost = median GPU inference per landscape; the
+non-source variant is not available for learned rows). Note that the learned rows are evaluated on the full
+`test_id` split (n = 4,823 at M, 1,927 at L) whereas the solver rows cover the block-1 reference subset
+[paper/tables/t4_pareto_M.md; paper/tables/t4_pareto_L.md].
 
-**Table 7.2 — T4 error vs cost per landscape against the exact block-1 map, test_id reference subset**
+**Table 7.2 — T4 error vs cost per landscape against the exact block-1 map, test_id (solver rows: reference subset; learned rows: full split)**
 
-| tier | method | n | cost s / landscape | rel-L2 | ns rel-L2 | top-5 % IoU | pinch recall | Spearman | source |
-|---|---|---|---|---|---|---|---|---|---|
-| M | block 1 (exact) | 400 | 776 | 0 | 0 | 1 | 1 | 1 | [paper/tables/t4_pareto_M.md] |
-| M | production block 3, artefact correction on | 400 | 111 | 0.0291 | 0.0371 | 0.9357 | 0.9312 | 0.9983 | [paper/tables/t4_pareto_M.md] |
-| M | block 3, correction off | 400 | 112 | 0.1105 | 0.1069 | 0.6105 | 0.7658 | 0.9856 | [paper/tables/t4_pareto_M.md] |
-| M | block 7, correction on | 400 | 25.5 | 0.0983 | 0.1064 | 0.8081 | 0.8081 | 0.9845 | [paper/tables/t4_pareto_M.md] |
-| M | block 7, correction off | 400 | 25.4 | 0.2918 | 0.3771 | 0.5468 | 0.9662 | 0.9664 | [paper/tables/t4_pareto_M.md] |
-| M | U-Net / FNO / GNN (seed 1) | — | 0.001–0.016 (range over the three models) | 0.051 / 0.079 / 0.099 | [TODO: not in docs] | [TODO: not in docs] | [TODO: not in docs] | [TODO: not in docs] | [docs/status/latest.md] |
-| L | block 1 (exact) | 24 | 1.23e+04 | 0 | 0 | 1 | 1 | 1 | [paper/tables/t4_pareto_L.md] |
-| L | block 3, correction on | 24 | 1.65e+03 | 0.0280 | 0.0286 | 0.9410 | 0.9347 | 0.9982 | [paper/tables/t4_pareto_L.md] |
-| L | production block 5, correction on | 24 | 566 | 0.0315 | 0.0359 | 0.9344 | 0.9319 | 0.9979 | [paper/tables/t4_pareto_L.md] |
-| L | block 5, correction off | 24 | 638 | 0.1011 | 0.1141 | 0.7710 | 0.9767 | 0.9870 | [paper/tables/t4_pareto_L.md] |
-| L | block 11, correction on | 24 | 164 | 0.0854 | 0.0954 | 0.8317 | 0.8183 | 0.9895 | [paper/tables/t4_pareto_L.md] |
-| L | U-Net / FNO / GNN (seed 1) | — | 0.005–0.066 (range over the three models) | 0.080 / 0.120 / 0.142 | [TODO: not in docs] | [TODO: not in docs] | [TODO: not in docs] | [TODO: not in docs] | [docs/status/latest.md] |
+| tier | method | n | cost s / landscape | rel-L2 | ns rel-L2 | MAE log10 | top-5 % IoU | pinch recall | Spearman | source |
+|---|---|---|---|---|---|---|---|---|---|---|
+| M | block 1 (exact) | 400 | 776 | 0 | 0 | 0 | 1 | 1 | 1 | [paper/tables/t4_pareto_M.md] |
+| M | production block 3, artefact correction on | 400 | 111 | 0.0291 | 0.0371 | 0.0119 | 0.9357 | 0.9312 | 0.9983 | [paper/tables/t4_pareto_M.md] |
+| M | block 3, correction off | 400 | 112 | 0.1105 | 0.1069 | 0.0260 | 0.6105 | 0.7658 | 0.9856 | [paper/tables/t4_pareto_M.md] |
+| M | block 7, correction on | 400 | 25.5 | 0.0983 | 0.1064 | 0.0526 | 0.8081 | 0.8081 | 0.9845 | [paper/tables/t4_pareto_M.md] |
+| M | block 7, correction off | 400 | 25.4 | 0.2918 | 0.3771 | 0.0679 | 0.5468 | 0.9662 | 0.9664 | [paper/tables/t4_pareto_M.md] |
+| M | U-Net (learned, 3 seeds) | 4823 | 0.00109 | 0.0513 | – | 0.0251 | 0.8569 | 0.8993 | 0.9951 | [paper/tables/t4_pareto_M.md] |
+| M | FNO (learned, 3 seeds) | 4823 | 0.00147 | 0.0787 | – | 0.0524 | 0.7784 | 0.7537 | 0.9847 | [paper/tables/t4_pareto_M.md] |
+| M | ViT (learned, 3 seeds) | 4823 | 0.00205 | 0.0942 | – | 0.0561 | 0.7199 | 0.8193 | 0.9789 | [paper/tables/t4_pareto_M.md] |
+| M | GNN (learned, 3 seeds) | 4823 | 0.0163 | 0.0989 | – | 0.0536 | 0.6983 | 0.7746 | 0.9720 | [paper/tables/t4_pareto_M.md] |
+| L | block 1 (exact) | 24 | 1.23e+04 | 0 | 0 | 0 | 1 | 1 | 1 | [paper/tables/t4_pareto_L.md] |
+| L | block 3, correction on | 24 | 1.65e+03 | 0.0280 | 0.0286 | 0.0079 | 0.9410 | 0.9347 | 0.9982 | [paper/tables/t4_pareto_L.md] |
+| L | production block 5, correction on | 24 | 566 | 0.0315 | 0.0359 | 0.0135 | 0.9344 | 0.9319 | 0.9979 | [paper/tables/t4_pareto_L.md] |
+| L | block 5, correction off | 24 | 638 | 0.1011 | 0.1141 | 0.0217 | 0.7710 | 0.9767 | 0.9870 | [paper/tables/t4_pareto_L.md] |
+| L | block 11, correction on | 24 | 164 | 0.0854 | 0.0954 | 0.0409 | 0.8317 | 0.8183 | 0.9895 | [paper/tables/t4_pareto_L.md] |
+| L | U-Net (learned, 3 seeds) | 1927 | 0.00652 | 0.0810 | – | 0.0377 | 0.8122 | 0.8254 | 0.9916 | [paper/tables/t4_pareto_L.md] |
+| L | FNO (learned, 3 seeds) | 1927 | 0.00541 | 0.1198 | – | 0.0729 | 0.7132 | 0.5531 | 0.9735 | [paper/tables/t4_pareto_L.md] |
+| L | ViT (learned, 3 seeds) | 1927 | 0.0141 | 0.1586 | – | 0.0973 | 0.6046 | 0.7348 | 0.9529 | [paper/tables/t4_pareto_L.md] |
+| L | GNN (learned, 3 seeds) | 1927 | 0.0658 | 0.1416 | – | 0.0738 | 0.6321 | 0.7041 | 0.9604 | [paper/tables/t4_pareto_L.md] |
 
 Three things follow. (i) The production targets are a good approximation of the exact map: the blocking error of
 the production setting is rel-L2 0.0291 at M and 0.0315 at L with Spearman 0.998 [paper/tables/t4_pareto_M.md;
@@ -99,8 +107,11 @@ learned models sit on a different part of the frontier rather than dominating it
 the production block-3 solver (0.029 at 111 s) and the block-7 solver (0.098 at 25.5 s) in error but at 1–16 ms per
 landscape; at L the U-Net's 0.080 is comparable to block 11 (0.085 at 164 s) at 5–66 ms [docs/status/latest.md;
 paper/tables/t4_pareto_L.md]. A practitioner who needs rel-L2 < 0.03 still needs the solver; one who needs hundreds of
-maps at rel-L2 ≈ 0.05–0.08 does not. ViT rows against the exact reference and per-model inference costs on this
-subset are [TODO: not in docs].
+maps at rel-L2 ≈ 0.05–0.08 does not. Per model, inference costs 1.09 / 1.47 / 2.05 / 16.3 ms per landscape at M and
+6.52 / 5.41 / 14.1 / 65.8 ms at L for U-Net / FNO / ViT / GNN (converted from the seconds in the source); the ViT
+reaches 0.0942 at M and 0.1586 at L against the exact map, and the learned models' Spearman stays ≥ 0.972 at M and
+≥ 0.953 at L, close to the block-7 and block-11 solvers (0.9845, 0.9895) [paper/tables/t4_pareto_M.md;
+paper/tables/t4_pareto_L.md].
 
 ## 7.3 Data scaling at S (F6)
 
@@ -279,14 +290,13 @@ robustness and cost at once; that trade-off, rather than any one number, is the 
 ## Sources used
 
 - paper/tables/baselines_sml.md — T2, companion table, §7.1, closing paragraph
-- paper/tables/t4_pareto_M.md, paper/tables/t4_pareto_L.md — solver rows of Table 7.2, §7.2
-- docs/status/latest.md ("Phase 10-full — final summary") — learned-model rows of Table 7.2, ms/landscape ranges, 1 − r_L/r_tier observation, scale-aware ranges, GNN characterisation
+- paper/tables/t4_pareto_M.md, paper/tables/t4_pareto_L.md — solver and learned rows of Table 7.2, §7.2
+- docs/status/latest.md ("Phase 10-full — final summary") — seed-1 learned errors quoted in §7.2 (i) and (iii), ms/landscape ranges, 1 − r_L/r_tier observation, scale-aware ranges, GNN characterisation
 - paper/tables/wp4_data_scaling.md, docs/wp4_data_scaling.md — §7.3
 - paper/tables/scale_transfer.md — §7.4, closing paragraph
 - paper/tables/ood_degradation.md, paper/ood_analysis.md — T3, §7.5
 - docs/wp7_demo.md, paper/tables/wp7_per_tile.md — §8
 - docs/tables/gpu_usage.md — GPU budget in the preamble
 
-Not sourced (marked [TODO: not in docs]): ViT errors against the exact block-1 reference; per-model inference cost
-in ms on the reference subset (only the ranges 1–16 ms at M and 5–66 ms at L are documented); the ranking metrics of
-the learned models against the block-1 map.
+Not sourced: the non-source-pixel rel-L2 (`ns_rel_l2`) of the learned models against the block-1 map is not
+available in the regenerated Pareto tables and is shown as "–".
