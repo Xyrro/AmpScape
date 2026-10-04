@@ -65,19 +65,19 @@ their practically relevant number; every number in the paper traces to a `docs/t
 - Pixel, domain (top-k IoU, pinch-point recall, corridor dice, Spearman), non-source-pixel variants, physics checks,
   efficiency/speed-up, T4 exact-reference surface, batch-1 inference at XL/XXL, harness and prediction format.
 
-## 7. Baselines and results (≈ 2 pages) — `paper/sections/baselines_protocol.md`, results tables pending
+## 7. Baselines and results (≈ 2 pages) — `paper/sections/baselines_protocol.md`, `paper/sections/results.md`
 - Official configs (U-Net, FNO, ViT, GNN), protocol (30 epochs, 3 seeds, 2-h resumable legs), non-learned baselines
   (coarsen, block-size Pareto).
 - Results: S/M/L table (mean ± std over 3 seeds; `docs/tables/baselines_full.md`); T4 error–cost Pareto at M and L
   (`docs/tables/t4_pareto_{M,L}.md`); data-scaling (WP4); scale transfer XL/XXL zero-shot and the scale-aware-target
-  variant; OOD degradation per split; GNN (pending).
+  variant; OOD degradation per split (`paper/ood_analysis.md`); GNN rows complete (2026-10-04).
 - Headline figure: error vs tier per model/task with the solver cost axis — the speed–accuracy–robustness trade-off.
 
 ## 8. Many-query demonstration (≈ 0.5 page) — `docs/wp7_demo.md`
 - 20 held-out real L tiles × 8 tables: study-level conclusions from the surrogate vs the solver (stability, consensus
   core, table ranking, persistent pinch points), with the cost comparison and the weakest point (pinch precision).
 
-## 9. Limitations, ethics, maintenance (≈ 0.75 page)
+## 9. Limitations, ethics, maintenance (≈ 0.75 page) — `paper/sections/discussion.md`
 - Limitations to state: resistance tables are structural proxies, not ecological truth; a faster approximation does
   not reduce resistance-surface uncertainty; learned models degrade OOD and final decision maps should be verified
   with the solver; T4 targets carry a quantified blocking approximation; the resolution-versus-size confound (WP5)
