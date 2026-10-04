@@ -17,7 +17,8 @@ while true; do
   dpid=$(python -c "import json;print(json.load(open('logs/lease_gpu_driver.json'))['pid'])" 2>/dev/null)
   if [ -z "$dpid" ] || ! kill -0 "$dpid" 2>/dev/null || ! ps -o args= -p "$dpid" 2>/dev/null | grep -q gpu_driver; then
     rm -f logs/lease_gpu_driver.json
-    setsid nohup python scripts/slurm/gpu/gpu_driver.py >> logs/gpu_driver.err 2>&1 < /dev/null &
+    PLAN=""; [ -s logs/driver_plan.txt ] && PLAN="--plan-file $(cat logs/driver_plan.txt)"  # phase 13+: plan file
+    setsid nohup python scripts/slurm/gpu/gpu_driver.py $PLAN >> logs/gpu_driver.err 2>&1 < /dev/null &
     log "driver (re)started pid $!"
   fi
   if ! ps -eo args | awk '$1=="python" && $2 ~ /offload_runs\.py$/' | grep -q .; then

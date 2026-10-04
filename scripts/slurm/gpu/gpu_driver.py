@@ -63,7 +63,12 @@ TIERS = ["S", "M", "L", "XL"]
 # landscapes and no val split), so nothing is trained at XL — the XL/XXL rows come from the L-trained models
 # (scale-transfer evaluation, docs/phase10_full_schedule.md §5)
 TRAIN_TIERS = ["S", "M", "L"]
-GROUP = {"T1": "T1", "T3": "T3", "T4": "T4"}
+GROUP = {
+    "T1": "T1",
+    "T3": "T3",
+    "T4": "T4",
+    "T1V": "T1",
+}  # T1V reads the T1 shards (+ aux/t1_pair1)
 # per-tier resources: (batch, cpus, mem)
 RES = {
     "S": {"batch": 16, "cpus": 6, "mem": "64G"},
@@ -211,6 +216,8 @@ XFER_EST = {"XL": 1.0, "XXL": 1.5}  # predictions at batch 1 + parallel metrics,
 
 
 def est_hours(j: dict) -> float:
+    if "est_h" in j:
+        return float(j["est_h"])
     if j.get("kind") == "transfer":
         return XFER_EST[j["tier"]] * (2.0 if j["model"] == "gnn" else 1.0)
     base = EST[(j["model"], j["task"])][j["tier"]]
@@ -535,13 +542,23 @@ def submit_t4_reference_backfill(jobs: list[dict], st: dict) -> None:
         if job and sh(["squeue", "-h", "-j", job]):
             continue
         pred = run / "predictions" / f"hfcache_{j['tier']}_test_id"
-        if not (pred / "predictions.h5").exists():
-            continue
         tier = j["tier"]
+        if not staged(tier, "T4"):
+            continue  # the harness reads the shards; the staging block above requests the group
+        fetch = ""
+        if not (
+            pred / "predictions.h5"
+        ).exists():  # offloaded to the Hub: fetched by the job, removed afterwards
+            fetch = (
+                f'mkdir -p {pred}; python -c "from huggingface_hub import hf_hub_download; import shutil; '
+                f"shutil.copyfile(hf_hub_download('Xirro/AmpScape', 'aux/results/runs_full/{j['name']}/predictions/"
+                f"hfcache_{tier}_test_id/predictions.h5', repo_type='dataset'), '{pred}/predictions.h5')\" && "
+            )
         cmd = (
-            f"source scripts/env.sh; python scripts/evaluate.py --predictions {pred} --root data/hfcache --tier {tier} "
+            f"source scripts/env.sh; {fetch}python scripts/evaluate.py --predictions {pred} --root data/hfcache --tier {tier} "
             f"--split test_id --t4-reference aux/t4_bs1_reference/{tier}_bs1 "
             f"--t4-blocks aux/t4_blocksize_baselines/{tier}_* --out {run}/eval_t4_reference"
+            + (f" && rm -f {pred}/predictions.h5" if fetch else "")
         )
         jid = sh(
             [
@@ -596,6 +613,17 @@ def cycle(jobs: list[dict], st: dict) -> None:
         key = (j["tier"], GROUP[j["task"]])
         if key not in needed:
             needed.append(key)
+    # finished T4 M/L runs whose exact-reference evaluation is missing need their group staged for the CPU job
+    for j in jobs:
+        if (
+            j["task"] == "T4"
+            and j["tier"] in ("M", "L")
+            and done(j)
+            and not (RUNS / j["name"] / "eval_t4_reference").exists()
+        ):
+            key = (j["tier"], "T4")
+            if key not in needed:
+                needed.append(key)
             if j.get("kind") == "transfer":
                 xfer_only.add(key)
         elif key in xfer_only and j.get("kind") != "transfer":
@@ -626,9 +654,19 @@ def cycle(jobs: list[dict], st: dict) -> None:
         # never evict a group whose next pending use comes before the target's (10:18Z: the driver staged M/T4 and
         # evicted it seconds later to make room for L/T1)
         cands = []
+        pinned = set()
+        pf = (
+            LOGS / "pinned_groups.txt"
+        )  # groups other jobs (outside this plan) are reading: never evict
+        if pf.exists():
+            pinned = {tuple(x.split("_", 1)) for x in pf.read_text().split() if "_" in x}
         for p_ in sorted((CACHE / "staged").glob("*.json")) if (CACHE / "staged").exists() else []:
             t_, g_ = p_.stem.split("_", 1)
-            if (t_, g_) in running_groups or first_use.get((t_, g_), 10**6) <= target_use:
+            if (
+                (t_, g_) in running_groups
+                or (t_, g_) in pinned
+                or first_use.get((t_, g_), 10**6) <= target_use
+            ):
                 continue
             cands.append((first_use.get((t_, g_), 10**6), t_, g_))
         for _, t_, g_ in sorted(cands, reverse=True):
@@ -758,12 +796,27 @@ def cycle(jobs: list[dict], st: dict) -> None:
     save_state(st)
 
 
+def load_plan_file(path: pathlib.Path) -> list[dict]:
+    """Phase 13 (2026-10-05): the job list comes from a JSON file — a list of {name, model, task, tier, seed, tag,
+    extra?, est_h?, kind?, src?}; `extra` is appended verbatim to train.py's arguments (variant, --target, …);
+    entries with "done_marker": true are finished runs listed only so their T4 reference evaluation is (re)computed."""
+    jobs = json.loads(path.read_text())
+    for j in jobs:
+        j.setdefault("tag", "P")
+        j.setdefault("extra", "")
+        j.setdefault("seed", 1)
+    return jobs
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--plan", action="store_true")
     ap.add_argument("--once", action="store_true")
+    ap.add_argument(
+        "--plan-file", default=None, help="JSON job list instead of the built-in Phase 10 plan"
+    )
     a = ap.parse_args()
-    jobs = plan()
+    jobs = load_plan_file(pathlib.Path(a.plan_file)) if a.plan_file else plan()
     if a.plan:
         tot = 0.0
         by = {}
