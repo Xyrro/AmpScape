@@ -33,9 +33,72 @@ from ampscape.data.dataset import AmpScapeDataset, load_norm_stats  # noqa: E402
 from ampscape.models import build_model  # noqa: E402
 
 
+def summarise(results_json: pathlib.Path) -> dict:
+    """Per-task means of a harness results.json, in the shape train.py stores under results['eval'][tag]."""
+    r = json.loads(results_json.read_text())
+    return {
+        t: {k: v.get("mean") for k, v in agg.items() if isinstance(v, dict) and "mean" in v}
+        | {"speedup": agg.get("speedup")}
+        for t, agg in r["per_task"].items()
+    } | {"n_rows": r["n_rows"]}
+
+
+def update_summary(out_path: pathlib.Path, summary: dict, tag: str, res: dict) -> dict:
+    """Merge one tag into results_transfer.json under a file lock: re-read the current file, set only this tag, write
+    atomically. Legs of the same run for different tiers may run concurrently (2026-10-04)."""
+    import fcntl
+
+    lock = out_path.with_suffix(".lock")
+    with open(lock, "w") as lf:
+        fcntl.flock(lf, fcntl.LOCK_EX)
+        try:
+            current = json.loads(out_path.read_text()) if out_path.exists() else summary
+        except (OSError, json.JSONDecodeError):
+            current = summary
+        current.setdefault("eval", {})[tag] = res
+        for k in ("source_run", "trained_tier", "model", "task"):
+            current.setdefault(k, summary.get(k))
+        current["updated_at"] = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
+        tmp = out_path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(current, indent=1, default=float))
+        tmp.replace(out_path)
+        fcntl.flock(lf, fcntl.LOCK_UN)
+    return current
+
+
+def repair(runs: pathlib.Path) -> int:
+    """Rebuild missing summary entries from eval_transfer/<tag>/results.json for every run; returns the count."""
+    n = 0
+    for run in sorted(runs.glob("*_L_s*")):
+        d = run / "eval_transfer"
+        p = run / "results_transfer.json"
+        if not d.exists():
+            continue
+        try:
+            summary = json.loads(p.read_text()) if p.exists() else {"eval": {}}
+        except (OSError, json.JSONDecodeError):
+            summary = {"eval": {}}
+        cfg = json.loads((run / "config.json").read_text())
+        summary.setdefault("source_run", run.name)
+        summary.setdefault("trained_tier", cfg["tier"])
+        summary.setdefault("model", cfg["model"])
+        summary.setdefault("task", cfg["task"])
+        for x in sorted(d.iterdir()):
+            if (x / "results.json").exists() and x.name not in summary["eval"]:
+                summary = update_summary(p, summary, x.name, summarise(x / "results.json"))
+                print(f"{run.name} {x.name}: summary entry rebuilt", flush=True)
+                n += 1
+    return n
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--run", required=True)
+    ap.add_argument("--run", default=None)
+    ap.add_argument(
+        "--repair",
+        default=None,
+        help="runs directory: rebuild missing summary entries for every run and exit",
+    )
     ap.add_argument("--tier", required=True, help="evaluation tier (XL, XXL)")
     ap.add_argument("--splits", default="test_id,test_ood,ood_region")
     ap.add_argument("--root", default="data/hfcache")
@@ -48,6 +111,11 @@ def main() -> None:
         "are ≈ 13 GB per split per run (2026-09-25: nine concurrent transfer jobs filled the scratch quota)",
     )
     a = ap.parse_args()
+    if a.repair:
+        print(f"repaired {repair(pathlib.Path(a.repair))} entries", flush=True)
+        return
+    if not a.run:
+        raise SystemExit("--run is required")
     run = pathlib.Path(a.run)
     cfg = json.loads((run / "config.json").read_text())
     name, task = cfg["model"], cfg["task"]
@@ -85,8 +153,14 @@ def main() -> None:
         tag = f"{pathlib.Path(a.root).name}_{a.tier}_{split}"
         pdir = run / "predictions" / tag
         edir = run / "eval_transfer" / tag
-        if (edir / "results.json").exists() and tag in summary["eval"]:
-            print(f"{tag}: done already", flush=True)
+        if (edir / "results.json").exists():
+            if tag not in summary["eval"]:
+                # metrics exist but the summary entry was lost (2026-10-04: XL and XXL legs of one run wrote the
+                # summary concurrently) — rebuild the entry from the stored results instead of re-predicting
+                summary = update_summary(out_path, summary, tag, summarise(edir / "results.json"))
+                print(f"{tag}: summary entry rebuilt from eval_transfer", flush=True)
+            else:
+                print(f"{tag}: done already", flush=True)
             continue
         ds = AmpScapeDataset(task, split, a.tier, a.root)
         if len(ds) == 0:
@@ -131,11 +205,7 @@ def main() -> None:
         edir.mkdir(parents=True, exist_ok=True)
         for f in src.glob("results.*"):
             (edir / f.name).write_bytes(f.read_bytes())
-        summary["eval"][tag] = res
-        summary["updated_at"] = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
-        tmp = out_path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(summary, indent=1, default=float))
-        tmp.replace(out_path)
+        summary = update_summary(out_path, summary, tag, res)
         keep = a.keep_predictions.split(",")
         if "all" not in keep and split not in keep:
             h5 = pdir / "predictions.h5"

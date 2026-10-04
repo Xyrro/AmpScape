@@ -741,6 +741,8 @@ def cycle(jobs: list[dict], st: dict) -> None:
         if j.get("kind") == "transfer":
             if not done({"name": j["src"]}) or not staged(*key):
                 continue  # the L-trained source run is not finished, or its XL/XXL data is not staged
+            if any(n.startswith(f"xfer_{j['src']}_") for n in running):
+                continue  # one transfer leg per source run at a time (2026-10-04: concurrent legs raced on the summary)
             if n_xfer_running >= MAX_XFER or quota_gb() - freed[0] > XFER_QUOTA_GB:
                 continue  # scratch: bounded number of prediction bursts in flight
         elif not (staged(*key) and stats_ready(j["tier"])):
