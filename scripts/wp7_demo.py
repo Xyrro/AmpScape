@@ -165,7 +165,7 @@ def cmd_run(a):
         m = dd["mask"]
 
         # (a) stability of the top-5 % regions across tables: pairwise IoU matrices for each route
-        def pair_iou(maps):
+        def pair_iou(maps, tables=tables, m=m):
             out = np.full((len(tables), len(tables)), np.nan)
             masks = {t: top_mask(maps[t], m, 5.0) for t in tables}
             for i, ti in enumerate(tables):

@@ -120,7 +120,7 @@ def rebuild_rows(h5: pathlib.Path, shard: str, touched: set[tuple[str, str]]) ->
     from ampscape.solve.finalize import index_rows_from_final
 
     df = index_rows_from_final(str(h5), f"{shard}.h5")  # same spelling as the production rows
-    df = df[[(s, c) in touched for s, c in zip(df.sample_id, df.config)]].copy()
+    df = df[[(s, c) in touched for s, c in zip(df.sample_id, df.config, strict=False)]].copy()
     orig, flags = [], []
     with h5py.File(h5, "r") as f:
         for r in df.itertuples():
@@ -191,8 +191,8 @@ def cmd_run(a):
     old = pd.read_parquet(f"data/v1/{a.tier}/index/{shard}.parquet")
     if "solver_original" not in old:
         old["solver_original"] = None
-    key = set(zip(upd.sample_id, upd.config))
-    keep = old[[(s, c) not in key for s, c in zip(old.sample_id, old.config)]]
+    key = set(zip(upd.sample_id, upd.config, strict=False))
+    keep = old[[(s, c) not in key for s, c in zip(old.sample_id, old.config, strict=False)]]
     merged = pd.concat([keep, upd[[c for c in old.columns if c in upd.columns]]], ignore_index=True)
     merged.to_parquet(work / "index" / f"{shard}.parquet", index=False)
     result["finished"] = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
