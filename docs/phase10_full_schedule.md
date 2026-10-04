@@ -78,3 +78,22 @@ results, verified on the smoke predictions). Results: `<run>/results_transfer.js
 and `<run>/eval_transfer/<tag>/`, pushed to the same Hub folder as the run and listed in the baselines table as
 `<run> → XL`. Plan: 144 jobs ≈ 933 GPU-h (XF 30 jobs after P3, XF4 12 GNN transfers after P4). XXL groups: T1 22 GB,
 T4 23 GB.
+
+## 6. Outcome (2026-10-04)
+
+Plan completed 2026-10-04 15:30Z: 166 jobs — 84 official training runs (4 models × T1/T4, U-Net/FNO on T3, × S/M/L
+× 3 seeds), 12 WP4 runs, 30 zero-shot transfer legs (L-trained → XL/XXL), 6 scale-aware-target runs at L + 10
+transfers, 18 GNN runs + 12 transfers + the GNN scale-aware variant (2 + 4). Nothing was trained at XL (§5). All
+results are on the Hub under `aux/results/runs_full/<run>/` (results, config, log, best.pt, T4 reference
+evaluations, transfer metrics; predictions kept for seed-1 test_id). Measured cost: 401 GPU jobs, 430.1 GPU-h
+(`docs/tables/gpu_usage.md`) against ≈ 1,081 GPU-h nominal; calendar 11 days, of which 6 lost to the staging
+deadlock of 26 Sep – 2 Oct (§3 keepalive and watchdog added afterwards). Tables and figures:
+`scripts/paper_figures.py` → `paper/tables/`, `paper/figures/`; reports: `docs/status/latest.md`,
+`docs/wp4_data_scaling.md`, `docs/wp7_demo.md`, `paper/ood_analysis.md`.
+
+Incidents that changed the driver during the phase, for the post-mortem: evaluation legs timing out (deferral),
+host-memory OOM from an unbounded open-file cache, the per-user running-GPU cap (2-h legs), scratch quota from
+transfer predictions (drop after metrics, per-split offload, concurrency cap), staging limits below the scratch floor
+(idle 6 days; keepalive + watchdog), circular hold between pre-staging and transfer legs, concurrent XL/XXL legs
+racing on one summary file (locked merge, one leg per run), the empty transfer script committed during the quota
+incident (CI parse test).
