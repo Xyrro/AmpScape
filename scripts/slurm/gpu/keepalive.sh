@@ -21,7 +21,7 @@ while true; do
     setsid nohup python scripts/slurm/gpu/gpu_driver.py $PLAN >> logs/gpu_driver.err 2>&1 < /dev/null &
     log "driver (re)started pid $!"
   fi
-  if ! ps -eo args | awk '$1=="python" && $2 ~ /offload_runs\.py$/' | grep -q .; then
+  if [ ! -f logs/offloader_disabled ] && ! ps -eo args | awk '$1=="python" && $2 ~ /offload_runs\.py$/' | grep -q .; then
     setsid nohup python scripts/slurm/gpu/offload_runs.py --loop 600 >> logs/offload_runs.log 2>&1 < /dev/null &
     log "offloader (re)started pid $!"
   fi
