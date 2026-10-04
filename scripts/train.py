@@ -61,6 +61,7 @@ class Items(torch.utils.data.Dataset):
         target_norm: str = "abs",
         target: str = "default",
         voltage_scale: float = 1.0,
+        coarse_factor: int = 4,
     ):
         self.ds, self.task, self.stats, self.graph, self.extra, self.multiscale = (
             ds,
@@ -72,6 +73,7 @@ class Items(torch.utils.data.Dataset):
         )
         self.tier, self.target_norm = tier, target_norm
         self.target, self.voltage_scale = target, voltage_scale
+        self.coarse_factor = coarse_factor  # must equal the multiscale GNN's `factor`
 
     def __len__(self):
         return len(self.ds)
@@ -97,7 +99,9 @@ class Items(torch.utils.data.Dataset):
             idx, ei, w = grid_graph(d["resistance"][0], d["nodata"][0] > 0)
             out.update({"node_index": idx, "edge_index": ei, "edge_weight": w})
             if self.multiscale:
-                idx_c, ei_c, w_c, f2c = coarse_graph(d["resistance"][0], d["nodata"][0] > 0)
+                idx_c, ei_c, w_c, f2c = coarse_graph(
+                    d["resistance"][0], d["nodata"][0] > 0, f=self.coarse_factor
+                )
                 out.update(
                     {
                         "coarse_edge_index": ei_c,
@@ -334,6 +338,9 @@ def main():
     )
     mcfg = dict(MODEL_VARIANTS[a.model][a.variant])
     multiscale = bool(mcfg.get("multiscale", False))
+    coarse_factor = int(
+        mcfg.get("factor", 4)
+    )  # multiscale GNN: the graph coarsening must match the model
     in_ch = n_channels(a.task, extra)
 
     stats = load_norm_stats(a.root, a.tier) or compute_norm_stats(a.root, a.tier, a.task)
@@ -397,6 +404,7 @@ def main():
                 a.target_norm,
                 a.target,
                 voltage_scale,
+                coarse_factor,
             ),
             batch_size=a.batch,
             shuffle=True,
@@ -418,6 +426,7 @@ def main():
                 a.target_norm,
                 a.target,
                 voltage_scale,
+                coarse_factor,
             ),
             batch_size=a.batch,
             shuffle=False,
@@ -587,6 +596,7 @@ def main():
                 a.target_norm,
                 a.target,
                 voltage_scale,
+                coarse_factor,
             ),
             batch_size=bs,
             shuffle=False,

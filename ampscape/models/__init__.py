@@ -35,19 +35,38 @@ MODEL_CONFIGS = {
 
 # owner tuning pass (2026-09-14): alternatives evaluated on the dev subset; the winners become the official configs
 MODEL_VARIANTS = {
-    "unet": {"base": MODEL_CONFIGS["unet"], "wide": {"base": 48, "levels": 4}},
+    "unet": {
+        "base": MODEL_CONFIGS["unet"],
+        "wide": {"base": 48, "levels": 4},
+        "w64": {"base": 64, "levels": 4},  # per-tier tuning pass 2026-10-05 (M/L)
+    },
     "fno": {
         "base": MODEL_CONFIGS["fno"],
         "m32": {"width": 32, "modes": 32, "layers": 4},
         "m64": {"width": 32, "modes": 64, "layers": 4},
+        "m96": {"width": 32, "modes": 96, "layers": 4},  # tuning pass: more modes for 256²/512²
+        "w48": {"width": 48, "modes": 64, "layers": 4},  # tuning pass: wider channels
     },
     "vit": {
         "base": MODEL_CONFIGS["vit"],
         "p2": {"patch": 2, "dim": 192, "depth": 6, "heads": 6, "grid": 64},
+        # tuning pass: patch size and learned positional grid sized to the tier (no interpolation of the embedding)
+        "p8g32": {"patch": 8, "dim": 192, "depth": 6, "heads": 6, "grid": 32},  # M: 256/8
+        "p16g16": {"patch": 16, "dim": 192, "depth": 6, "heads": 6, "grid": 16},  # M: 256/16
+        "p16g32": {"patch": 16, "dim": 192, "depth": 6, "heads": 6, "grid": 32},  # L: 512/16
+        "p8g64": {
+            "patch": 8,
+            "dim": 192,
+            "depth": 6,
+            "heads": 6,
+            "grid": 64,
+        },  # L: 512/8 (4096 tokens)
     },
     "gnn": {
         "base": MODEL_CONFIGS["gnn"],
         "ms": {"multiscale": True, "dim": 64, "coarse_layers": 12, "fine_layers": 6},
+        # tuning pass: coarser second level (8× instead of 4×) for the larger tiers
+        "ms8": {"multiscale": True, "dim": 64, "coarse_layers": 12, "fine_layers": 6, "factor": 8},
     },
 }
 
