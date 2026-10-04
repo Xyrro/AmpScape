@@ -100,7 +100,9 @@ their practically relevant number; every number in the paper traces to a `docs/t
 | F3 | error vs tier per model and task (S–M–L) with speed-up | `docs/tables/baselines_full.md` |
 | F4 | scale transfer: L-trained models at XL (and XXL), zero-shot vs scale-aware target | `runs/full/*/results_transfer.json` → `docs/tables/scale_transfer.md` |
 | F5 | WP7 many-query agreement and cost | `aux/wp7/demo_results.parquet`, `docs/wp7_demo.md` |
+| F6 | WP4 data scaling at S (fixed-epoch vs fixed-step) | `docs/tables/baselines_full.md` → `paper/tables/wp4_data_scaling.md` |
+| F7 | OOD degradation at the training tier (ratios to test_id) | `paper/tables/ood_degradation.md`, `paper/ood_analysis.md` |
 | T1 | per-tier counts and sizes | `docs/tables/final_counts.json` |
-| T2 | S/M/L baselines, mean ± std over seeds | `docs/tables/baselines_full.md` |
+| T2 | S/M/L baselines, mean ± std over seeds (test_id: `paper/tables/baselines_sml.md`; all splits: `paper/baselines.md`) | `docs/tables/baselines_full.md` |
 | T3 | OOD degradation per split | `docs/tables/baselines_full.md` |
-| T4 | GNN and scale-aware variant rows | pending |
+| T4 | GNN and scale-aware variant rows | `paper/tables/baselines_sml.md`, `paper/tables/scale_transfer.md` (complete 2026-10-04) |

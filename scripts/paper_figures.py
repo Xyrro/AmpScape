@@ -17,6 +17,7 @@ Outputs (all under paper/):
                                          F6  WP4 data-scaling ablation at S (fixed-epoch vs fixed-step)
   figures/ood_degradation.png, tables/ood_degradation.md
                                          F7  per-OOD-split degradation at the training tier (ratios to test_id)
+  baselines.md, dataset_statistics.md     F8  brief §14 deliverables: all-split baselines table (mean ± std); dataset statistics table
 Every number comes from docs/tables/*.md, runs/full/*/results*.json or aux/wp7/demo_results.parquet; the script
 never recomputes metrics. Missing inputs are reported and skipped, never fabricated.
 """
@@ -57,7 +58,7 @@ def dataset_stats(out: pathlib.Path) -> None:
             "--out",
             str(fig_dir),
             "--table",
-            str(out / "tables" / "dataset_statistics.md"),
+            str(out / "dataset_statistics.md"),  # brief §14 deliverable name
         ],
         cwd=ROOT,
         capture_output=True,
@@ -572,6 +573,62 @@ def ood_degradation(out: pathlib.Path) -> None:
     log(f"F7 OOD degradation: {len(wide)} (task, tier, model) rows")
 
 
+# ----------------------------------------------------------------------------------------------------------------- F8
+def baselines_all_splits(out: pathlib.Path) -> None:
+    """paper/baselines.md (brief §14): every task / tier / model / split, mean ± std over seeds, official configs."""
+    src = ROOT / "docs" / "tables" / "baselines_full.md"
+    if not src.exists():
+        return
+    df = read_markdown_table(src)
+    parsed = df.model.apply(split_run_name)
+    df["base"] = [p[0] for p in parsed]
+    df["seed"] = [p[3] for p in parsed]
+    df["suffix"] = [p[4] for p in parsed]
+    learned = df[df.seed.notna() & (df.suffix == "")]
+    metrics = [
+        "rel_l2",
+        "mae_log10eps",
+        "top5_iou",
+        "pinch_recall",
+        "spearman",
+        "corridor_dice",
+        "ssim",
+    ]
+    agg = (
+        learned.groupby(["task", "tier", "split", "base"])[metrics + ["speed-up (median)"]]
+        .agg(["mean", "std", "count"])
+        .reset_index()
+    )
+    order = {t: i for i, t in enumerate(TIER_ORDER)}
+    sp_order = {"test_id": 0, "test_ood": 1, "ood_region": 2, "published S": 3}
+    agg["o"] = agg["tier"].map(order)
+    agg["so"] = agg["split"].map(sp_order).fillna(9)
+    lines = [
+        "# Learned baselines — all evaluation splits, mean ± std over seeds (official configs; from docs/tables/baselines_full.md)",
+        "",
+        "Non-learned baselines (coarsen ×4, Omniscape block sizes) are in docs/tables/baselines_full.md and paper/tables/t4_pareto_{M,L}.md.",
+        "",
+        "| task | tier | split | model | seeds | rel-L2 | MAE log10 | top-5 % IoU | pinch recall | Spearman | corridor dice | SSIM | speed-up (median) |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    for _, r in agg.sort_values(["task", "o", "so", "base"]).iterrows():
+        n = int(r[("rel_l2", "count")])
+
+        def ms(k, r=r, n=n):
+            m, s_ = r[(k, "mean")], r[(k, "std")]
+            if not np.isfinite(m):
+                return "–"
+            return f"{m:.3f} ± {s_:.3f}" if n > 1 and np.isfinite(s_) else f"{m:.3f}"
+
+        lines.append(
+            f"| {r['task'].iloc[0]} | {r['tier'].iloc[0]} | {r['split'].iloc[0]} | {MODEL_LABEL.get(r['base'].iloc[0], r['base'].iloc[0])} | {n} | "
+            f"{ms('rel_l2')} | {ms('mae_log10eps')} | {ms('top5_iou')} | {ms('pinch_recall')} | {ms('spearman')} | "
+            f"{ms('corridor_dice')} | {ms('ssim')} | {r[('speed-up (median)', 'mean')]:.0f} |"
+        )
+    (out / "baselines.md").write_text("\n".join(lines) + "\n")
+    log(f"F8 baselines (all splits): {len(agg)} rows -> paper/baselines.md")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -594,6 +651,7 @@ def main() -> None:
     wp7(out)
     wp4_data_scaling(out)
     ood_degradation(out)
+    baselines_all_splits(out)
     log("done")
 
 
