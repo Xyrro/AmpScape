@@ -99,7 +99,7 @@ def main() -> None:
         default=None,
         help="runs directory: rebuild missing summary entries for every run and exit",
     )
-    ap.add_argument("--tier", required=True, help="evaluation tier (XL, XXL)")
+    ap.add_argument("--tier", default=None, help="evaluation tier (XL, XXL); required with --run")
     ap.add_argument("--splits", default="test_id,test_ood,ood_region")
     ap.add_argument("--root", default="data/hfcache")
     ap.add_argument("--workers", type=int, default=int(os.environ.get("SLURM_CPUS_PER_TASK", "1")))
@@ -114,8 +114,8 @@ def main() -> None:
     if a.repair:
         print(f"repaired {repair(pathlib.Path(a.repair))} entries", flush=True)
         return
-    if not a.run:
-        raise SystemExit("--run is required")
+    if not a.run or not a.tier:
+        raise SystemExit("--run and --tier are required")
     run = pathlib.Path(a.run)
     cfg = json.loads((run / "config.json").read_text())
     name, task = cfg["model"], cfg["task"]
