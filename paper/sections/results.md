@@ -2,10 +2,9 @@
 
 Every number in this section is copied from a regenerated table or report file; the source is tagged inline in
 square brackets. Unless stated otherwise, errors are rel-L2 on the `test_id` split of the tier the model was trained
-on, mean ± std over three seeds of the official configurations (30 epochs, 2-h resumable legs; §7 protocol). The
-"speed-up" column is the median per-landscape wall-time ratio between the reference solver and batched GPU
-inference, as defined in §6. The GPU budget for everything reported here was 430.1 GPU-h across 401 jobs, against a
-nominal plan of ≈ 1,081 GPU-h [docs/tables/gpu_usage.md].
+on, mean ± std over three seeds of the official configurations (30 epochs; §7 protocol). The "speed-up" column is the
+median per-landscape wall-time ratio between the reference solver and batched GPU inference, as defined in §6. All
+baselines reported here consumed 430.1 GPU-h across 401 jobs [docs/tables/gpu_usage.md].
 
 The headline is a trade-off, not a replacement: the best learned surrogate reaches rel-L2 0.04–0.08 on T4 at four to
 five orders of magnitude lower per-map cost than the production Omniscape run, but it is about 2× further from the exact
@@ -48,29 +47,25 @@ entries are from [paper/tables/baselines_sml.md]. T3 was run with U-Net and FNO 
 | T4 | ViT | 0.992 / 0.811 / 0.893; ×106,498 | 0.979 / 0.720 / 0.819; ×51,358 | 0.953 / 0.605 / 0.735; ×49,239 |
 | T4 | GNN | 0.982 / 0.742 / 0.840; ×12,545 | 0.972 / 0.698 / 0.775; ×6,604 | 0.960 / 0.632 / 0.704; ×10,843 |
 
-Three observations structure the rest of the section. First, the two task families behave differently. T4 is the
-easier learning problem and the one with the real compute problem: the U-Net stays at rel-L2 0.041–0.081 from S to
-L with Spearman ≥ 0.991, at speed-ups of 10⁴–10⁵ over the production Omniscape run [paper/tables/baselines_sml.md].
-T1 and T3 — pairwise and advanced-mode current, globally coupled through a single sparse solve — are harder for
-every model and the speed-up is only 10²–10³ for the U-Net, FNO and ViT (×48–59 for the GNN) because a single
-full-raster Circuitscape solve is already cheap; their
-practical value is as an operator-learning challenge and as a warm start, as argued in §1. Second, error grows with
-tier for every model and task: the best T1 result goes from 0.114 at S to 0.361 at L, the best T4 result from 0.041
-to 0.081 [paper/tables/baselines_sml.md]. Third, ranking-type metrics degrade more slowly than magnitudes: between S and L the T4
-U-Net's rel-L2 doubles (0.041 → 0.081) and its pinch-point recall drops from 0.918 to 0.825, while its Spearman
-coefficient barely moves (0.996 → 0.991) [paper/tables/baselines_sml.md]. Training cost was small — 0.72–2.49 GPU-h
-per U-Net or FNO run, 0.80–5.12 GPU-h for the ViT, 5.06–15.09 GPU-h for the GNN [paper/tables/baselines_sml.md].
+Three observations structure the section. First, the task families differ: T4 is the easier learning problem and
+the one with the real compute problem — the U-Net stays at rel-L2 0.041–0.081 from S to L with Spearman ≥ 0.991 at
+speed-ups of 10⁴–10⁵ over the production Omniscape run — whereas T1 and T3, globally coupled through a single sparse
+solve, are harder for every model and give speed-ups of only 10²–10³ (×48–59 for the GNN) because a single
+full-raster Circuitscape solve is already cheap; their value is as an operator-learning challenge and as a warm start
+(§1) [paper/tables/baselines_sml.md]. Second, error grows with tier for every model and task: the best T1 result
+goes from 0.114 at S to 0.361 at L, the best T4 result from 0.041 to 0.081 [paper/tables/baselines_sml.md]. Third,
+ranking metrics degrade more slowly than magnitudes: between S and L the T4 U-Net's rel-L2 doubles (0.041 → 0.081)
+and its pinch-point recall drops from 0.918 to 0.825 while its Spearman barely moves (0.996 → 0.991)
+[paper/tables/baselines_sml.md].
 
 ## 7.2 T4 against the exact block-1 reference: the speed–accuracy trade-off (F2)
 
-The T4 training targets are production Omniscape maps computed with a block size of ≈ radius/10 (block 3 at M,
-block 5 at L). For the reference subsets we also computed the exact block-1 maps, so solver approximations and
-learned models can be placed on the same error-versus-cost axes (F2). Table 7.2 lists the solver rows from
-[paper/tables/t4_pareto_M.md] and [paper/tables/t4_pareto_L.md] (test_id subset; `ns_rel_l2` is the non-source-pixel
-variant) and the learned rows of the same files (3-seed means; cost = median GPU inference per landscape; the
-non-source variant is not available for learned rows). Note that the learned rows are evaluated on the full
-`test_id` split (n = 4,823 at M, 1,927 at L) whereas the solver rows cover the block-1 reference subset
-[paper/tables/t4_pareto_M.md; paper/tables/t4_pareto_L.md].
+T4 training targets are production Omniscape maps at block ≈ radius/10 (block 3 at M, block 5 at L); for the
+reference subsets we also computed the exact block-1 maps, so solver approximations and learned models share one
+error-versus-cost axis (F2). Table 7.2 lists solver rows (block-1 reference subset of test_id; `ns_rel_l2` is the
+non-source-pixel variant) and learned rows (3-seed means on the full `test_id` split, n = 4,823 at M and 1,927 at L;
+cost = median GPU inference per landscape; no non-source variant available) from [paper/tables/t4_pareto_M.md] and
+[paper/tables/t4_pareto_L.md].
 
 **Table 7.2 — T4 error vs cost per landscape against the exact block-1 map, test_id (solver rows: reference subset; learned rows: full split)**
 
@@ -95,23 +90,22 @@ non-source variant is not available for learned rows). Note that the learned row
 | L | ViT (learned, 3 seeds) | 1927 | 0.0141 | 0.1586 | – | 0.0973 | 0.6046 | 0.7348 | 0.9529 | [paper/tables/t4_pareto_L.md] |
 | L | GNN (learned, 3 seeds) | 1927 | 0.0658 | 0.1416 | – | 0.0738 | 0.6321 | 0.7041 | 0.9604 | [paper/tables/t4_pareto_L.md] |
 
-Three things follow. (i) The production targets are a good approximation of the exact map: the blocking error of
-the production setting is rel-L2 0.0291 at M and 0.0315 at L with Spearman 0.998 [paper/tables/t4_pareto_M.md;
-paper/tables/t4_pareto_L.md], so a learned model's error against its training target and against the exact map
-differ little; indeed the U-Net's seed-1 rel-L2 against the exact map, 0.051 at M and 0.080 at L
-[docs/status/latest.md], equals its three-seed mean against the production target, 0.051 and 0.081
-[paper/tables/baselines_sml.md]. (ii) Omniscape's own artefact correction matters more than the block size: block 3
-without correction is worse (0.1105) than block 7 with it (0.0983) at M, and block 5 without correction (0.1011) is
+(i) The production targets approximate the exact map well: the blocking error is rel-L2 0.0291 at M and 0.0315 at L
+with Spearman 0.998 [paper/tables/t4_pareto_M.md; paper/tables/t4_pareto_L.md], so a model's error against its
+training target and against the exact map differ little — the U-Net's seed-1 rel-L2 against the exact map, 0.051 at
+M and 0.080 at L [docs/status/latest.md], equals its three-seed mean against the production target, 0.051 and 0.081
+[paper/tables/baselines_sml.md]. (ii) Omniscape's artefact correction matters more than the block size: block 3
+without correction (0.1105) is worse than block 7 with it (0.0983) at M, and block 5 without correction (0.1011)
 worse than block 11 with it (0.0854) at L [paper/tables/t4_pareto_M.md; paper/tables/t4_pareto_L.md]. (iii) The
-learned models sit on a different part of the frontier rather than dominating it: at M the U-Net's 0.051 lies between
-the production block-3 solver (0.029 at 111 s) and the block-7 solver (0.098 at 25.5 s) in error but at 1–16 ms per
-landscape; at L the U-Net's 0.080 is comparable to block 11 (0.085 at 164 s) at 5–66 ms [docs/status/latest.md;
-paper/tables/t4_pareto_L.md]. A practitioner who needs rel-L2 < 0.03 still needs the solver; one who needs hundreds of
-maps at rel-L2 ≈ 0.05–0.08 does not. Per model, inference costs 1.09 / 1.47 / 2.05 / 16.3 ms per landscape at M and
+learned models occupy a different part of the frontier rather than dominating it: at M the U-Net's 0.051 lies
+between the production block-3 solver (0.029 at 111 s) and block 7 (0.098 at 25.5 s) in error but at 1–16 ms per
+landscape; at L its 0.080 is comparable to block 11 (0.085 at 164 s) at 5–66 ms [docs/status/latest.md;
+paper/tables/t4_pareto_L.md]. Inference costs 1.09 / 1.47 / 2.05 / 16.3 ms per landscape at M and
 6.52 / 5.41 / 14.1 / 65.8 ms at L for U-Net / FNO / ViT / GNN (converted from the seconds in the source); the ViT
 reaches 0.0942 at M and 0.1586 at L against the exact map, and the learned models' Spearman stays ≥ 0.972 at M and
 ≥ 0.953 at L, close to the block-7 and block-11 solvers (0.9845, 0.9895) [paper/tables/t4_pareto_M.md;
-paper/tables/t4_pareto_L.md].
+paper/tables/t4_pareto_L.md]. A practitioner who needs rel-L2 < 0.03 still needs the solver; one who needs hundreds
+of maps at rel-L2 ≈ 0.05–0.08 does not.
 
 ## 7.3 Data scaling at S (F6)
 
@@ -132,13 +126,12 @@ compares with the official run on 61,577 landscapes [docs/wp4_data_scaling.md; p
 
 [paper/tables/wp4_data_scaling.md]
 
-At a fixed step budget the U-Net saturates in data early: 20,000 landscapes give 0.103 and 5,000 give 0.139 against
-0.111 for the official run on 61,577 landscapes, so the official 30-epoch protocol at S is budget-limited rather than
-data-limited for the U-Net. The FNO keeps improving with data in both regimes (0.438 → 0.298 → 0.246 → 0.198) with
-little difference between regimes above 5,000 landscapes: it is data-limited at S. Fixed-epoch training on small
-subsets understates both models by 1.3–2.3× rel-L2 at 1,000–5,000 landscapes, so the regime must be stated when
-quoting data efficiency [docs/wp4_data_scaling.md]. The ablation cost 5.1 GPU-h [docs/wp4_data_scaling.md]. It does
-not, by itself, explain the S → M → L error growth of §7.1, since the fixed-step rows at M and L were not run
+At a fixed step budget the U-Net saturates in data early — 20,000 landscapes give 0.103 and 5,000 give 0.139 against
+0.111 for the official run on 61,577 — so the official 30-epoch protocol at S is budget-limited rather than
+data-limited for the U-Net, whereas the FNO keeps improving with data in both regimes (0.438 → 0.298 → 0.246 → 0.198)
+and is data-limited at S. Fixed-epoch training on small subsets understates both models by 1.3–2.3× rel-L2 at
+1,000–5,000 landscapes, so the regime must be stated when quoting data efficiency [docs/wp4_data_scaling.md]. The
+ablation does not by itself explain the S → M → L error growth of §7.1, since fixed-step rows at M and L were not run
 [docs/wp4_data_scaling.md].
 
 ## 7.4 Scale transfer: zero-shot XL/XXL and the scale-aware target (F4)
@@ -162,22 +155,20 @@ docs/status/latest.md]. Rel-L2 on test_id:
 
 [paper/tables/scale_transfer.md]; ViT has no XXL rows in that table.
 
-Zero-shot transfer fails on magnitude in a strikingly regular way for T4: every model lands at rel-L2 ≈ 0.52 at XL
-and ≈ 0.75 at XXL, which equals 1 − r_L/r_tier, the fraction of the current magnitude that the larger Omniscape
-radius adds and an L-trained model cannot know about [docs/status/latest.md]. Removing that factor from the target
-recovers T4 to 0.16–0.22 at XL and 0.20–0.34 at XXL [docs/status/latest.md] — still well above the in-tier errors,
-but no longer dominated by a known scale factor. For T1 the FNO also benefits (0.707 → 0.572 at XL, 1.502 → 0.671 at XXL), whereas the U-Net and GNN stay near
-rel-L2 0.8–1.0 at both tiers — their receptive field, not the magnitude, is the limit [docs/status/latest.md;
-paper/tables/scale_transfer.md]. The ViT's structural problem is unchanged by the variant [docs/status/latest.md].
-
-The second observation is that rankings survive what magnitudes do not. For the zero-shot T4 U-Net, Spearman is
-0.992 at L, 0.946 at XL and 0.904 at XXL, and top-5 % IoU 0.812, 0.596 and 0.505, while rel-L2 goes 0.081 → 0.515 →
-0.749; the FNO keeps Spearman 0.973 → 0.956 → 0.941 [paper/tables/scale_transfer.md]. The scale-aware variant leaves
-every Spearman value where the zero-shot run put it (e.g. T4 U-Net XL 0.946 for both; T4 FNO XXL 0.941 vs 0.940)
-[paper/tables/scale_transfer.md; docs/status/latest.md]. The zero-shot T1 U-Net at XXL is the one genuinely unstable
-case, with rel-L2 4.425 ± 3.659 and Spearman 0.461 ± 0.034 [paper/tables/scale_transfer.md]. The practical reading is
-that a surrogate trained at one resolution can still be used to *rank* locations at a larger one, but its absolute
-currents must be rescaled or re-trained.
+Zero-shot transfer fails on magnitude in a regular way for T4: every model lands at rel-L2 ≈ 0.52 at XL and ≈ 0.75
+at XXL, which equals 1 − r_L/r_tier, the fraction of the current magnitude that the larger Omniscape radius adds and
+an L-trained model cannot know about [docs/status/latest.md]. Removing that factor from the target recovers T4 to
+0.16–0.22 at XL and 0.20–0.34 at XXL [docs/status/latest.md] — still well above in-tier errors, but no longer
+dominated by a known scale factor. For T1 the FNO also benefits (0.707 → 0.572 at XL, 1.502 → 0.671 at XXL), whereas
+the U-Net and GNN stay near rel-L2 0.8–1.0 at both tiers — their receptive field, not the magnitude, is the limit —
+and the ViT's structural problem is unchanged [docs/status/latest.md; paper/tables/scale_transfer.md]. Rankings
+survive what magnitudes do not: for the zero-shot T4 U-Net, Spearman is 0.992 at L, 0.946 at XL and 0.904 at XXL and
+top-5 % IoU 0.812, 0.596 and 0.505 while rel-L2 goes 0.081 → 0.515 → 0.749; the FNO keeps Spearman
+0.973 → 0.956 → 0.941; and the scale-aware variant leaves every Spearman value where the zero-shot run put it (T4
+U-Net XL 0.946 for both; T4 FNO XXL 0.941 vs 0.940) [paper/tables/scale_transfer.md; docs/status/latest.md]. The one
+genuinely unstable case is the zero-shot T1 U-Net at XXL, rel-L2 4.425 ± 3.659 and Spearman 0.461 ± 0.034
+[paper/tables/scale_transfer.md]. A surrogate trained at one resolution can therefore still *rank* locations at a
+larger one, but its absolute currents must be rescaled or re-trained.
 
 ## 7.5 OOD degradation at the training tier (T3, F7)
 
@@ -220,24 +211,19 @@ the held-out biomes and realm, `published` the real tiles with published resista
 | T4 | L | ViT | 0.159 | 0.152 | 0.125 | – | 0.960 | 0.790 | – |
 | T4 | L | GNN | 0.142 | 0.136 | 0.102 | – | 0.962 | 0.718 | – |
 
-A held-out resistance table and a held-out contrast cost little at the training tier: the `test_ood` ratios are
-0.92–1.18 for every model and task at S–L, except the ViT on T1 at L (1.49, its structurally failing configuration).
-T4 is the most sensitive family (1.04–1.18): the Omniscape surrogates lose more on an unseen table than the pairwise
-surrogates do [paper/ood_analysis.md]. Published real resistance surfaces are the hardest in-tier set for T4 (S only:
-ratios 1.30–1.52, U-Net 1.52), while for T1 and T3 they are within ±15 % of `test_id`; since the T4 surrogates are
-the ones that would be run on practitioners' own surfaces, this is the number to quote beside the headline
-[paper/ood_analysis.md].
-
-The held-out-region split must be read with care. It is *easier* than `test_id` for every model, task and tier
-(ratios 0.65–1.00, typically 0.70–0.85) [paper/ood_analysis.md]. This is not evidence of spatial robustness: the
-split is real-tile only by construction, and the held-out biomes (montane grasslands and shrublands, mangroves) and
-realm (Australasia) have a different composition — at S, `ood_region` has a real share of 1.00 and a p90 contrast of
-595 against a real share of 0.38 and a p90 contrast of 10,000 for `test_id`; at L the p90 contrasts are 1,000 and
-10,000 [paper/ood_analysis.md]. The errors of all models track landscape difficulty more than spatial novelty. We
-therefore present `ood_region` as a spatial-leakage control — test regions never overlap training regions and the
-models do not profit from that separation being absent — and not as a stress test; any robustness claim that uses it
-would have to be made on matched difficulty [paper/ood_analysis.md]. Consistent with §7.4, the ranking metrics on
-these splits degrade less than the magnitudes [paper/ood_analysis.md].
+A held-out resistance table and contrast cost little at the training tier: `test_ood` ratios are 0.92–1.18 for
+every model and task at S–L except the ViT on T1 at L (1.49, its structurally failing configuration); T4 is the most
+sensitive family (1.04–1.18) [paper/ood_analysis.md]. Published real resistance surfaces are the hardest in-tier set
+for T4 (S only: ratios 1.30–1.52, U-Net 1.52) while T1 and T3 stay within ±15 % of `test_id`; since T4 surrogates are
+the ones that would run on practitioners' own surfaces, this is the number to quote beside the headline
+[paper/ood_analysis.md]. The held-out-region split is *easier* than `test_id` for every model, task and tier (ratios
+0.65–1.00, typically 0.70–0.85), which is not evidence of spatial robustness: the split is real-tile only, and the
+held-out biomes (montane grasslands and shrublands, mangroves) and realm (Australasia) differ in composition — at S,
+`ood_region` has a real share of 1.00 and a p90 contrast of 595 against 0.38 and 10,000 for `test_id`; at L the p90
+contrasts are 1,000 and 10,000 [paper/ood_analysis.md]. Errors track landscape difficulty more than spatial novelty,
+so `ood_region` is a spatial-leakage control (test regions never overlap training regions), not a stress test; any
+robustness claim using it would need matched difficulty, and, as in §7.4, its ranking metrics degrade less than its
+magnitudes [paper/ood_analysis.md].
 
 ## 8. Many-query demonstration (F5)
 
@@ -258,34 +244,30 @@ surrogate match those drawn from the solver [docs/wp7_demo.md].
 
 [docs/wp7_demo.md]
 
-Every study-level conclusion is reproduced: the stability estimate differs by 0.005, the consensus core overlaps at
-IoU 0.825, the table ranking has Spearman 0.991 with the same most-influential table on every tile, and persistent
-pinch points are recovered with recall 0.941 — at ≈ ×11,000 lower cost after training once [docs/wp7_demo.md]. The
-per-tile rows [paper/tables/wp7_per_tile.md] show how uniform this is and where it is not: the core IoU ranges from
-0.674 (L_nea_b02_0401) to 0.943 (L_neo_b02_0303), the ranking Spearman is 1.000 on 14 of 20 tiles and 0.964 on the
-other six, `top1_table_agree` is true on all 20, and persistent-pinch recall is 0.872–0.998. The weakest point is
-pinch-point *precision*: 0.657 on average and as low as 0.169 (L_afr_b07_0986) and 0.216 (L_afr_b07_0233)
-[paper/tables/wp7_per_tile.md] — the surrogate proposes more persistent pinch points than the solver confirms, so a
-candidate list drawn from it should be verified with the solver before it becomes a decision map.
+Every study-level conclusion is reproduced — the stability estimate differs by 0.005, the consensus core overlaps at
+IoU 0.825, the table ranking has Spearman 0.991 with the same most-influential table on every tile, persistent pinch
+points are recovered with recall 0.941 — at ≈ ×11,000 lower cost after training once [docs/wp7_demo.md]. Per tile
+[paper/tables/wp7_per_tile.md], the core IoU ranges from 0.674 (L_nea_b02_0401) to 0.943 (L_neo_b02_0303), the
+ranking Spearman is 1.000 on 14 of 20 tiles and 0.964 on the other six, `top1_table_agree` holds on all 20, and
+persistent-pinch recall is 0.872–0.998. The weak point is pinch-point *precision*: 0.657 on average and as low as
+0.169 (L_afr_b07_0986) and 0.216 (L_afr_b07_0233) [paper/tables/wp7_per_tile.md] — the surrogate proposes more
+persistent pinch points than the solver confirms, so a candidate list drawn from it should be solver-verified before
+it becomes a decision map.
 
 ## What the benchmark separates
 
-The four model families fail in different places, which is what makes the benchmark informative. The **U-Net** is
-the strongest model on T1 and T4 at S and M (T1 0.114 / 0.212; T4 0.041 / 0.051) and degrades fastest with tier,
-losing its T1 lead to the FNO at L (0.397 vs 0.361) [paper/tables/baselines_sml.md]; on T1 it cannot transfer to
-larger grids at all (rel-L2 ≈ 1 even with the scale-aware target) [paper/tables/scale_transfer.md]. The **FNO** is
-data-limited at S [docs/wp4_data_scaling.md], but has the best T1 result at L (0.361) and the highest T1 Spearman at
-every tier (0.967 / 0.959 / 0.945) [paper/tables/baselines_sml.md], and it transfers best: scale-aware T4 0.162 at XL
-and 0.201 at XXL, and, with the scale-aware target, the only T1 model below rel-L2 0.7 at XXL (0.671)
-[paper/tables/scale_transfer.md]. The
-**ViT** official configuration is competitive at S (T1 0.218, T4 0.052) and resolution-inappropriate above it: T1
-0.419 ± 0.123 at M and 0.648 at L with top-5 % IoU 0.146, and the one case where a held-out table costs 49 %
-[paper/tables/baselines_sml.md; paper/tables/ood_degradation.md]. The **GNN** is far behind on T1 at every tier
-(0.561 / 0.849 / 1.067; its multi-scale graph does not resolve long-range pairwise flow) but competitive on T4
-(0.066 / 0.099 / 0.142, ahead of the ViT at L), where the Omniscape window is local — the opposite of the
-convolutional models' relative strengths — at 6–10× the U-Net's training cost and roughly a tenth of its speed-up
-[paper/tables/baselines_sml.md; docs/status/latest.md]. No single family wins on accuracy, scale robustness, OOD
-robustness and cost at once; that trade-off, rather than any one number, is the result.
+The four families fail in different places: the U-Net is strongest on T1 and T4 at S and M (T1 0.114 / 0.212; T4
+0.041 / 0.051) but degrades fastest with tier, losing its T1 lead to the FNO at L (0.397 vs 0.361) and not
+transferring on T1 at all (rel-L2 ≈ 1 even with the scale-aware target); the FNO is data-limited at S but has the
+best T1 result at L (0.361), the highest T1 Spearman at every tier (0.967 / 0.959 / 0.945) and the best transfer
+(scale-aware T4 0.162 at XL and 0.201 at XXL; the only T1 model below rel-L2 0.7 at XXL, 0.671); the ViT official
+configuration is competitive at S (T1 0.218, T4 0.052) and resolution-inappropriate above it (T1 0.419 ± 0.123 at M
+and 0.648 at L with top-5 % IoU 0.146, and the one case where a held-out table costs 49 %); and the GNN is far behind
+on T1 at every tier (0.561 / 0.849 / 1.067) but competitive on the locally windowed T4 (0.066 / 0.099 / 0.142, ahead
+of the ViT at L), at 6–10× the U-Net's training cost and roughly a tenth of its speed-up [paper/tables/baselines_sml.md;
+paper/tables/scale_transfer.md; paper/tables/ood_degradation.md; docs/wp4_data_scaling.md; docs/status/latest.md].
+No single family wins on accuracy, scale robustness, OOD robustness and cost at once; that trade-off, rather than
+any one number, is the result.
 
 ## Sources used
 

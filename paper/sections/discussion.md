@@ -1,9 +1,7 @@
 # Discussion, limitations, ethics and maintenance
 
-<!-- Draft 2026-10-04 for Phase 12 §9 (plus the discussion half of §7–8). Every number is copied from a repository
-file and tagged [source]; the former "[TODO: not in docs]" markers were resolved on 2026-10-04 from
-docs/addendum_WP5_report.md and docs/phase_09_report.md. Reference labels [n] are those of
-paper/sections/related_work.md. -->
+<!-- Draft for Phase 12 §9 (plus the discussion half of §7–8). Every number is copied from a repository file and
+tagged [source]. Reference labels [n] are those of paper/sections/related_work.md. -->
 
 ## What the results say: a speed–accuracy–robustness trade-off
 
@@ -13,44 +11,44 @@ already cheap [paper/tables/baselines_sml.md] — a median 0–63 s per tier, ag
 landscape [paper/tables/dataset_statistics.md]; the U-Net returns a T4 map in 1 ms at M and 5 ms at L
 [docs/status/latest.md].
 
-**Accuracy, by task and tier.** Omnidirectional current is the easy direction: U-Net T4 rel-L2 is 0.041 / 0.051 / 0.081
-at S / M / L (three-seed means) [paper/tables/baselines_sml.md]; against the exact block-1 map it sits at 0.051 (M) and
-0.080 (L) where the production block-3 and block-5 solvers sit at 0.029 and 0.032 [paper/tables/t4_pareto_M.md;
-paper/tables/t4_pareto_L.md] — the cheapest point on the T4 error–cost front, not the most accurate. Pairwise current is
-the hard direction: U-Net T1 error grows 0.114 → 0.212 → 0.397 from S to L, FNO 0.199 → 0.361, the GNN sits at
+**Accuracy.** Omnidirectional current is the easy direction: U-Net T4 rel-L2 is 0.041 / 0.051 / 0.081 at S / M / L
+(three-seed means) [paper/tables/baselines_sml.md]; against the exact block-1 map it sits at 0.051 (M) and 0.080 (L)
+where the production block-3 and block-5 solvers sit at 0.029 and 0.032 [paper/tables/t4_pareto_M.md;
+paper/tables/t4_pareto_L.md] — the cheapest point on the T4 error–cost front, not the most accurate. Pairwise current
+is the hard direction: U-Net T1 error grows 0.114 → 0.212 → 0.397 from S to L, FNO 0.199 → 0.361, the GNN sits at
 0.561–1.067, and T3 follows T1 (U-Net 0.111 → 0.379) [paper/tables/baselines_sml.md]. In-distribution T4 at S is
 near-solved; the difficulty is in T1, scale transfer and the published tiles [DECISIONS.md, 2026-09-24].
 
-**Robustness, two kinds.** At the training tier a held-out table and contrast (`test_ood`) cost little — ratios
-0.92–1.18 for every model and task except the ViT on T1 at L (1.49), T4 the most sensitive (1.04–1.18) — while published
-real resistance surfaces are the hardest in-tier set for T4 (1.30–1.52 at S) [paper/ood_analysis.md]. Zero-shot scale
-transfer of L-trained models fails on magnitude: T4 rel-L2 ≈ 0.52 at XL and ≈ 0.75 at XXL for every model, equal to
-1 − r_L/r_tier; T1 U-Net reaches 4.425 ± 3.659 at XXL [paper/tables/scale_transfer.md; docs/status/latest.md]. Rankings
-survive where magnitudes fail: zero-shot T4 Spearman at XL is 0.937–0.956 (GNN 0.928) [paper/tables/scale_transfer.md],
-as in-tier rankings degrade less than magnitudes [paper/ood_analysis.md]. The scale-aware target (T4 currents scaled by
-64/r_tier, T1 by √(N_valid/512²)) removes most of the T4 magnitude error — U-Net 0.515 → 0.189 at XL, 0.749 → 0.312 at
-XXL; FNO 0.162 / 0.201 — helps the FNO on T1 (0.707 → 0.572), leaves the U-Net on T1 near rel-L2 1 (0.957 / 0.987) and
-changes no ranking [paper/tables/scale_transfer.md; docs/status/latest.md]. It is a documented variant isolating one
-cause of the failure, not a fix: seed-1 only, with a T4 residual (0.16–0.34) well above the in-tier 0.08–0.12.
+**Robustness.** At the training tier a held-out table and contrast cost little — `test_ood` ratios 0.92–1.18 for every
+model and task except the ViT on T1 at L (1.49), T4 the most sensitive (1.04–1.18) — while published real resistance
+surfaces are the hardest in-tier set for T4 (1.30–1.52 at S) [paper/ood_analysis.md]. Zero-shot scale transfer of
+L-trained models fails on magnitude: T4 rel-L2 ≈ 0.52 at XL and ≈ 0.75 at XXL for every model, equal to
+1 − r_L/r_tier; T1 U-Net reaches 4.425 ± 3.659 at XXL [paper/tables/scale_transfer.md; docs/status/latest.md].
+Rankings survive where magnitudes fail: zero-shot T4 Spearman at XL is 0.937–0.956 (GNN 0.928)
+[paper/tables/scale_transfer.md], and in-tier rankings degrade less than magnitudes [paper/ood_analysis.md]. The
+scale-aware target (T4 currents scaled by 64/r_tier, T1 by √(N_valid/512²)) removes most of the T4 magnitude error —
+U-Net 0.515 → 0.189 at XL, 0.749 → 0.312 at XXL; FNO 0.162 / 0.201 — helps the FNO on T1 (0.707 → 0.572), leaves the
+U-Net on T1 near rel-L2 1 (0.957 / 0.987) and changes no ranking [paper/tables/scale_transfer.md;
+docs/status/latest.md]. It isolates one cause of the failure rather than fixing it: seed-1 only, with a T4 residual
+(0.16–0.34) well above the in-tier 0.08–0.12.
 
 ## What the benchmark separates, and what it does not yet test
 
 The tasks separate families along interpretable axes: the GNN's multi-scale graph does not resolve long-range pairwise
 flow (T1 L 1.067) but is competitive on the locally windowed T4 (0.142 vs ViT 0.159 at L), the reverse of the
-convolutional models' strengths [docs/status/latest.md; paper/tables/baselines_sml.md]. Data scaling separates budget
-from data limits: at the official step budget the U-Net saturates by 20,000 landscapes at S (0.103 vs 0.111 on 61,577)
-while the FNO keeps improving (0.438 → 0.298 → 0.246 → 0.198) [docs/wp4_data_scaling.md]. The block-size rows put a
+convolutional models' strengths [docs/status/latest.md; paper/tables/baselines_sml.md]; data scaling separates budget
+from data limits — at the official step budget the U-Net saturates by 20,000 landscapes at S (0.103 vs 0.111 on 61,577)
+while the FNO keeps improving (0.438 → 0.298 → 0.246 → 0.198) [docs/wp4_data_scaling.md]; and the block-size rows put a
 non-learned approximation on the same cost axis [paper/tables/t4_pareto_M.md]. Not yet tested: a multiscale operator of
-the HANO/MgNO family [41, 42] (WP6 was optional and is not among the runs [docs/REVIEW_ADDENDUM_2026-09.md;
-docs/status/latest.md]); training at XL (XL rows are transfers of L models [DECISIONS.md, 2026-09-24]); fixed-step
-training at M/L, the direct test of how much S → L error growth is budget rather than scale [docs/wp4_data_scaling.md];
-and the warm-start iterations-saved metric for T1/T3 on the learned baselines: the track is implemented and defined
-(AMG-PCG iterations and wall time to the reference residual from the predicted voltage vs a zero start,
-`scripts/warm_start_eval.jl`, same preconditioner and matrix as the stored `cg_baseline`) [DECISIONS.md, 2026-09-06,
-2026-09-13], but was run in this release only on the non-learned coarsen ×4 baseline at tier S on the dev build (70
-systems: iterations 11 → 10, median reduction 6.9 %, time 28 → 22 ms; and no gain on the 68 published-tile systems,
-14 → 14), where the PCG converges in ≈ 11 iterations and leaves little headroom; it becomes informative at XL/XXL with
-a learned voltage [docs/phase_09_report.md]. No full-baseline run carries it [docs/tables/baselines_full.md].
+the HANO/MgNO family [41, 42] [docs/REVIEW_ADDENDUM_2026-09.md; docs/status/latest.md]; training at XL (XL rows are
+transfers of L models [DECISIONS.md, 2026-09-24]); fixed-step training at M/L, the direct test of how much S → L error
+growth is budget rather than scale [docs/wp4_data_scaling.md]; and the warm-start metric for T1/T3 on learned
+baselines. That track is implemented (AMG-PCG iterations and wall time to the reference residual from the predicted
+voltage vs a zero start, `scripts/warm_start_eval.jl`, same preconditioner and matrix as the stored `cg_baseline`)
+[DECISIONS.md, 2026-09-06, 2026-09-13] but was run only on the non-learned coarsen ×4 baseline at S on the dev build
+(70 systems: iterations 11 → 10, median reduction 6.9 %, time 28 → 22 ms; no gain on the 68 published-tile systems,
+14 → 14), where PCG converges in ≈ 11 iterations and leaves little headroom; it becomes informative at XL/XXL with a
+learned voltage [docs/phase_09_report.md]. No full-baseline run carries it [docs/tables/baselines_full.md].
 
 ## Implications for practice
 
@@ -59,11 +57,11 @@ parameters, scenario comparison, resistance optimisation [15, 16, 17]. WP7 is th
 tiles × 8 tables the U-Net reproduced the solver's study-level conclusions — top-5 % stability across tables 0.458 vs
 0.463, consensus-core IoU 0.825, table ranking Spearman 0.991 with the same most-influential table on every tile,
 persistent pinch-point recall 0.941 — in 11.8 s on one GPU against 36.3 CPU-h (≈ ×11,000 after training once)
-[docs/wp7_demo.md]. The weakest point is pinch-point precision, 0.657 at 3 px and as low as 0.169 on one tile
-[docs/wp7_demo.md; paper/tables/wp7_per_tile.md]: the surrogate finds the solver's pinch points and adds spurious ones.
-Hence the recipe: screen with the surrogate, verify every map that enters a decision with the solver. For T1–T3 the
-practical number is not wall-clock replacement — a pairwise solve takes seconds [paper/tables/dataset_statistics.md] —
-but the operator-learning difficulty itself and, for applied use, the iterations saved when a prediction warm-starts the
+[docs/wp7_demo.md]. Its weak point is pinch-point precision, 0.657 at 3 px and as low as 0.169 on one tile
+[docs/wp7_demo.md; paper/tables/wp7_per_tile.md]: the surrogate finds the solver's pinch points and adds spurious ones;
+hence screen with the surrogate and verify every map that enters a decision with the solver. For T1–T3 the practical
+number is not wall-clock replacement — a pairwise solve takes seconds [paper/tables/dataset_statistics.md] — but the
+operator-learning difficulty itself and, for applied use, the iterations saved when a prediction warm-starts the
 solver [paper/outline.md].
 
 ## Limitations
@@ -83,18 +81,16 @@ solver [paper/outline.md].
    The best model's M error (0.051) exceeds the label deviation (0.029), but not by a wide margin
    [paper/tables/t4_pareto_M.md].
 5. **Resolution and size are confounded in the scale split.** Pixel size (100 m / 100 m / 200 m / 500 m / 1 km), raster
-   size (128² … 2048²) and the Omniscape radius, fixed at raster/8 in pixels and hence 1.6 → 256 km, co-vary across
-   tiers; only S → M changes one factor at a time, so from M upward `test_ood_scale` mixes pixel-count extrapolation,
-   coarser pixels and a larger physical window [docs/addendum_WP5_report.md §1; docs/dataset_card.md]. A controlled 2×2
-   probe set separating the axes (256²/512² × 100 m/200 m at a fixed 12.8 km window; 360 landscapes, 47 CPU-h) was
-   designed and built [docs/addendum_WP5_report.md §3, §5] and published under `aux/` [CHANGELOG.md, 2026-09-21], but
-   its evaluation was not run for v1.0: no probe-cell results exist in docs/tables or the report
-   [docs/addendum_WP5_report.md].
+   size (128² … 2048²) and the Omniscape radius (raster/8 in pixels, hence 1.6 → 256 km) co-vary across tiers; only
+   S → M changes one factor at a time, so from M upward `test_ood_scale` mixes pixel-count extrapolation, coarser pixels
+   and a larger physical window [docs/addendum_WP5_report.md §1; docs/dataset_card.md]. A controlled 2×2 probe set
+   separating the axes (256²/512² × 100 m/200 m at a fixed 12.8 km window; 360 landscapes) is published under `aux/`
+   [docs/addendum_WP5_report.md §3, §5; CHANGELOG.md, 2026-09-21] but not yet evaluated: no probe-cell results exist in
+   this release [docs/addendum_WP5_report.md].
 6. **XXL footprints overlap finer-tier training cells.** XXL is test-only; its 32 tiles (2,048 km) cover ≈ 90 % of land,
    so its scale split isolates resolution, not spatial novelty; `test_ood_scale_strict` (6 XXL tiles sampled inside
-   test_id cells, with a finalize-time geometric check that no train/val tile of any tier intersects them) isolates
-   both, and XL tiles are cell-assigned and overlap-free by construction [docs/dataset_card.md;
-   docs/addendum_WP5_report.md §2].
+   test_id cells, with a geometric check that no train/val tile of any tier intersects them) isolates both, and XL tiles
+   are cell-assigned and overlap-free by construction [docs/dataset_card.md; docs/addendum_WP5_report.md §2].
 7. **The held-out-region split is easier by composition** (ratios 0.65–1.00; real-tile only, p90 contrast 595–1,000
    vs 10,000 on `test_id`). It is a spatial-leakage control, not a stress test [paper/ood_analysis.md].
 8. **The ViT official config is resolution-inappropriate above S** (fixed across tiers: patch 4, dim 192, depth 6, a
@@ -102,10 +98,9 @@ solver [paper/outline.md].
    the degradation is structural, and the number stands with this note [DECISIONS.md, 2026-09-24].
 9. **T4 scale transfer crosses an operator change**: the Omniscape radius doubles above L (64 → 128 → 256 px, block
    5 → 11 → 25), so zero-shot T4 transfer is across operators as well as scales [docs/t4_fidelity.md; docs/status/latest.md].
-10. **XL amendment C3 had a metadata defect, corrected in v1.0.2.** In v1.0/1.0.1 the 25 % train/val rule hashed a
-    missing macro-cell id for synthetic XL landscapes (XL train 228 / val 0); v1.0.2 restores train 880 / val 131 /
-    test_id 2,335 and rebuilds the split lists, no data file changed, XL transfer rows re-aggregated
-    [docs/dataset_card.md; CHANGELOG.md]. Nothing was trained at XL, so no result depends on it [DECISIONS.md, 2026-09-25].
+10. **Nothing is trained at XL.** The XL train/val split exists (v1.0.2: train 880 / val 131 / test_id 2,335) but every
+    XL and XXL row is a transfer of an L-trained model, so no result depends on it [docs/dataset_card.md; CHANGELOG.md;
+    DECISIONS.md, 2026-09-25].
 11. **Seed-1-only studies**: the scale-aware variants, WP4, the exact-reference Pareto rows and WP7
     [paper/tables/scale_transfer.md; paper/tables/wp4_data_scaling.md; paper/tables/t4_pareto_M.md; docs/wp7_demo.md];
     the official S/M/L rows use three seeds [paper/tables/baselines_sml.md].
@@ -136,16 +131,16 @@ use is screening — many-query exploration, model comparison, operator-learning
 
 ## Maintenance
 
-The data revision is `v1.0` (2026-09-23) on `Xirro/AmpScape`; `1.0.1` (2026-09-24, nested `lite` subset) and `1.0.2`
-(2026-09-26, C3 correction and split lists) are metadata-only tags on GitHub and the Hub with identical data files
-[docs/dataset_card.md; CHANGELOG.md]. Changes are logged in `CHANGELOG.md`, decisions in `DECISIONS.md`. Regeneration is
-scripted from the frozen `v1.0-pipeline` tag (bitwise on the same CPU model, ≤ 1.2e-9 relative across models
-[docs/dataset_card.md]); the post-mortem lists the runbook changes a reproducer needs [docs/generation_postmortem.md].
-All auxiliary evaluation sets and baseline results are on the Hub under `aux/` (20.5 GB) [docs/dataset_card.md;
-docs/status/latest.md]. CI runs the test suite, a licence-consistency test over the source manifest and a parse test
-over all 75 scripts [CHANGELOG.md; docs/licenses.md; docs/status/latest.md]; issues are tracked on GitHub
-`Xyrro/AmpScape` (MIT) and a DOI will be minted at submission [paper/outline.md]. Compute: 16,552 core-hours for
-generation and the precision pass [docs/dataset_card.md], 430.1 GPU-hours for the baselines [docs/status/latest.md].
+The current release is `1.0.2` on `Xirro/AmpScape`; `v1.0` is the data revision and the later tags are metadata-only
+with identical data files [docs/dataset_card.md; CHANGELOG.md]. Changes are logged in `CHANGELOG.md`, decisions in
+`DECISIONS.md`. Regeneration is scripted from the frozen `v1.0-pipeline` tag (bitwise on the same CPU model, ≤ 1.2e-9
+relative across models [docs/dataset_card.md]) and the post-mortem lists the runbook changes a reproducer needs
+[docs/generation_postmortem.md]. Auxiliary evaluation sets and baseline results are on the Hub under `aux/` (20.5 GB)
+[docs/dataset_card.md; docs/status/latest.md]. CI runs the test suite, a licence-consistency test over the source
+manifest and a parse test over all 75 scripts [CHANGELOG.md; docs/licenses.md; docs/status/latest.md]; issues are
+tracked on GitHub `Xyrro/AmpScape` (MIT) and a DOI will be minted at submission [paper/outline.md]. Compute: 16,552
+core-hours for generation and the precision pass [docs/dataset_card.md], 430.1 GPU-hours for the baselines
+[docs/status/latest.md].
 
 ## Sources used
 
