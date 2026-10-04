@@ -45,7 +45,7 @@ from ampscape.models.common import (  # noqa: E402
     target_scale,
 )
 
-DEFAULT_LR = {"unet": 1e-3, "fno": 1e-3, "vit": 3e-4, "gnn": 1e-3}
+DEFAULT_LR = {"unet": 1e-3, "fno": 1e-3, "vit": 3e-4, "gnn": 1e-3, "mgno": 1e-3}
 
 
 class Items(torch.utils.data.Dataset):

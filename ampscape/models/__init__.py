@@ -22,6 +22,10 @@ def build_model(name: str, in_channels: int, **kw):
         if kw.pop("multiscale", False):
             return MultiScaleGridGNN(in_channels, **kw)
         return GridGNN(in_channels, **kw)
+    if name == "mgno":
+        from ampscape.models.mgno import MgNO
+
+        return MgNO(in_channels, **kw)
     raise ValueError(name)
 
 
@@ -30,6 +34,7 @@ MODEL_CONFIGS = {
     "fno": {"width": 32, "modes": 16, "layers": 4},
     "vit": {"patch": 4, "dim": 192, "depth": 6, "heads": 6},
     "gnn": {"dim": 64, "layers": 12},
+    "mgno": {"levels": 6, "width": 24, "layers": 4},  # paper Darcy config (WP6, vendored)
 }
 
 
@@ -68,6 +73,7 @@ MODEL_VARIANTS = {
         # tuning pass: coarser second level (8× instead of 4×) for the larger tiers
         "ms8": {"multiscale": True, "dim": 64, "coarse_layers": 12, "fine_layers": 6, "factor": 8},
     },
+    "mgno": {"base": MODEL_CONFIGS["mgno"]},
 }
 
 # Official baseline configurations frozen after the dev tuning pass (2026-09-14, docs/tables/tuning_dev.md):
@@ -75,9 +81,11 @@ MODEL_VARIANTS = {
 #   fno:  64 modes + distance-to-source channel (T1 rel-L2 1.14 → 0.34; the only configuration in which FNO recovers)
 #   vit:  base (patch 2 and the distance channel do not help)
 #   gnn:  multi-scale (4× coarsened graph) + distance channel (T1 1.04 → 0.69, T4 0.17 → 0.15)
+#   mgno: base = the paper's Darcy configuration (vendored official code, WP6; not yet tuned on the dev subset)
 OFFICIAL = {
     "unet": ("base", ()),
     "fno": ("m64", ("dist",)),
     "vit": ("base", ()),
     "gnn": ("ms", ("dist",)),
+    "mgno": ("base", ()),
 }
