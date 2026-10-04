@@ -39,6 +39,7 @@ from ampscape.models.common import (  # noqa: E402
     inverse_target,
     make_inputs,
     make_target,
+    make_voltage_target,
     masked_mse,
     n_channels,
     target_scale,
@@ -58,6 +59,8 @@ class Items(torch.utils.data.Dataset):
         multiscale: bool = False,
         tier: str | None = None,
         target_norm: str = "abs",
+        target: str = "default",
+        voltage_scale: float = 1.0,
     ):
         self.ds, self.task, self.stats, self.graph, self.extra, self.multiscale = (
             ds,
@@ -68,6 +71,7 @@ class Items(torch.utils.data.Dataset):
             multiscale,
         )
         self.tier, self.target_norm = tier, target_norm
+        self.target, self.voltage_scale = target, voltage_scale
 
     def __len__(self):
         return len(self.ds)
@@ -75,14 +79,19 @@ class Items(torch.utils.data.Dataset):
     def __getitem__(self, i):
         d = self.ds[i]
         x = make_inputs(d, self.task, self.stats, self.extra)
-        y, m = make_target(d, self.task, self.tier, self.target_norm)
+        if self.target == "voltage":
+            y, m = make_voltage_target(d, self.voltage_scale)
+            sc = self.voltage_scale
+        else:
+            y, m = make_target(d, self.task, self.tier, self.target_norm)
+            sc = target_scale(d, self.task, self.tier, self.target_norm)
         out = {
             "x": x,
             "y": y,
             "mask": m,
             "sample_id": d["sample_id"],
             "config": d["config"],
-            "scale": target_scale(d, self.task, self.tier, self.target_norm),
+            "scale": sc,
         }
         if self.graph:
             idx, ei, w = grid_graph(d["resistance"][0], d["nodata"][0] > 0)
@@ -179,10 +188,11 @@ def run_epoch(model, name, loader, device, opt=None, sched=None, amp=True, clip=
 
 
 @torch.no_grad()
-def predict(model, name, loader, device, task, out_h5, amp=True):
-    """Write predictions.h5 in the documented format with per-sample inference time (GPU-synchronised)."""
+def predict(model, name, loader, device, task, out_h5, amp=True, target="default"):
+    """Write predictions.h5 in the documented format with per-sample inference time (GPU-synchronised).
+    target="voltage": the dataset key is `voltage` and the inverse is linear (prediction × scale)."""
     model.eval()
-    key = TASK_TARGET[task]
+    key = "voltage" if target == "voltage" else TASK_TARGET[task]
     n = 0
     with h5py.File(out_h5, "w") as f:
         for batch in loader:
@@ -198,9 +208,10 @@ def predict(model, name, loader, device, task, out_h5, amp=True):
             dt = (time.perf_counter() - t0) / pred.shape[0]
             pred = pred.cpu().numpy()
             for i, (sid, cfg) in enumerate(zip(batch["sample_id"], batch["config"], strict=True)):
+                sc_i = batch.get("scale", [1.0] * len(batch["sample_id"]))[i]
                 c = inverse_target(
-                    pred[i, 0], batch.get("scale", [1.0] * len(batch["sample_id"]))[i]
-                )
+                    pred[i, 0], sc_i
+                )  # voltage target: same floor-log transform, scale 1
                 c[batch["mask"][i, 0].numpy() == 0] = np.where(
                     batch["x"][i, 1].numpy() > 0, np.nan, c
                 )[batch["mask"][i, 0].numpy() == 0]
@@ -264,6 +275,12 @@ def main():
         help="target normalisation: abs = official (absolute currents); scale = scale-aware variant "
         "(ampscape.models.common.target_scale), for the documented zero-shot transfer variant",
     )
+    ap.add_argument(
+        "--target",
+        default="default",
+        choices=["default", "voltage"],
+        help="voltage: predict the T3 advanced-mode voltage map (linear target) for the solver-acceleration track",
+    )
     ap.add_argument("--published-root", default="data/builds/published")
     ap.add_argument(
         "--published-tiers", default="S", help="comma list; XXL only for fully convolutional models"
@@ -315,6 +332,11 @@ def main():
     in_ch = n_channels(a.task, extra)
 
     stats = load_norm_stats(a.root, a.tier) or compute_norm_stats(a.root, a.tier, a.task)
+    voltage_scale = 1.0
+    if a.target == "voltage":
+        if a.task != "T3":
+            raise SystemExit("--target voltage requires --task T3 (advanced-mode voltage map)")
+        print("voltage target: log10(V + eps*max V), inverse = inverse_target", flush=True)
     cfg = {
         "model": a.model,
         "task": a.task,
@@ -324,6 +346,8 @@ def main():
         "variant": a.variant,
         "extra_channels": list(extra),
         "target_norm": a.target_norm,
+        "target_kind": a.target,
+        "voltage_scale": voltage_scale,
         "lr": lr,
         "batch": a.batch,
         "epochs": a.epochs,
@@ -333,7 +357,11 @@ def main():
         "patience": a.patience,
         "time_budget_min": a.time_budget_min,
         "input_channels": in_ch,
-        "target": f"log10({TASK_TARGET[a.task]} + eps*max)",
+        "target": (
+            "log10(voltage + eps*max)"
+            if a.target == "voltage"
+            else f"log10({TASK_TARGET[a.task]} + eps*max)"
+        ),
         "norm_stats": stats["log_resistance"],
         "device": torch.cuda.get_device_name(0) if device.type == "cuda" else "cpu",
         "git": subprocess.run(
@@ -353,7 +381,18 @@ def main():
             tr.index = tr.index.iloc[: a.max_train].reset_index(drop=True)
         va = AmpScapeDataset(a.task, "val", a.tier, a.root)
         dl_tr = torch.utils.data.DataLoader(
-            Items(tr, a.task, stats, graph, extra, multiscale, a.tier, a.target_norm),
+            Items(
+                tr,
+                a.task,
+                stats,
+                graph,
+                extra,
+                multiscale,
+                a.tier,
+                a.target_norm,
+                a.target,
+                voltage_scale,
+            ),
             batch_size=a.batch,
             shuffle=True,
             num_workers=a.workers,
@@ -363,7 +402,18 @@ def main():
             persistent_workers=a.workers > 0,
         )
         dl_va = torch.utils.data.DataLoader(
-            Items(va, a.task, stats, graph, extra, multiscale, a.tier, a.target_norm),
+            Items(
+                va,
+                a.task,
+                stats,
+                graph,
+                extra,
+                multiscale,
+                a.tier,
+                a.target_norm,
+                a.target,
+                voltage_scale,
+            ),
             batch_size=a.batch,
             shuffle=False,
             num_workers=a.workers,
@@ -521,7 +571,18 @@ def main():
             continue
         bs = 1 if tier in ("XL", "XXL") else a.batch
         dl = torch.utils.data.DataLoader(
-            Items(ds, a.task, stats, graph, extra, multiscale, tier, a.target_norm),
+            Items(
+                ds,
+                a.task,
+                stats,
+                graph,
+                extra,
+                multiscale,
+                tier,
+                a.target_norm,
+                a.target,
+                voltage_scale,
+            ),
             batch_size=bs,
             shuffle=False,
             num_workers=min(a.workers, 2),
@@ -530,7 +591,7 @@ def main():
         tag = f"{pathlib.Path(root).name}_{tier}_{split}"
         pdir = out / "predictions" / tag
         pdir.mkdir(parents=True, exist_ok=True)
-        n = predict(model, a.model, dl, device, a.task, pdir / "predictions.h5", amp)
+        n = predict(model, a.model, dl, device, a.task, pdir / "predictions.h5", amp, a.target)
         (pdir / "meta.json").write_text(
             json.dumps(
                 {

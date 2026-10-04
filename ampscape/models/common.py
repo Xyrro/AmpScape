@@ -132,6 +132,17 @@ def target_scale(d: dict, task: str, tier: str | None, norm: str = "abs") -> flo
     return float(np.sqrt(n_valid / float(512 * 512)))
 
 
+def make_voltage_target(d: dict, scale: float = 1.0) -> tuple[np.ndarray, np.ndarray]:
+    """Voltage-head variant (solver-acceleration track, 2026-10-05): target = log10(V + ε·max V) — the same
+    floor-log transform as the current targets (a linear target was dominated by a few high-voltage landscapes in
+    the smoke test); the inverse is `inverse_target`. Loss mask = valid pixels. `scale` is kept at 1 for API symmetry."""
+    v = d["voltage"][0].astype(np.float64)
+    m = np.where(np.isfinite(v), v, 0.0) * float(scale)
+    y = np.log10(np.maximum(m, 0.0) + EPS * max(float(m.max()), 1e-30)).astype(np.float32)
+    mask = (d["nodata"][0] == 0) & np.isfinite(v)
+    return y[None], mask[None].astype(np.float32)
+
+
 def make_target(
     d: dict, task: str, tier: str | None = None, norm: str = "abs"
 ) -> tuple[np.ndarray, np.ndarray]:
