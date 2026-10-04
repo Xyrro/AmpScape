@@ -293,3 +293,11 @@ All 42 references and the inline links were re-verified on 2026-10-02 (full tabl
 - HANO is now *J. Comput. Phys.* 506:112944 (2024); MgNO is ICLR 2024; DCNO is arXiv:2408.00775 (2024); LOD-MSNO is
   arXiv:2607.12570 (Haltmayer et al., 14 Jul 2026).
 - [41] still resolves; no NeurIPS 2027 call exists yet (neurips.cc/Conferences/2027 → 404 on 2026-10-02).
+
+### 2026-10-05 WP6 implementation check (MgNO, HANO; details in `docs/wp6_implementations.md`)
+
+- **MgNO** — https://github.com/xlliu2017/MgNO, MIT (`LICENSE.txt`, (c) 2024 Xinliang Liu), pure PyTorch; `MgNO_DC` with the README Darcy config (6 levels, 24 channels, 4 layers, `[[1,0]]*5+[[2,0]]`) has 572,661 parameters = the paper's 0.57 M; resolution-agnostic for 128²/256² (H, W divisible by 32). **USABLE** — vendor ~150 lines into `ampscape/models/mgno.py` with `num_channel_f = in_channels` and an `output_dim` head fix.
+- **HANO** — https://github.com/xlliu2017/HANO (URL given in JCP §3.9), MIT (`LICENSE.txt`, (c) 2021 Shuhao Cao). The repo's `HANO` is now an unpublished "multigrid-attention" model (≈5.2 M params) introduced by a Copilot commit on 2026-05-31; the paper's hierarchical window-attention model survives only as `hano_legacy.py`, unwired, with a 3-level/dim-64 config that contradicts the paper's Table 1 (5 levels, dim 32, window 3, 2 cycles) and a 2^k+1-grid convention. **NOT USABLE** as an official baseline; keep as related work.
+- The HANO README (Copilot PR #2, merged 2026-10-01) cites a non-existent "NeurIPS 2023" HANO paper (arXiv 2311.10189 is an unrelated FPGA paper; authors do not match). Cite only arXiv 2210.10890 / JCP 506:112944 (Liu, Xu, Cao, Zhang).
+- Both repos pin `torch==1.13.0`, `timm==0.6.12`, `numpy==1.23.5` (requirements.txt identical); none of these pins is needed for the MgNO model code, which imports only torch.
+- Paper reference numbers for later comparison (×1e-2, 256², H1-trained): MgNO Darcy rough L2 0.339 / H1 1.380, multiscale 0.715 / 1.756; HANO Darcy rough 0.343 / 1.846, multiscale 0.580 / 1.749.
