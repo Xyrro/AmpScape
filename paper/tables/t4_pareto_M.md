@@ -12,6 +12,10 @@
 | test_id | production block 3 (correct_artifacts=1) | 400 | 111 | 0.0291 | 0.0371 | 0.0119 | 0.9357 | 0.9312 | 0.9983 |
 | test_id | block 7 (correct_artifacts=1) | 400 | 25.5 | 0.0983 | 0.1064 | 0.0526 | 0.8081 | 0.8081 | 0.9845 |
 | test_id | block 7 (correct_artifacts=0) | 400 | 25.4 | 0.2918 | 0.3771 | 0.0679 | 0.5468 | 0.9662 | 0.9664 |
+| test_id | gnn_T4_M (learned, 3 seeds) | 4823 | 0.0163 | 0.0989 | – | 0.0536 | 0.6983 | 0.7746 | 0.9720 |
+| test_id | vit_T4_M (learned, 3 seeds) | 4823 | 0.00205 | 0.0942 | – | 0.0561 | 0.7199 | 0.8193 | 0.9789 |
+| test_id | fno_T4_M (learned, 3 seeds) | 4823 | 0.00147 | 0.0787 | – | 0.0524 | 0.7784 | 0.7537 | 0.9847 |
+| test_id | unet_T4_M (learned, 3 seeds) | 4823 | 0.00109 | 0.0513 | – | 0.0251 | 0.8569 | 0.8993 | 0.9951 |
 | test_ood | block 1 (exact, reference) | 300 | 860 | 0.0000 | 0.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 |
 | test_ood | production block 3 (correct_artifacts=1) | 300 | 133 | 0.0316 | 0.0517 | 0.0112 | 0.9154 | 0.9252 | 0.9954 |
 | test_ood | block 3 (correct_artifacts=0) | 300 | 132 | 0.1153 | 0.1520 | 0.0266 | 0.5998 | 0.7793 | 0.9626 |

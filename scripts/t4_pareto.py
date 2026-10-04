@@ -62,13 +62,40 @@ def block_rows(ref: pathlib.Path, blocks: list[pathlib.Path]) -> pd.DataFrame:
 
 
 def model_rows(runs: list[pathlib.Path], tier: str) -> pd.DataFrame:
+    """Learned rows. Phase 10-full runs carry the evaluation against the exact block-1 map in
+    <run>/eval_t4_reference/results.json (test_id; `scripts/evaluate.py --t4-reference`): its per-task metrics and the
+    median per-landscape inference time are used, and seeds of one model are averaged into one row
+    (`<model> (learned, k seeds)`). Dev-era runs without that file fall back to the production-target metrics in
+    results.json (tags `<root>_<tier>_<split>`)."""
+    import re
+
     rows = []
     for r in runs:
+        ref = r / "eval_t4_reference" / "results.json"
+        if ref.exists():
+            rr = json.loads(ref.read_text())
+            m = rr["per_task"].get("T4", {})
+            ts = [x.get("inference_time_s") for x in rr["per_sample"] if x.get("inference_time_s")]
+            rows.append(
+                {
+                    "split": rr["splits"][0],
+                    "method": re.sub(r"_s\d+$", "", r.name),
+                    "seed": r.name,
+                    "n": rr["n_rows"],
+                    "cost_s": float(pd.Series(ts).median()) if ts else None,
+                    **{
+                        k: (m.get(k) or {}).get("mean") if isinstance(m.get(k), dict) else m.get(k)
+                        for k in KEYS
+                    },
+                }
+            )
+            continue
         res = json.loads((r / "results.json").read_text())
         for tag, e in res["eval"].items():
-            if not tag.startswith(f"S_{tier}_") and not tag.startswith(f"{tier}_{tier}_"):
+            mt = re.match(rf"^[^_]+_{tier}_(test_id|test_ood|ood_region)$", tag)
+            if not mt:
                 continue
-            split = tag.split("_", 2)[2]
+            split = mt.group(1)
             m = e.get("T4", {})
             if not m or m.get("rel_l2") is None:
                 continue
@@ -81,13 +108,31 @@ def model_rows(runs: list[pathlib.Path], tier: str) -> pd.DataFrame:
             rows.append(
                 {
                     "split": split,
-                    "method": f"{r.name} (learned)",
+                    "method": re.sub(r"_s\d+$", "", r.name),
+                    "seed": r.name,
                     "n": e.get("n_rows"),
                     "cost_s": cost,
                     **{k: m.get(k) for k in KEYS},
                 }
             )
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    if not len(df):
+        return df
+    agg = (
+        df.groupby(["split", "method"])
+        .agg(
+            n=("n", "first"),
+            seeds=("seed", "nunique"),
+            cost_s=("cost_s", "mean"),
+            **{k: (k, "mean") for k in KEYS},
+        )
+        .reset_index()
+    )
+    agg["method"] = [
+        f"{m} (learned, {k} seed{'s' if k > 1 else ''})"
+        for m, k in zip(agg.method, agg.seeds, strict=True)
+    ]
+    return agg.drop(columns="seeds")
 
 
 def main():
