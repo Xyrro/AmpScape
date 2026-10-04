@@ -2009,3 +2009,288 @@ pinch-point recall 0.94 (precision 0.66 at 3 px); per-map rel-L2 0.054 mean, 0.1
 the solver route vs 11.8 s on one GPU (≈ ×11,000 after training once).
 
 Next: transfer evaluations at XL/XXL → scale-aware variants at L + their transfers → GNN (S, M, L) → GNN transfers and variant; weekly report or on schedule changes.
+
+---
+
+# Status — 2026-10-04 21:30Z: Phase 13 (post-review work items) running; harness defect found and fixed
+
+## Headline rel-L2 on test_id (seed 1, 30 epochs, official configs)
+
+| task | S | M | L |
+|---|---|---|---|
+| T1 U-Net | 0.111 | 0.238 | 0.392 |
+| T1 FNO | 0.198 | 0.266 | 0.364 |
+| T1 ViT | 0.238 | 0.533 | 0.644 (structural, see DECISIONS) |
+| T4 U-Net | 0.040 | 0.051 | 0.080 |
+| T4 FNO | 0.051 | 0.079 | 0.120 |
+| T4 ViT | 0.052 | 0.099 | 0.159 |
+
+- T1 error grows with tier for both U-Net and FNO (S → L: ×3.5 and ×1.8). Two effects are confounded in the
+  official configs: larger landscapes (longer-range flow) and a smaller fixed-epoch training set (100 k / 30.7 k /
+  12.3 k landscapes at S / M / L, 30 epochs each; U-Net L trains in 1.5 GPU-h and its validation loss is still
+  falling at epoch 30). WP4 (data-scaling at S, running) and the fixed-step variants separate these; a longer-epoch
+  L run is a candidate addition once the plan is through.
+- T4 against the exact block-1 map (test_id): at M U-Net 0.051 at 1 ms/landscape, FNO 0.079 at 1.5 ms vs the
+  production block-3 solver 0.029 at 111 s and block 7 with artifact correction 0.098 at 25 s; at L U-Net 0.080 at
+  5 ms, FNO 0.120 at 7 ms vs production block 5 at 0.032 and 566 s. U-Net T4 L seeds 1–3: 0.080 / 0.082 / 0.081
+  (`runs/full/<run>/eval_t4_reference/results.md`, backfilled by CPU jobs where the training job skipped it).
+- 70 of 144 jobs finished (training runs); L/T3 running, transfer evaluations and GNN next. Running table: `docs/tables/baselines_full.md`.
+
+## Schedule change (22:40Z): XL and XXL rows by scale transfer
+- XL is a held-out-scale tier (card; 228 train / 0 val landscapes): the first XL training legs were degenerate and
+  their single-process metrics at 1024² exceeded a 2-h leg. All XL training was cancelled; every L-trained run is
+  instead evaluated at XL and XXL (`scripts/transfer_eval.py`, 42 jobs ≈ 66 GPU-h, after P3 / after the GNNs).
+  Plan now 144 jobs ≈ 933 GPU-h. Harness metrics run in parallel processes (identical results, verified).
+- Owner items done: tile rasters deleted (scratch 285 → 251 GB); T4-at-S finding recorded; ViT L checked (no
+  divergence, resolution-inappropriate official config) — all in DECISIONS.md.
+
+## Scale transfer (L-trained models at XL, first rows; `<run>/results_transfer.json`)
+
+| trained at L → XL, test_id | rel-L2 | throughput error | Spearman | top-5 % IoU |
+|---|---|---|---|---|
+| T1 U-Net (s1 / s3) | 1.70 / 1.03 | 0.94 / 0.93 | 0.70 / 0.74 | 0.42 |
+| T1 FNO (s1 / s3) | 0.75 / 0.74 | 0.62 / 0.71 | 0.93 / 0.92 | 0.56 |
+| T1 ViT (s3) | 0.77 | 0.53 | 0.66 | 0.14 |
+| T4 U-Net / FNO / ViT (s1) | 0.51 / 0.53 / 0.54 | — | 0.94 / 0.95 / 0.93 | 0.60 / 0.66 / 0.56 |
+
+- Zero-shot scale transfer of the official baselines fails on magnitude and partly survives on ranking: T1 predictions
+  at XL carry the wrong total current (throughput error 0.5–0.9; the target is absolute log-current and the injected
+  current per pixel changes with landscape size), while FNO keeps the pixel ranking (Spearman 0.93). For T4 the
+  three models agree at rel-L2 ≈ 0.5 with Spearman ≥ 0.93 — consistent with a near-constant magnitude factor, and
+  note that the XL Omniscape target uses a window twice as large (radius 128 vs 64 at L; block 11 vs 5), so T4
+  transfer is transfer across operators as well as scales (verified on every XL/XXL row, see check 1). Both are benchmark findings, reported as measured (official protocol,
+  no re-calibration). The transfer script was cross-checked on training-tier data where possible; the pattern is
+  consistent across seeds and models.
+- Remaining splits (test_ood, ood_region) and XXL follow as the transfer jobs run.
+
+## Phase 13 — owner's six items (started 2026-10-04 evening)
+
+**Editing rule applied** to all `paper/sections/*.md` (operational narrative removed; one reproducibility paragraph;
+moved material in `paper/appendix_notes.md`). Several sections remain above the length targets with dense content
+only; the cut to a 9-page main text happens when `paper/draft.md` is assembled (step 6).
+
+**Item 1 — solver-acceleration metric.** The official T1/T3 models predict current maps, so the warm start needs
+voltage-predicting counterparts: `train.py --target voltage` (same floor-log transform) for T3; six seed-1 runs
+(U-Net, FNO × S/M/L, ≈ 9 GPU-h) are training/queued, and a waiter submits the CPU warm-start evaluations
+(`evaluate.py --acceleration`, test_id and test_ood) per finished run. T1 `points` shards store no pair voltages, so
+the first pair of every T1 landscape (ground = lowest label, source = second label, unit current — the pair the
+metric uses) is being pre-solved on CPU (`pair1_voltage.jl`, 45 array tasks, `aux/t1_pair1/`, ≈ 90 CPU-h); the
+same voltage head then trains on those systems as task `T1V` (six runs, ≈ 9 GPU-h) once the pre-solves are
+complete. Table and results paragraph follow.
+
+**Item 2 — per-tier tuning at M/L.** Plan and cost in `docs/tuning_plan_full.md`: 13 single-seed T1 runs (U-Net
+wide/w64, FNO m96/w48, ViT patch and positional grid sized to the tier, GNN ×8 multiscale), ≈ 47 GPU-h, selection
+on val only; running under the GPU driver now (M/T1 staging). Re-runs for changed configs are costed when the
+winners are known.
+
+**Item 3 — derivation.** `paper/appendix_derivation.md`: the zero-shot T4 error equals 1 − r_train/r_eval because the
+cumulative current scales with the window radius (injected current ∝ r², spread ∝ r, visits per pixel constant at
+b = r/10); the scale-aware factor cancels it; the T1 analogue and the assumptions are stated.
+
+**Item 4 — WP6.** MgNO has an MIT, pure-PyTorch official implementation reproducing the paper's 0.57 M parameters:
+vendored as model `mgno` (`ampscape/models/mgno.py`, `docs/THIRD_PARTY_LICENSES.md`), smoke-tested; four seed-1 runs
+(T1/T4 × S/M, ≈ 6 GPU-h) are in the driver plan. HANO's public repository no longer contains the published model in
+runnable form; recorded in `docs/wp6_implementations.md` and `docs/prior_art.md`; it stays in related work.
+
+**Item 5 — submission format.** `docs/submission.md`, `scripts/submit_results.py` (validate / make-entry / append /
+seed-baselines), 30 tests; the leaderboard (`aux/leaderboard/results.jsonl` + rendered README) is seeded locally
+with 142 entries and will be pushed after the tuning pass.
+
+**Harness defect (found while building item 5, fixed, affects reported numbers):** the T4 exact block-1 comparison
+branch was unreachable, so every learned-model "vs block-1" number so far (reference evaluations, Pareto learned
+rows, the status headline, the results draft) was the production-target number on the full test_id split. Fixed with
+a regression test; the evaluation is now restricted to the reference subset (400 M / 24 L landscapes) so learned and
+solver rows share the surface. The 28 wrong evaluation directories are set aside; the driver recomputes them from the
+Hub-stored predictions when M/T4 and L/T4 are staged, after which the Pareto tables, the status headline and the
+results section are regenerated. The solver block rows, the in-tier production-target rows and every other table are
+unaffected.
+
+**Scratch incident 20:20Z:** staging three T3 groups by hand on top of two groups left from the GNN phase filled the
+quota; two voltage-head runs and ≈ 300 pre-solve shards failed and were redone; staging now goes only through the
+driver (plan files, pinned groups). Driver and keepalive restarted 21:05Z; offloader paused while CPU evaluations
+read local predictions.
+
+**Order of the remaining work:** warm-start evaluations → T1V runs → tuning selection and re-runs → T4 reference
+recompute → MgNO runs → regenerate tables/figures/sections → leaderboard push → `paper/draft.md` (step 6).
+
+## Phase 10-full — final summary (2026-10-04; tables `paper/tables/`, figures `paper/figures/`, all regenerated by `scripts/paper_figures.py`)
+
+**Done:** 110 training runs (U-Net, FNO, ViT, GNN × T1/T4 and U-Net/FNO × T3, × S/M/L × 3 seeds; WP4; six
+scale-aware variants), 56 transfer legs (XL/XXL), WP7. All on the Hub (`aux/results/runs_full/`). Cost 401 GPU jobs,
+430.1 GPU-h vs ≈ 1,081 nominal (`docs/tables/gpu_usage.md`); 11 calendar days incl. 6 idle. Daemons stopped.
+
+**Headline (rel-L2 on test_id, mean over 3 seeds; `paper/tables/baselines_sml.md`):**
+
+| task | model | S | M | L |
+|---|---|---|---|---|
+| T1 | U-Net / FNO / ViT / GNN | 0.114 / 0.199 / 0.218 / 0.561 | 0.212 / 0.248 / 0.419 / 0.849 | 0.397 / 0.361 / 0.648 / 1.067 |
+| T3 | U-Net / FNO | 0.111 / 0.253 | 0.202 / 0.284 | 0.379 / 0.347 |
+| T4 | U-Net / FNO / ViT / GNN | 0.041 / 0.051 / 0.052 / 0.066 | 0.051 / 0.079 / 0.094 / 0.099 | 0.081 / 0.120 / 0.159 / 0.142 |
+
+- T4 against the exact block-1 map (seed 1; `paper/tables/t4_pareto_{M,L}.md`): at M U-Net 0.051, FNO 0.079, GNN
+  0.099 at 1–16 ms/landscape vs the production block-3 solver 0.029 at 111 s; at L U-Net 0.080, FNO 0.120, GNN 0.142
+  at 5–66 ms vs block 5 at 0.032 and 566 s.
+- The GNN is far behind on T1 (its multi-scale graph does not resolve long-range pairwise flow) and competitive on
+  T4 (local Omniscape windows), the opposite of the convolutional models' relative strengths.
+- Scale transfer (`paper/tables/scale_transfer.md`): zero-shot XL/XXL fails on magnitude (T4 rel-L2 ≈ 0.52 / 0.75
+  for every model, = 1 − r_L/r_tier); the scale-aware target recovers T4 to 0.16–0.22 at XL and 0.20–0.34 at XXL
+  (U-Net 0.189 / 0.312, FNO 0.162 / 0.201, GNN 0.223 / 0.341) and the FNO on T1 to 0.57 / 0.67; U-Net and GNN on T1
+  stay near rel-L2 0.8–1.0 (receptive field). Rankings are unchanged by the variant.
+- OOD at the training tier (`paper/ood_analysis.md`): held-out table + contrast costs ≤ 18 % (ViT L excepted);
+  published real surfaces cost 30–52 % on T4 at S; the held-out-region split is *easier* (0.65–1.0×) because of its
+  composition — to be presented as a leakage control, not a stress test.
+- WP4 (`docs/wp4_data_scaling.md`): under the official step budget the U-Net saturates by 20k landscapes at S; the
+  FNO stays data-limited. WP7 (`docs/wp7_demo.md`): study-level conclusions reproduced at ≈ ×11,000 lower cost.
+
+**Phase 12 state (complete as a draft package):** `paper/outline.md`; seven section drafts under `paper/sections/`
+(dataset/generation, tasks/metrics, splits/OOD, baselines/protocol, related work with 62 verified sources + source
+table, results, discussion/limitations/ethics/maintenance) with every number tagged to its source file and no TODO
+markers left (the only unavailable fact — non-source rel-L2 of learned models against the block-1 map — is stated as
+such); brief §14 deliverables `paper/baselines.md`, `paper/dataset_statistics.md`, `paper/ood_analysis.md`; one script
+(`scripts/paper_figures.py`) regenerates 12 figures and 8 tables under `paper/`. Open for the owner: the two
+practitioner cost quotes flagged in `paper/sections/related_work_sources.md` need a human check; the public repo
+surfaces in novelty searches (double-blind); DOI at submission.
+
+## 2026-10-03: scale-aware target variant — result (seed 1, trained at L, zero-shot at XL/XXL; `paper/tables/scale_transfer.md`)
+
+| task / model | L (trained) | XL zero-shot → scale-aware | XXL zero-shot → scale-aware |
+|---|---|---|---|
+| T4 U-Net | 0.080 | 0.515 → **0.189** | 0.749 → **0.312** |
+| T4 FNO | 0.120 | 0.532 → **0.162** | 0.765 → **0.201** |
+| T4 ViT | 0.161 | 0.538 → **0.203** | — |
+| T1 U-Net | 0.369 | 1.250 → 0.957 | 4.43 → 0.987 |
+| T1 FNO | 0.411 | 0.707 → **0.572** | 1.502 → **0.671** |
+| T1 ViT | 0.617 | 0.768 → 0.656 | — |
+
+(rel-L2 on test_id; zero-shot values are the 3-seed means of the official configs.) Making the target scale-free with
+the quantity that sets the current magnitude — the Omniscape radius for T4, the valid-pixel count for T1 — removes most
+of the zero-shot transfer error for T4 (the radius factor is exactly the 1 − 1/2 and 1 − 1/4 seen before) and for the
+FNO on T1; the U-Net on T1 stays near rel-L2 1 at XL/XXL (its receptive field, not the magnitude, is the limit) and
+the ViT's structural problem is unchanged. Rankings (Spearman) are the same as zero-shot in every case. No XL/XXL data
+entered training or the inverse transform. At L the variant equals the official run for T4 (k = 1) and differs within
+seed noise for T1. Figure: `paper/figures/scale_transfer.png`.
+
+**Incident 2026-10-03 01:00–02:15Z (caught by the watchdog in an hour):** pre-staging the S/M groups for the gated GNN
+phase pushed scratch over the transfer threshold and held the last five variant transfer legs, which in turn gated the
+GNN phase. Fixed: no pre-staging for a gated phase; the hold may evict any group whose next use is later than the held
+leg. GNN phase started 02:50Z (18 runs + 12 transfers + variant).
+
+## 2026-10-02 reconnect: inventory, incident, restart
+
+**Inventory (from disk and the Hub, `aux/results/runs_full/`):** all 84 training runs of P1–P3 and WP4 are complete
+and on the Hub with results (every T4 M/L run also has its exact-reference evaluation). Scale transfer: 18 of 30
+legs done (all T1 at XL and XXL, 3 seeds; T4 seed-1 at XL for U-Net/FNO/ViT) — remaining 12: T4 XL seeds 2–3 (6)
+and T4 XXL (6). Not started: scale-aware variants (6 L runs + 10 transfers), GNN (18 runs), GNN transfers (12),
+GNN variant (2 + 4). Nominal remaining 772 GPU-h (GNN 578 of it); at the measured 3–7× faster training the realistic
+remainder is ≈ 200–300 GPU-h.
+
+**Incident:** the driver and the offloader never died — both ran through the week — but the driver was deadlocked
+since 26 Sep 03:30Z: after the XXL/T1 group was released it refused to stage XL/T4 because the transfer-group staging
+limit (201 GB = 245 − 4 × 11) sat below the scratch floor plus one XL group (156 + 61 GB), so nothing could be staged
+and the queue stayed empty for six days. Silent because the hold was logged only as "does not fit". Fix: the limit
+is now measured against the hard 280 GB guard (280 − 3 × 11 = 247; three transfer legs in flight), and the monitor
+has a watchdog that reports an empty queue while jobs are pending. Six calendar days lost; no results lost.
+
+**Restart (detached):** `scripts/slurm/gpu/keepalive.sh` under `setsid nohup` restarts the driver whenever its lease
+pid is dead and the offloader whenever none runs (every 5 min; `logs/keepalive.log`). One-line runbook entry in
+`docs/phase10_full_schedule.md` §3. It survives a dead session; a login-node reboot still needs the line re-run
+(PACE login nodes allow no user cron/systemd). Driver restarted 13:54Z; XL/T4 staging; T4 transfer legs next.
+
+**Calendar estimate at the measured rates:** transfers ≈ 1 day (12 legs + the variants' 10), scale-aware L runs
+≈ 0.5 day in parallel, GNN 18 runs ≈ 2–3 days (L/T4 GNN is the long pole, 2-h legs re-queued), GNN transfers and
+variant ≈ 1 day → **≈ 4–5 calendar days** if nothing stalls. Weekly report, or on failures.
+
+## v1.0.2 (metadata only) — done 2026-09-26 02:40Z (owner approval)
+- Audit of every hashed share: only the C3 macro-cell hash had a None key (synthetic XL). The block-order hash
+  (real tiles, seed|stratum|block), the synthetic seed-family hash and the strict-XXL geometric check use defined keys;
+  real-tile val cells at L are assigned by the block rule and were never subject to C3.
+- Second defect found during the audit and fixed in the same release: the Hub split lists `splits/<subset>/<split>.parquet`
+  held only the last published tier's ids (per-tier uploads overwrote each other; `splits/full/train.parquet` had L's
+  12,613 ids). Rebuilt as cross-tier unions (full: train 108,291 / val 18,934 / test_id 19,206 / test_ood 11,225 /
+  ood_region 16,720); `publish_index` now builds them from every tier's index. The per-tier index `split` column was
+  always complete, so loaders were unaffected.
+- XL after the correction: train 880 / val 131 / test_id 2,335 / test_ood 254 / ood_region 400 (25.3 % train+val;
+  synthetic share 0.3635 of the moved landscapes; 28 real val landscapes drawn among the kept cells).
+- Published: `index/XL.parquet`, `splits/**`, card, Croissant 1.0.2 (validated, 0 warnings); local caches refreshed;
+  13 transfer runs re-aggregated on the new XL test_id (`scripts/reaggregate_transfer.py`, per-sample metrics kept);
+  CITATION 1.0.2; tags `v1.0.2` on GitHub and the Hub. CI: `tests/test_scripts_parse.py` (every script non-empty and
+  parseable, shell syntax-checked) — 75 files.
+
+## Owner checks (2026-09-25)
+
+**1. Omniscape geometry, read from the data** (`solver_stats.solver_params` on every T4 output group on the Hub, staged
+copies): XL — all 4,000 rows `block_size 11, radius 128`; XXL — all 400 rows `block_size 25, radius 256`; L (the 100
+WP7 v1 rows as a spot check) `block_size 5, radius 64`; all `solver cholmod`, `correct_artifacts true`,
+`fallback_used false`. The adopted rule block ≤ radius/10 holds (XL 11 ≤ 12.8, XXL 25 ≤ 25.6); the card's fidelity
+statement is correct and no target needs regenerating. (My 10:00Z note quoting "block 33" came from an early
+DECISIONS row about the *cost probe*, not from the data; corrected above.)
+
+**2. XL train/val vs amendment C3.** C3 is implemented in `ampscape/splits/assign.py` as: apply the base split
+(train 0.8 / val 0.1 / test_id 0.1 by seed family), then keep an XL landscape in train/val only if
+`stable_unit(f"{block_id}|{seed}") < 0.25`. `block_id` exists only for real tiles (macro-cell of the tile); synthetic
+landscapes carry `block_id = None`, and `stable_unit("None|20260906") = 0.348 ≥ 0.25`, so **every synthetic XL
+train/val landscape (2,165 of 2,400) was moved to test_id**, and of the real tiles only the 25 % of macro-cells that
+hash below the share kept their rows: 228 train, and the real val cells all hashed out (val = 0). Result: XL train
+228 / val 0 / test_id 3,118 / test_ood 254 / ood_region 400 instead of ≈ 1,000 train+val. XXL is test-only by design
+(unchanged). Nothing in the v1.0 *data* is affected; the released model results are unaffected too (nothing was
+trained at XL; the XL/XXL rows are zero-shot transfers evaluated on test_id).
+
+*Proposed metadata fix (1.0.2, index `split` column + `splits/full/*.parquet` + Croissant; data revision unchanged):*
+for synthetic XL landscapes apply the C3 share per seed family, `stable_unit(f"{seed_family}|{seed}|xl") < share`,
+with share = 0.278 so that synthetic train+val ≈ 600 (25 % of the 2,400 synthetic landscapes; simulated with 0.25:
+470 train / 77 val); for real tiles keep the macro-cell rule but draw val cells among the kept cells at the base
+10 % ratio (today 0). Expected XL: ≈ 830–1,000 train+val (≈ 21–25 %), test_id ≈ 2,300 (still ≥ 5× the XXL test).
+Consequences: the transfer rows on XL test_id are re-aggregated from the stored per-sample metrics (no recompute);
+mini/lite/core are unaffected (XL is full-only); the datasheet split table and the card's XL sentence change.
+Not applied — awaiting your go-ahead.
+
+**3. Scale-aware target variant** (`--target-norm scale`, `ampscape.models.common.target_scale`; documented in the
+code): T1/T3 target = log10(k·C + ε·max) with k = sqrt(N_valid / 512²) — under a uniform rescaling by s per axis
+with the same injected current (T1's injection does not change with tier by construction) current per pixel column
+∝ 1/s and N_valid ∝ s²; T4: k = 64 / r_tier — Omniscape currents accumulate ∝ r·s̄ (window injects ∝ r²·s̄, spreads
+over ∝ r, a pixel sits in ∝ (r/b)² windows with b ≈ r/10), which is exactly the ×2 seen at XL. k is computed from the
+inputs / the evaluation tier only; the prediction is divided by k before the harness, so metrics stay in absolute
+current units and no XL/XXL data enters the training or the inverse. At L the variant's target equals the official
+one numerically (k = 1 at 512², r = 64), so any difference is the transfer.
+Runs: `<model>_<task>_L_s1_scalenorm` for U-Net, FNO, ViT × T1, T4 (official configs otherwise), then the same
+zero-shot XL/XXL transfer (tags SN/SNX, after the current transfer phase); GNN variant after the GNN phase (SN4/SNX4).
+*GPU cost estimate* (measured L seed-1 times): training 17.5 GPU-h (U-Net 1.5+1.6, FNO 2.7+2.8, ViT 4.4+4.6) +
+evaluation legs ≈ 4.5 + transfers ≈ 7.5 (XL 6 × ≈ 0.6 h, XXL 4 × ≈ 1 h) ≈ **30 GPU-h**; GNN variant ≈ 15–35 GPU-h
+more (its official L runs are not measured yet). Smoke-tested on the mini build before queueing.
+
+## Incident 10:00Z–22:35Z: transfer phase silently held for 12 h
+- After the quota recovery the driver refused transfer legs while scratch was above the 255 GB threshold, but the
+  four staged XL/XXL groups (166 GB) plus the floor kept scratch at 272 GB, nothing triggered an eviction, and the
+  hold was silent. Fix (22:35Z): when transfer legs are held by scratch the driver evicts staged groups whose next
+  use is later than the first runnable transfer; the hold is logged; transfer jobs are ordered task-major (T1 then
+  T4) so only one task's XL/XXL groups need to stay staged; the threshold is 245 GB with 4 legs in flight. The
+  first XL T1 legs went out at 22:35Z. Plan: 166 jobs ≈ 1,081 GPU-h nominal (the scale-aware variants added 46 nominal;
+  measured rates are 3–7× lower).
+
+## Incident 09:09Z: scratch quota reached (300 GB)
+- Nine concurrent XL transfer legs each wrote up to 13 GB of predictions (FNO at 1024²) before their metrics ran;
+  the 280 GB guard only governs staging. Effects: transfer legs died on write errors (resumable, no metrics lost),
+  the offloader could not push (the Hub client needs local temp space), one config file was caught mid-rewrite.
+- Fixes (committed): transfer legs drop predictions after their metrics except seed-1 test_id; the offloader pushes
+  per split; ≤ 2 transfer legs in flight below 265 GB (4 once the quota breathes); robust JSON reads. To recover
+  I deleted transfer predictions whose metrics were already stored (seed 2/3, 19 GB — exactly what the new policy
+  drops) and incomplete prediction files of the killed legs (15 GB, no metrics, re-predicted on resume); paths are in
+  the session log. Scratch 300 → 220 GB; driver and offloader restarted 09:42Z.
+
+## Operation
+- Fixed today: the in-job T4 reference evaluation looked for predictions under the wrong path and the M reference
+  was not local — path fixed in the job template, M reference fetched, and the driver backfills any finished T4 M/L
+  run with a CPU job (≈ 9 min at M). Driver: strict-priority tier-major staging, draining, eviction protection,
+  scratch guard 280 GB, GNN strictly last (one early GNN job cancelled at start).
+- Storage-bound at L: with ≈ 130 GB of scratch outside the training cache, L/T1 (84 GB) and L/T4 (82 GB) cannot
+  be staged together. L/T4 waits for the last L/T1 legs (ViT seeds, ≈ 1–2 h), during which only 4 of 18 GPU slots
+  are used. XL groups (61 + 61 GB) fit together.
+
+## WP7 many-query demonstration — done (`docs/wp7_demo.md`, `aux/wp7/demo_summary.md` on the Hub)
+U-Net T4 L seed 1 on 20 held-out real L tiles × 8 tables (160 maps): the surrogate reproduces the study-level
+conclusions of the solver — top-5 % stability across tables 0.458 vs 0.463 (IoU matrices differ by 0.019), consensus
+core IoU 0.825, table-effect ranking Spearman 0.991 with the same most-influential table on every tile, persistent
+pinch-point recall 0.94 (precision 0.66 at 3 px); per-map rel-L2 0.054 mean, 0.100 worst table. Cost: 36.3 CPU-h for
+the solver route vs 11.8 s on one GPU (≈ ×11,000 after training once).
+
+Next: transfer evaluations at XL/XXL → scale-aware variants at L + their transfers → GNN (S, M, L) → GNN transfers and variant; weekly report or on schedule changes.
