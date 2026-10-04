@@ -135,6 +135,17 @@ def model_rows(runs: list[pathlib.Path], tier: str) -> pd.DataFrame:
     return agg.drop(columns="seeds")
 
 
+def short_label(method: str) -> str:
+    """'unet_T4_L (learned, 3 seeds)' -> 'U-Net'; '…_s1_scalenorm (learned, 1 seed)' -> 'U-Net (scale-aware)'; solver rows unchanged."""
+    import re as _re
+
+    mm = _re.match(r"^(unet|fno|vit|gnn)_T4_\w+?(_s\d+)?(_scalenorm)? \(learned", method)
+    if not mm:
+        return method
+    name = {"unet": "U-Net", "fno": "FNO", "vit": "ViT", "gnn": "GNN"}[mm.group(1)]
+    return name + (" (scale-aware)" if mm.group(3) else "")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--reference", required=True)
@@ -183,9 +194,17 @@ def main():
         for ax, split in zip(axes[0], splits, strict=True):
             g = df[(df.split == split) & df.cost_s.notna()]
             for r in g.itertuples():
-                ax.scatter(r.cost_s, r.rel_l2, s=40, marker="o" if "learned" in r.method else "s")
+                learned = "learned" in r.method
+                variant = "scalenorm" in r.method
+                ax.scatter(
+                    r.cost_s,
+                    r.rel_l2,
+                    s=40,
+                    marker=("^" if variant else "o") if learned else "s",
+                    alpha=0.6 if variant else 1.0,
+                )
                 ax.annotate(
-                    r.method.replace(" (correct_artifacts=", " ca=").replace(")", ""),
+                    short_label(r.method).replace(" (correct_artifacts=", " ca=").replace(")", ""),
                     (r.cost_s, r.rel_l2),
                     fontsize=6,
                     xytext=(3, 3),
