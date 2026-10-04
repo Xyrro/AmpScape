@@ -17,7 +17,7 @@
 | XXL | 400 | 2,008 | 210 / 190 | 755 | 100.7 | 2 |
 | total | 174,400 | 920,372 | | | 1157.4 | 25 |
 
-The row total is 920,372 in the index-derived count table [docs/tables/final_counts.json] but 902 904 in the post-mortem and changelog [docs/generation_postmortem.md; CHANGELOG.md]. [TODO: not in docs — the two row totals are not reconciled in the documentation.]
+The v1.0 index holds 920,372 configuration rows (920,347 QC-pass) [docs/tables/final_counts.json]; the 902 904 quoted in the post-mortem and changelog at tag time was a stale pre-audit count and was corrected on 2026-10-02 [docs/generation_postmortem.md; CHANGELOG.md].
 
 **Real landscapes.** Real tiles are genuine covariate stacks (ESA WorldCover, Copernicus DEM, GRIP4 roads, HydroRIVERS, gHM) [docs/dataset_card.md]: 13 958 tiles and 69 790 resistance rasters [CHANGELOG.md], with S 8 000, M 4 000, L 1 600, XL 320 and XXL 32 tiles [docs/dataset_plan.md]. Each tile yields 5 landscapes, one per resistance table: four expert-style tables (`generic_hm`, `large_mammal`, `amphibian`, `forest_bird`) and one seeded random table per tile (`random_lm`) [docs/dataset_plan.md]; `forest_bird` (r_max 100 versus 1000 for the others [DECISIONS.md]) is held out. Only class ordering and term structure follow the literature; the numeric values are AmpScape's own and are not species-calibrated ecological truth [docs/dataset_card.md].
 

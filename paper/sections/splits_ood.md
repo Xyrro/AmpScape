@@ -1,7 +1,7 @@
 # Splits, subsets and out-of-distribution sets
 
 <!-- Draft section for the AmpScape D&B paper. Every number is tagged with the repository file it was copied from;
-     "[derived: …]" marks arithmetic on tagged numbers; "[TODO: not in docs]" marks facts the docs do not state. -->
+     "[derived: …]" marks arithmetic on tagged numbers; "" marks facts the docs do not state. -->
 
 ## Split design
 
@@ -21,7 +21,7 @@ A landscape can belong to several OOD sets; the index carries one boolean column
 - **`test_ood_table`** — all real landscapes built with the `forest_bird` table (r_max 100, elevation bands: structurally different) are test-only; training sees generic_hm, large_mammal, amphibian and random [docs/dataset_plan.md §4]. Plan expectation ≈ 14,000 real landscapes at S–L [docs/dataset_plan.md §4].
 - **`test_ood_contrast`** — synthetic contrast 10⁶ is never in train/val; training includes up to 10⁵ [configs/datasets/v1_0.yaml `ood.test_ood_contrast`]. Plan expectation ≈ 6,300 synthetic landscapes at S–L [docs/dataset_plan.md §4].
 - **`test_ood_scale`** — XL/XXL test landscapes evaluated by models trained on tiers ≤ L only; the in-distribution XL test for XL-trained models is `test_id` at XL [configs/datasets/v1_0.yaml `ood.test_ood_scale`]. XXL footprints (2,048 km, 32 tiles covering ≈ 90 % of land) unavoidably overlap finer-tier training cells, so for XXL this set isolates *resolution* transfer, not spatial novelty [docs/dataset_card.md]. Pixel size, raster size and the T4 window radius co-vary across tiers, so the set measures combined scale transfer [docs/dataset_card.md "Scale split caveat"].
-- **`test_ood_scale_strict`** — ≈ 6 XXL real tiles placed entirely inside non-training cells, zero overlap with any training tile at any tier, verified geometrically [docs/dataset_card.md]; built as XXL 32 + 6 strict accepted tiles [DECISIONS.md 2026-09-15]. Any overlap with a train/val tile raises an error at assignment time [ampscape/splits/assign.py `strict_scale_flags`]. Final count: [TODO: not in docs].
+- **`test_ood_scale_strict`** — 6 XXL real tiles (30 landscapes; `test_ood_scale_strict` in the XXL index [data/hfcache/index/XXL.parquet]) placed entirely inside non-training cells, zero overlap with any training tile at any tier, verified geometrically [docs/dataset_card.md]; built as XXL 32 + 6 strict accepted tiles [DECISIONS.md 2026-09-15]. Any overlap with a train/val tile raises an error at assignment time [ampscape/splits/assign.py `strict_scale_flags`]. Final count:.
 - **`test_ood_synth2real`** — a flag only: evaluation on all real `test_id`, training restricted to `family = synthetic` by a loader flag; no extra samples [docs/dataset_plan.md §4].
 - **`test_ood_published`** — published resistance surfaces used as given (Eurac Alps, CC BY 4.0; Northern raccoon Europe, CC BY 4.0; Hawaiian gallinule, CC0) with AmpScape's source configurations and all applicable tasks [docs/dataset_plan.md §5.4]: 45 S tiles (Eurac 30, gallinule 15) and 1 XXL tile (raccoon) [CHANGELOG.md Phase 9; DECISIONS.md 2026-09-13], published under `aux/` [docs/dataset_card.md].
 
@@ -43,7 +43,14 @@ The 25 rows failing QC after the precision pass (24 landscapes, all synthetic at
 | XL (v1.0.2) | 880 | 131 | 2,335 | 254 | 400 | 7 |
 | XXL | 0 | 0 | 275 | 25 | 100 | 2 |
 
-S, M, L, XXL and the QC column: `tiers.<tier>.splits` / `qc_fail_samples` in docs/tables/final_counts.json (index counts, before QC exclusion). XL: v1.0.2 figures from CHANGELOG.md 1.0.2; docs/tables/final_counts.json still records the pre-correction XL row (train 228 / test_id 3,118 / test_ood 254 / ood_region 400). Subset membership per tier: core 20,000 S / 10,000 M / 5,000 L, mini 600 S [docs/tables/final_counts.json]. Per-split counts within mini/lite/core, and the realised sizes of `test_ood_table` and `test_ood_contrast` separately (the index merges both into `test_ood`): [TODO: not in docs].
+S, M, L, XXL and the QC column: `tiers.<tier>.splits` / `qc_fail_samples` in docs/tables/final_counts.json (index counts, before QC exclusion). XL: v1.0.2 figures from CHANGELOG.md 1.0.2; docs/tables/final_counts.json was updated to the same figures on 2026-10-02 (previously records the pre-correction XL row (train 228 / test_id 3,118 / test_ood 254 / ood_region 400). Subset membership per tier: core 20,000 S / 10,000 M / 5,000 L, mini 600 S [docs/tables/final_counts.json]. Per-split counts within mini/lite/core, and the realised sizes of `test_ood_table` and `test_ood_contrast` separately (the index merges both into `test_ood`):.
+
+
+**Subset and OOD-set sizes (v1.0.2 split lists, QC-failing samples excluded; `splits/<subset>/<split>.parquet` on the Hub):**
+mini train 481 / val 54 / test_id 50 / test_ood 15; lite 8,753 / 1,126 / 1,120 / 196; core 27,439 / 3,456 / 3,461 / 637;
+full 108,291 / 18,934 / 19,206 / 11,225 (+ ood_region 16,720) [CHANGELOG.md 1.0.2; data/hfcache/splits]. Within `test_ood`
+the two hold-outs do not overlap: 9,336 landscapes carry the held-out resistance table only and 1,907 the held-out
+contrast only (index flags `test_ood_table` / `test_ood_contrast`, all tiers, before QC exclusion) [data/hfcache/index/*.parquet].
 
 ## Sources used
 
