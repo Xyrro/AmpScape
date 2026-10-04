@@ -281,6 +281,11 @@ def main():
         choices=["default", "voltage"],
         help="voltage: predict the T3 advanced-mode voltage map (linear target) for the solver-acceleration track",
     )
+    ap.add_argument(
+        "--aux-root",
+        default=None,
+        help="T1V: directory of pre-solved first-pair voltages (default aux/t1_pair1/<tier>)",
+    )
     ap.add_argument("--published-root", default="data/builds/published")
     ap.add_argument(
         "--published-tiers", default="S", help="comma list; XXL only for fully convolutional models"
@@ -334,8 +339,8 @@ def main():
     stats = load_norm_stats(a.root, a.tier) or compute_norm_stats(a.root, a.tier, a.task)
     voltage_scale = 1.0
     if a.target == "voltage":
-        if a.task != "T3":
-            raise SystemExit("--target voltage requires --task T3 (advanced-mode voltage map)")
+        if a.task not in ("T3", "T1V"):
+            raise SystemExit("--target voltage requires --task T3 or T1V (voltage maps)")
         print("voltage target: log10(V + eps*max V), inverse = inverse_target", flush=True)
     cfg = {
         "model": a.model,
@@ -376,10 +381,10 @@ def main():
     if a.eval_only:
         model.load_state_dict(torch.load(a.eval_only, map_location=device)["model"])
     else:
-        tr = AmpScapeDataset(a.task, "train", a.tier, a.root)
+        tr = AmpScapeDataset(a.task, "train", a.tier, a.root, aux_root=a.aux_root)
         if a.max_train:
             tr.index = tr.index.iloc[: a.max_train].reset_index(drop=True)
-        va = AmpScapeDataset(a.task, "val", a.tier, a.root)
+        va = AmpScapeDataset(a.task, "val", a.tier, a.root, aux_root=a.aux_root)
         dl_tr = torch.utils.data.DataLoader(
             Items(
                 tr,
@@ -566,7 +571,7 @@ def main():
             if t.strip()
         ]
     for root, tier, split in groups:
-        ds = AmpScapeDataset(a.task, split, tier, root)
+        ds = AmpScapeDataset(a.task, split, tier, root, aux_root=a.aux_root)
         if len(ds) == 0:
             continue
         bs = 1 if tier in ("XL", "XXL") else a.batch

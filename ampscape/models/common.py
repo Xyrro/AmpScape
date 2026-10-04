@@ -13,13 +13,14 @@ import torch
 
 from ampscape.metrics.transforms import EPS
 
-TASK_CHANNELS = {"T1": 3, "T1W": 3, "T1R": 3, "T3": 4, "T4": 3}
+TASK_CHANNELS = {"T1": 3, "T1W": 3, "T1R": 3, "T1V": 4, "T3": 4, "T4": 3}
 TASK_TARGET = {
     "T1": "cum_current",
     "T1W": "cum_current",
     "T1R": "cum_current",
     "T3": "current",
     "T4": "cum_current",
+    "T1V": "voltage",
 }
 TASK_CONFIG = {
     "T1": "points",
@@ -27,6 +28,7 @@ TASK_CONFIG = {
     "T1R": "regions",
     "T3": "advanced",
     "T4": "omniscape",
+    "T1V": "points",
 }
 
 
@@ -64,6 +66,11 @@ def make_inputs(d: dict, task: str, stats: dict, extra: tuple[str, ...] = ()) ->
     elif task == "T3":
         n_valid = max(int((~nd).sum()), 1)
         chans.append((d["source_strength"][0] * n_valid).astype(np.float32))
+        chans.append(d["ground"][0].astype(np.float32))
+    elif (
+        task == "T1V"
+    ):  # first-pair system: source and ground one-hot (unit current, no n_valid scaling)
+        chans.append(d["source_strength"][0].astype(np.float32))
         chans.append(d["ground"][0].astype(np.float32))
     elif task == "T4":
         chans.append(d["source_strength"][0].astype(np.float32))
