@@ -1,7 +1,8 @@
 # Discussion, limitations, ethics and maintenance
 
 <!-- Draft 2026-10-04 for Phase 12 §9 (plus the discussion half of §7–8). Every number is copied from a repository
-file and tagged [source]; "[TODO: not in docs]" marks facts no allowed file states. Reference labels [n] are those of
+file and tagged [source]; the former "[TODO: not in docs]" markers were resolved on 2026-10-04 from
+docs/addendum_WP5_report.md and docs/phase_09_report.md. Reference labels [n] are those of
 paper/sections/related_work.md. -->
 
 ## What the results say: a speed–accuracy–robustness trade-off
@@ -43,8 +44,13 @@ non-learned approximation on the same cost axis [paper/tables/t4_pareto_M.md]. N
 the HANO/MgNO family [41, 42] (WP6 was optional and is not among the runs [docs/REVIEW_ADDENDUM_2026-09.md;
 docs/status/latest.md]); training at XL (XL rows are transfers of L models [DECISIONS.md, 2026-09-24]); fixed-step
 training at M/L, the direct test of how much S → L error growth is budget rather than scale [docs/wp4_data_scaling.md];
-and the warm-start iterations-saved metric for T1/T3 (track defined [DECISIONS.md, 2026-09-06, 2026-09-13]; numbers
-[TODO: not in docs]).
+and the warm-start iterations-saved metric for T1/T3 on the learned baselines: the track is implemented and defined
+(AMG-PCG iterations and wall time to the reference residual from the predicted voltage vs a zero start,
+`scripts/warm_start_eval.jl`, same preconditioner and matrix as the stored `cg_baseline`) [DECISIONS.md, 2026-09-06,
+2026-09-13], but was run in this release only on the non-learned coarsen ×4 baseline at tier S on the dev build (70
+systems: iterations 11 → 10, median reduction 6.9 %, time 28 → 22 ms; and no gain on the 68 published-tile systems,
+14 → 14), where the PCG converges in ≈ 11 iterations and leaves little headroom; it becomes informative at XL/XXL with
+a learned voltage [docs/phase_09_report.md]. No full-baseline run carries it [docs/tables/baselines_full.md].
 
 ## Implications for practice
 
@@ -76,13 +82,19 @@ solver [paper/outline.md].
    subsets; at XL/XXL only the production target exists and the M/L figures are the stated bound [docs/t4_fidelity.md].
    The best model's M error (0.051) exceeds the label deviation (0.029), but not by a wide margin
    [paper/tables/t4_pareto_M.md].
-5. **Resolution and size are confounded in the scale split.** Pixel size, raster size and the window radius co-vary
-   across tiers (S 128² at 100 m … XXL 2048² at 1 km; only S → M changes the raster alone), so `test_ood_scale` measures
-   combined transfer [docs/dataset_card.md]. A controlled probe set is published under `aux/` [CHANGELOG.md,
-   2026-09-21]; results on it [TODO: not in docs].
+5. **Resolution and size are confounded in the scale split.** Pixel size (100 m / 100 m / 200 m / 500 m / 1 km), raster
+   size (128² … 2048²) and the Omniscape radius, fixed at raster/8 in pixels and hence 1.6 → 256 km, co-vary across
+   tiers; only S → M changes one factor at a time, so from M upward `test_ood_scale` mixes pixel-count extrapolation,
+   coarser pixels and a larger physical window [docs/addendum_WP5_report.md §1; docs/dataset_card.md]. A controlled 2×2
+   probe set separating the axes (256²/512² × 100 m/200 m at a fixed 12.8 km window; 360 landscapes, 47 CPU-h) was
+   designed and built [docs/addendum_WP5_report.md §3, §5] and published under `aux/` [CHANGELOG.md, 2026-09-21], but
+   its evaluation was not run for v1.0: no probe-cell results exist in docs/tables or the report
+   [docs/addendum_WP5_report.md].
 6. **XXL footprints overlap finer-tier training cells.** XXL is test-only; its 32 tiles (2,048 km) cover ≈ 90 % of land,
-   so its scale split isolates resolution, not spatial novelty; `test_ood_scale_strict` (≈ 6 real XXL tiles with zero
-   overlap with any training tile, verified geometrically) isolates both [docs/dataset_card.md].
+   so its scale split isolates resolution, not spatial novelty; `test_ood_scale_strict` (6 XXL tiles sampled inside
+   test_id cells, with a finalize-time geometric check that no train/val tile of any tier intersects them) isolates
+   both, and XL tiles are cell-assigned and overlap-free by construction [docs/dataset_card.md;
+   docs/addendum_WP5_report.md §2].
 7. **The held-out-region split is easier by composition** (ratios 0.65–1.00; real-tile only, p90 contrast 595–1,000
    vs 10,000 on `test_id`). It is a spatial-leakage control, not a stress test [paper/ood_analysis.md].
 8. **The ViT official config is resolution-inappropriate above S** (fixed across tiers: patch 4, dim 192, depth 6, a
@@ -154,4 +166,7 @@ generation and the precision pass [docs/dataset_card.md], 430.1 GPU-hours for th
 - DECISIONS.md — T4-at-S finding, ViT config note, XL-by-transfer, acceleration track, C3 check
 - CHANGELOG.md — 1.0.1 / 1.0.2 contents, CI tests, WP5 probe set under aux/
 - docs/REVIEW_ADDENDUM_2026-09.md — WP6 optional, pilot numbers never cited, WP8 framing
+- docs/addendum_WP5_report.md — §1 tier table and confound statement, §2 XXL/XL geographic independence, §3/§5 probe-set design and build (no evaluation results)
+- docs/phase_09_report.md — acceleration-track definition and the coarsen-baseline warm-start numbers at S (dev build, published set)
+- docs/tables/baselines_full.md — absence of an acceleration column on the full baselines
 - paper/sections/related_work.md — reference labels [14]–[31], [41], [42]

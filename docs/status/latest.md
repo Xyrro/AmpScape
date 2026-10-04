@@ -1,4 +1,4 @@
-# Status — 2026-10-04 16:00Z: Phase 10-full COMPLETE (166/166 jobs, 430 GPU-h); Phase 12 drafts in progress
+# Status — 2026-10-04 20:30Z: Phase 10-full COMPLETE (166/166 jobs, 430 GPU-h); Phase 12 draft package complete
 
 ## Headline rel-L2 on test_id (seed 1, 30 epochs, official configs)
 
@@ -78,9 +78,14 @@ scale-aware variants), 56 transfer legs (XL/XXL), WP7. All on the Hub (`aux/resu
 - WP4 (`docs/wp4_data_scaling.md`): under the official step budget the U-Net saturates by 20k landscapes at S; the
   FNO stays data-limited. WP7 (`docs/wp7_demo.md`): study-level conclusions reproduced at ≈ ×11,000 lower cost.
 
-**Phase 12 state:** outline, five section drafts (dataset/generation, tasks/metrics, splits/OOD, baselines/protocol,
-related work with 62 verified sources), OOD analysis, figure script with 12 figures and 8 tables. Results and
-discussion sections are being drafted from the final tables now.
+**Phase 12 state (complete as a draft package):** `paper/outline.md`; seven section drafts under `paper/sections/`
+(dataset/generation, tasks/metrics, splits/OOD, baselines/protocol, related work with 62 verified sources + source
+table, results, discussion/limitations/ethics/maintenance) with every number tagged to its source file and no TODO
+markers left (the only unavailable fact — non-source rel-L2 of learned models against the block-1 map — is stated as
+such); brief §14 deliverables `paper/baselines.md`, `paper/dataset_statistics.md`, `paper/ood_analysis.md`; one script
+(`scripts/paper_figures.py`) regenerates 12 figures and 8 tables under `paper/`. Open for the owner: the two
+practitioner cost quotes flagged in `paper/sections/related_work_sources.md` need a human check; the public repo
+surfaces in novelty searches (double-blind); DOI at submission.
 
 ## 2026-10-03: scale-aware target variant — result (seed 1, trained at L, zero-shot at XL/XXL; `paper/tables/scale_transfer.md`)
 
