@@ -86,15 +86,6 @@ def evaluate_sample(
     if kind in ("points", "wall_to_wall", "regions"):
         if "cum_current" in gp:
             p, t = gp["cum_current"][...], o["cum_current"][...]
-            if kind == "omniscape" and t4_reference and sid in t4_reference:
-                # official T4 surface at M/L (owner decision 2026-09-18): primary metrics against the exact block-1 map,
-                # the block-centred production target becomes the secondary `bc_*` set
-                t_bc, t = t, t4_reference[sid]
-                for k, v in pixel.all_pixel(p, t_bc, m).items():
-                    out[f"bc_{k}"] = v
-                for k, v in domain.all_domain(p, t_bc, m).items():
-                    out[f"bc_{k}"] = v
-                out["t4_target"] = "block1_reference"
             out.update(pixel.all_pixel(p, t, m))
             out.update(domain.all_domain(p, t, m))
             out.update(
@@ -166,6 +157,17 @@ def evaluate_sample(
         for k in ("cum_current", "normalized", "flow_potential"):
             if k in gp:
                 p, t = gp[k][...], o[k][...]
+                if k == "cum_current" and t4_reference and sid in t4_reference:
+                    # official T4 surface at M/L (owner decision 2026-09-18): primary metrics against the exact
+                    # block-1 map, the block-centred production target becomes the secondary `bc_*` set. Until
+                    # 2026-10-05 this branch sat inside the pairwise block and never ran, so every "vs block-1"
+                    # learned-model number before that date was a production-target number.
+                    t_bc, t = t, t4_reference[sid]
+                    for kk, vv in pixel.all_pixel(p, t_bc, m).items():
+                        out[f"bc_{kk}"] = vv
+                    for kk, vv in domain.all_domain(p, t_bc, m).items():
+                        out[f"bc_{kk}"] = vv
+                    out["t4_target"] = "block1_reference"
                 pre = "" if k == "cum_current" else f"{k}_"
                 out.update({pre + kk: vv for kk, vv in pixel.all_pixel(p, t, m).items()})
                 if k == "cum_current":
@@ -252,6 +254,11 @@ def evaluate(
     idx = idx[idx.split.isin(splits) & idx.qc_pass]
     if subset and f"subset_{subset}" in idx:
         idx = idx[idx[f"subset_{subset}"]]
+    if t4_reference:
+        # the exact-reference surface is defined on the reference subset only (400 landscapes at M, 24 at L):
+        # evaluate exactly those rows so the learned rows are comparable with the solver block rows
+        ref_ids = set(load_t4_reference(t4_reference).keys())
+        idx = idx[idx.sample_id.isin(ref_ids)]
     flags = [c for c in _OOD_FLAGS if c in idx]
     cols = ["sample_id", "config", "kind", "family", "split", "solve_time_s", "path", *flags]
     idx = idx.sort_values(["sample_id", "config"])
