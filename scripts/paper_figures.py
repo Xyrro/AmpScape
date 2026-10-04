@@ -15,6 +15,8 @@ Outputs (all under paper/):
                                          F5  many-query demonstration: surrogate vs solver conclusions per tile
   figures/wp4_data_scaling.png, tables/wp4_data_scaling.md
                                          F6  WP4 data-scaling ablation at S (fixed-epoch vs fixed-step)
+  figures/ood_degradation.png, tables/ood_degradation.md
+                                         F7  per-OOD-split degradation at the training tier (ratios to test_id)
 Every number comes from docs/tables/*.md, runs/full/*/results*.json or aux/wp7/demo_results.parquet; the script
 never recomputes metrics. Missing inputs are reported and skipped, never fabricated.
 """
@@ -494,6 +496,82 @@ def wp4_data_scaling(out: pathlib.Path) -> None:
     log(f"F6 WP4: {len(d)} rows")
 
 
+# ----------------------------------------------------------------------------------------------------------------- F7
+def ood_degradation(out: pathlib.Path) -> None:
+    """Per-OOD-split degradation at the training tier: rel-L2 on test_ood / ood_region / published tiles relative to
+    test_id, official runs, mean over seeds (brief §14 ood_analysis)."""
+    src = ROOT / "docs" / "tables" / "baselines_full.md"
+    if not src.exists():
+        return
+    df = read_markdown_table(src)
+    parsed = df.model.apply(split_run_name)
+    df["base"] = [p[0] for p in parsed]
+    df["seed"] = [p[3] for p in parsed]
+    df["suffix"] = [p[4] for p in parsed]
+    df = df[df.seed.notna() & (df.suffix == "")].copy()
+    df["split"] = df.split.replace({"published S": "published"})
+    splits = ["test_id", "test_ood", "ood_region", "published"]
+    df = df[df.split.isin(splits)]
+    g = df.groupby(["task", "tier", "base", "split"])[
+        ["rel_l2", "spearman", "top5_iou", "pinch_recall"]
+    ].mean()
+    wide = g["rel_l2"].unstack("split")
+    for sp_ in splits:
+        if sp_ not in wide:
+            wide[sp_] = np.nan
+    wide["test_ood/test_id"] = wide["test_ood"] / wide["test_id"]
+    wide["ood_region/test_id"] = wide["ood_region"] / wide["test_id"]
+    wide["published/test_id"] = wide["published"] / wide["test_id"]
+    wide = wide.reset_index()
+    lines = [
+        "# OOD degradation at the training tier (rel-L2, official configs, mean over seeds; from docs/tables/baselines_full.md)",
+        "",
+        "test_ood = held-out resistance table (forest_bird) + held-out contrast (10⁶); ood_region = held-out biomes/realm; "
+        "published = real tiles with published resistance surfaces (S only). Ratios > 1 mean degradation relative to test_id.",
+        "",
+        "| task | tier | model | test_id | test_ood | ood_region | published | test_ood / id | ood_region / id | published / id |",
+        "|---|---|---|---|---|---|---|---|---|---|",
+    ]
+
+    def f(v):
+        return "–" if not np.isfinite(v) else f"{v:.3f}"
+
+    order = {t: i for i, t in enumerate(TIER_ORDER)}
+    wide["o"] = wide.tier.map(order)
+    for _, r in wide.sort_values(["task", "o", "base"]).iterrows():
+        lines.append(
+            f"| {r.task} | {r.tier} | {MODEL_LABEL.get(r.base, r.base)} | {f(r.test_id)} | {f(r.test_ood)} | {f(r.ood_region)} | "
+            f"{f(r.published)} | {f(r['test_ood/test_id'])} | {f(r['ood_region/test_id'])} | {f(r['published/test_id'])} |"
+        )
+    (out / "tables" / "ood_degradation.md").write_text("\n".join(lines) + "\n")
+    tasks = [t for t in ("T1", "T3", "T4") if t in set(wide.task)]
+    fig, axes = plt.subplots(1, len(tasks), figsize=(4.6 * len(tasks), 3.8), sharey=True)
+    axes = np.atleast_1d(axes)
+    ratios = [
+        ("test_ood/test_id", "held-out table + contrast"),
+        ("ood_region/test_id", "held-out region"),
+        ("published/test_id", "published tiles (S)"),
+    ]
+    for ax, task in zip(axes, tasks, strict=False):
+        sub = wide[wide.task == task].sort_values(["o", "base"])
+        labels = [f"{r.tier}\n{MODEL_LABEL.get(r.base, r.base)}" for _, r in sub.iterrows()]
+        x = np.arange(len(sub))
+        w = 0.27
+        for k, (col, lab) in enumerate(ratios):
+            ax.bar(x + (k - 1) * w, sub[col].values, width=w, label=lab)
+        ax.axhline(1.0, color="k", lw=0.8, ls="--")
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, fontsize=7)
+        ax.set_title(f"{task}: rel-L2 relative to test_id")
+        ax.grid(alpha=0.3, axis="y")
+        ax.legend(fontsize=7)
+    axes[0].set_ylabel("rel-L2(split) / rel-L2(test_id)")
+    fig.tight_layout()
+    fig.savefig(out / "figures" / "ood_degradation.png", dpi=150)
+    plt.close(fig)
+    log(f"F7 OOD degradation: {len(wide)} (task, tier, model) rows")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -515,6 +593,7 @@ def main() -> None:
     scale_transfer(out)
     wp7(out)
     wp4_data_scaling(out)
+    ood_degradation(out)
     log("done")
 
 
