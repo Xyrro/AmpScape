@@ -20,6 +20,24 @@
 | T1 | FNO | zero-shot | XXL | ood_region | 3 | 1.716 ± 0.377 | 0.880 ± 0.005 | 0.327 ± 0.026 | 2.125 ± 0.622 |
 | T1 | FNO | zero-shot | XXL | test_id | 3 | 1.502 ± 0.387 | 0.913 ± 0.005 | 0.484 ± 0.074 | 1.826 ± 0.646 |
 | T1 | FNO | zero-shot | XXL | test_ood | 3 | 1.593 ± 0.376 | 0.871 ± 0.005 | 0.447 ± 0.041 | 1.932 ± 0.663 |
+| T1 | GNN | scale-aware | L | ood_region | 1 | 1.036 | 0.858 | 0.521 | 1.052 |
+| T1 | GNN | scale-aware | L | test_id | 1 | 1.049 | 0.828 | 0.468 | 1.007 |
+| T1 | GNN | scale-aware | L | test_ood | 1 | 1.042 | 0.836 | 0.474 | 0.994 |
+| T1 | GNN | scale-aware | XL | ood_region | 1 | 0.799 | 0.787 | 0.379 | 0.959 |
+| T1 | GNN | scale-aware | XL | test_id | 1 | 0.796 | 0.763 | 0.360 | 0.868 |
+| T1 | GNN | scale-aware | XL | test_ood | 1 | 0.825 | 0.774 | 0.371 | 0.921 |
+| T1 | GNN | scale-aware | XXL | ood_region | 1 | 0.885 | 0.753 | 0.258 | 1.001 |
+| T1 | GNN | scale-aware | XXL | test_id | 1 | 0.824 | 0.739 | 0.344 | 0.831 |
+| T1 | GNN | scale-aware | XXL | test_ood | 1 | 1.000 | 0.748 | 0.344 | 1.318 |
+| T1 | GNN | zero-shot | L | ood_region | 3 | 1.064 ± 0.024 | 0.864 ± 0.004 | 0.519 ± 0.006 | 1.143 ± 0.072 |
+| T1 | GNN | zero-shot | L | test_id | 3 | 1.067 ± 0.026 | 0.834 ± 0.004 | 0.469 ± 0.004 | 1.075 ± 0.059 |
+| T1 | GNN | zero-shot | L | test_ood | 3 | 1.094 ± 0.068 | 0.843 ± 0.004 | 0.473 ± 0.005 | 1.092 ± 0.083 |
+| T1 | GNN | zero-shot | XL | ood_region | 3 | 1.401 ± 0.063 | 0.793 ± 0.006 | 0.410 ± 0.010 | 2.016 ± 0.148 |
+| T1 | GNN | zero-shot | XL | test_id | 3 | 1.325 ± 0.064 | 0.768 ± 0.005 | 0.388 ± 0.010 | 1.739 ± 0.126 |
+| T1 | GNN | zero-shot | XL | test_ood | 3 | 1.423 ± 0.080 | 0.778 ± 0.005 | 0.396 ± 0.005 | 1.858 ± 0.155 |
+| T1 | GNN | zero-shot | XXL | ood_region | 3 | 2.018 ± 0.133 | 0.761 ± 0.006 | 0.287 ± 0.014 | 3.350 ± 0.267 |
+| T1 | GNN | zero-shot | XXL | test_id | 3 | 2.174 ± 0.165 | 0.746 ± 0.006 | 0.368 ± 0.015 | 3.421 ± 0.282 |
+| T1 | GNN | zero-shot | XXL | test_ood | 3 | 2.848 ± 0.238 | 0.753 ± 0.007 | 0.361 ± 0.009 | 5.140 ± 0.451 |
 | T1 | U-Net | scale-aware | L | ood_region | 1 | 0.309 | 0.888 | 0.597 | 0.085 |
 | T1 | U-Net | scale-aware | L | test_id | 1 | 0.369 | 0.873 | 0.542 | 0.116 |
 | T1 | U-Net | scale-aware | L | test_ood | 1 | 0.348 | 0.877 | 0.558 | 0.101 |
@@ -68,6 +86,15 @@
 | T4 | FNO | zero-shot | XXL | ood_region | 3 | 0.765 ± 0.001 | 0.976 ± 0.000 | 0.618 ± 0.003 | – |
 | T4 | FNO | zero-shot | XXL | test_id | 3 | 0.765 ± 0.001 | 0.941 ± 0.000 | 0.627 ± 0.001 | – |
 | T4 | FNO | zero-shot | XXL | test_ood | 3 | 0.775 ± 0.001 | 0.922 ± 0.001 | 0.542 ± 0.004 | – |
+| T4 | GNN | zero-shot | L | ood_region | 1 | 0.102 | 0.977 | 0.617 | – |
+| T4 | GNN | zero-shot | L | test_id | 1 | 0.142 | 0.960 | 0.629 | – |
+| T4 | GNN | zero-shot | L | test_ood | 1 | 0.136 | 0.901 | 0.463 | – |
+| T4 | GNN | zero-shot | XL | ood_region | 1 | 0.492 | 0.971 | 0.564 | – |
+| T4 | GNN | zero-shot | XL | test_id | 1 | 0.519 | 0.927 | 0.538 | – |
+| T4 | GNN | zero-shot | XL | test_ood | 1 | 0.501 | 0.918 | 0.447 | – |
+| T4 | GNN | zero-shot | XXL | ood_region | 1 | 0.738 | 0.949 | 0.452 | – |
+| T4 | GNN | zero-shot | XXL | test_id | 1 | 0.748 | 0.899 | 0.480 | – |
+| T4 | GNN | zero-shot | XXL | test_ood | 1 | 0.750 | 0.901 | 0.417 | – |
 | T4 | U-Net | scale-aware | L | ood_region | 1 | 0.063 | 0.996 | 0.807 | – |
 | T4 | U-Net | scale-aware | L | test_id | 1 | 0.080 | 0.991 | 0.807 | – |
 | T4 | U-Net | scale-aware | L | test_ood | 1 | 0.088 | 0.982 | 0.700 | – |
