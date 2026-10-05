@@ -393,7 +393,11 @@ def evaluate(
     if acceleration:
         from ampscape.metrics.acceleration import run_warm_start_eval, summarize
 
-        srcs = sorted(set(idx.path))
+        # only the shards of the evaluated task: the split index also lists the other task groups' shards, which
+        # need not be staged (2026-10-05: the warm-start jobs failed opening T1 shards while evaluating T3)
+        with h5py.File(pred_dir / "predictions.h5", "r") as fp:
+            pred_cfgs = {c for sid in list(fp.keys())[:50] for c in fp[sid].keys()}
+        srcs = sorted({r["path"] for r in all_rows if r["config"] in pred_cfgs})
         recs = []
         for s in srcs:
             recs += run_warm_start_eval(
