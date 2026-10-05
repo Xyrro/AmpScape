@@ -1,4 +1,4 @@
-# Status — 2026-10-04 21:30Z: Phase 13 (post-review work items) running; harness defect found and fixed
+# Status — 2026-10-05 05:30Z: item 1 result (no warm-start gain at S/M); tuning at M favours every per-tier candidate; L tier and reference recompute queued
 
 ## Headline rel-L2 on test_id (seed 1, 30 epochs, official configs)
 
@@ -55,7 +55,13 @@
 moved material in `paper/appendix_notes.md`). Several sections remain above the length targets with dense content
 only; the cut to a 9-page main text happens when `paper/draft.md` is assembled (step 6).
 
-**Item 1 — solver-acceleration metric.** The official T1/T3 models predict current maps, so the warm start needs
+**Item 1 — result so far (`docs/acceleration_report.md`, `docs/tables/acceleration.md`):** no acceleration at S or M —
+10 → 10 and 12 → 13 PCG iterations, wall time within ±5 %; the predicted voltage maps are accurate (median per-landscape
+MAE 0.05–0.14 V on ≈ 1 V fields) but their Kirchhoff residual is 80–580× the zero start's (pixel-wise errors are
+high-frequency; PCG removes them in the same ≈ 10–16 iterations it needs from zero). Reported as a negative result with
+the explanation; L and the T1 first-pair rows pending (their runs are queued behind scratch).
+
+**Item 1 — solver-acceleration metric (setup).** The official T1/T3 models predict current maps, so the warm start needs
 voltage-predicting counterparts: `train.py --target voltage` (same floor-log transform) for T3; six seed-1 runs
 (U-Net, FNO × S/M/L, ≈ 9 GPU-h) are training/queued, and a waiter submits the CPU warm-start evaluations
 (`evaluate.py --acceleration`, test_id and test_ood) per finished run. T1 `points` shards store no pair voltages, so
@@ -64,7 +70,13 @@ metric uses) is being pre-solved on CPU (`pair1_voltage.jl`, 45 array tasks, `au
 same voltage head then trains on those systems as task `T1V` (six runs, ≈ 9 GPU-h) once the pre-solves are
 complete. Table and results paragraph follow.
 
-**Item 2 — per-tier tuning at M/L.** Plan and cost in `docs/tuning_plan_full.md`: 13 single-seed T1 runs (U-Net
+**Item 2 — preliminary (M tier, val loss, `scripts/tuning_select.py`):** every candidate beats the official config by
+more than the seed spread — U-Net w64 −41 %, FNO w48 −7 %, ViT patch-16/native-grid −75 % (the resolution-sized ViT
+works), GNN ×8 multiscale −19 % (run still in progress). If L confirms, all four configs change at both tiers:
+≈ 60 re-runs plus transfers and scale-aware variants, ≈ 300 GPU-h — the exact estimate is recorded before launch.
+MgNO at M (T1): rel-L2 0.412 with 0.58 M parameters (U-Net 0.238 / 7.8 M, FNO 0.266 / 33.6 M).
+
+**Item 2 — per-tier tuning at M/L (plan).** Plan and cost in `docs/tuning_plan_full.md`: 13 single-seed T1 runs (U-Net
 wide/w64, FNO m96/w48, ViT patch and positional grid sized to the tier, GNN ×8 multiscale), ≈ 47 GPU-h, selection
 on val only; running under the GPU driver now (M/T1 staging). Re-runs for changed configs are costed when the
 winners are known.
