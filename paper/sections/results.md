@@ -269,6 +269,22 @@ paper/tables/scale_transfer.md; paper/tables/ood_degradation.md; docs/wp4_data_s
 No single family wins on accuracy, scale robustness, OOD robustness and cost at once; that trade-off, rather than
 any one number, is the result.
 
+
+## Solver acceleration from predicted voltages
+
+For T1–T3 the practically relevant number is whether a predicted voltage field shortens the exact solve. We trained
+the official U-Net and FNO configurations with the voltage map as target (same floor-log transform; seed 1) and
+warm-started the AMG-preconditioned CG of the reference solver from the prediction on every test_id / test_ood
+system of the training tier, measuring iterations and wall time to a relative residual of 1e-6 against a zero start
+[docs/acceleration_report.md]. There is no gain: at S the solve takes 10 iterations from either start (19 ms), at M
+12 from zero and 13 from the prediction (100–120 ms), and on test_ood 11 and 16 iterations from either start, with
+wall time within ±5 % [docs/tables/acceleration.md]. The predicted maps are accurate (median per-landscape voltage
+MAE 0.05–0.14 V on fields whose typical pixel is ≈ 0.9 V) but their relative Kirchhoff residual is 80–580 times that
+of the zero vector [docs/acceleration_report.md]: a pixel-wise error of a few per cent is high-frequency, the
+Laplacian amplifies it, and PCG removes it in the same iterations it needs from zero. The value of the surrogates on
+these tasks is therefore the 10²–10³× cheaper *map*, not a better initial guess; acceleration would require a
+residual-aware objective, which this benchmark leaves open. [L-tier and first-pair T1 rows: pending.]
+
 ## Sources used
 
 - paper/tables/baselines_sml.md — T2, companion table, §7.1, closing paragraph
