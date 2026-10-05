@@ -41,7 +41,7 @@ import pandas as pd  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TIER_ORDER = ["S", "M", "L", "XL", "XXL"]
-MODEL_LABEL = {"unet": "U-Net", "fno": "FNO", "vit": "ViT", "gnn": "GNN"}
+MODEL_LABEL = {"unet": "U-Net", "fno": "FNO", "vit": "ViT", "gnn": "GNN", "mgno": "MgNO"}
 
 
 def log(msg: str) -> None:
@@ -135,11 +135,27 @@ def read_markdown_table(path: pathlib.Path) -> pd.DataFrame:
 
 
 def split_run_name(model: str) -> tuple[str, str, str, int | None, str]:
-    """'unet_T1_M_s2[_suffix]' -> (base 'unet', task, tier, seed, suffix); non-learned rows -> (model, '', '', None, '')."""
-    m = re.match(r"^(unet|fno|vit|gnn)_(T\w+)_(S|M|L|XL|XXL)_s(\d+)(?:_(.+))?$", model)
+    """'unet_T1_M_s2[_suffix]' -> (base 'unet', task, tier, seed, suffix); non-learned rows -> (model, '', '', None, '').
+    The suffix 't2' (tier-tuned official configuration, item 2 of 2026-10-05) is reported as suffix '' with the
+    run marked tuned; callers that prefer tuned rows use `prefer_tuned`."""
+    m = re.match(r"^(unet|fno|vit|gnn|mgno)_(T\w+)_(S|M|L|XL|XXL)_s(\d+)(?:_(.+))?$", model)
     if not m:
         return model, "", "", None, ""
-    return m.group(1), m.group(2), m.group(3), int(m.group(4)), m.group(5) or ""
+    suffix = m.group(5) or ""
+    if suffix == "t2":
+        suffix = ""
+    return m.group(1), m.group(2), m.group(3), int(m.group(4)), suffix
+
+
+def prefer_tuned(df: pd.DataFrame) -> pd.DataFrame:
+    """Among rows of one (task, tier, split, base, seed) keep the tier-tuned run ('_t2' in the model name) when it
+    exists, otherwise the pre-tuning run; adds a boolean column `tuned`."""
+    df = df.copy()
+    df["tuned"] = df.model.str.contains(r"_t2(?:$|_)", regex=True)
+    key = ["task", "tier", "split", "base", "seed"]
+    has_t2 = df[df.tuned].groupby(key).size().index
+    drop = df.index[(~df.tuned) & df.set_index(key).index.isin(has_t2)]
+    return df.drop(drop)
 
 
 def error_vs_tier(out: pathlib.Path) -> None:
@@ -153,7 +169,7 @@ def error_vs_tier(out: pathlib.Path) -> None:
     df["base"] = [p[0] for p in parsed]
     df["seed"] = [p[3] for p in parsed]
     df["suffix"] = [p[4] for p in parsed]
-    learned = df[df.seed.notna() & (df.suffix == "")]
+    learned = prefer_tuned(df[df.seed.notna() & (df.suffix == "")])
     metrics = ["rel_l2", "mae_log10eps", "top5_iou", "pinch_recall", "spearman"]
     agg = (
         learned.groupby(["task", "tier", "base"])[metrics + ["speed-up (median)", "train GPU-h"]]
@@ -187,7 +203,7 @@ def error_vs_tier(out: pathlib.Path) -> None:
     axes = np.atleast_1d(axes)
     for ax, task in zip(axes, tasks, strict=False):
         sub = agg[agg.task == task]
-        for base in ("unet", "fno", "vit", "gnn"):
+        for base in ("unet", "fno", "vit", "gnn", "mgno"):
             g = sub[sub.base == base]
             if not len(g):
                 continue
@@ -218,6 +234,17 @@ def scale_transfer(out: pathlib.Path) -> None:
         base, task, tier, seed, suffix = split_run_name(run.name)
         if seed is None:
             continue
+        tuned = "_t2" in run.name
+        if (
+            not tuned
+            and (
+                run.parent
+                / (run.name.replace(f"_s{seed}", f"_s{seed}_t2") if suffix == "" else run.name)
+            )
+            .joinpath("results_transfer.json")
+            .exists()
+        ):
+            continue  # a tier-tuned counterpart exists: it is the official L model
         ev = json.loads(pathlib.Path(p).read_text())["eval"]
         for tag, v in ev.items():
             m = re.match(r"^[^_]+_(XL|XXL)_(test_id|test_ood|ood_region)$", tag)
@@ -302,7 +329,7 @@ def scale_transfer(out: pathlib.Path) -> None:
     axes = np.atleast_1d(axes)
     for ax, task in zip(axes, tasks, strict=False):
         sub = agg[(agg.task == task) & (agg.split == "test_id")]
-        models = [m for m in ("unet", "fno", "vit", "gnn") if m in set(sub.model)]
+        models = [m for m in ("unet", "fno", "vit", "gnn", "mgno") if m in set(sub.model)]
         variants = [v for v in ("zero-shot", "scale-aware") if v in set(sub.variant)]
         width = 0.8 / (len(models) * max(len(variants), 1))
         for i, model in enumerate(models):
@@ -509,7 +536,7 @@ def ood_degradation(out: pathlib.Path) -> None:
     df["base"] = [p[0] for p in parsed]
     df["seed"] = [p[3] for p in parsed]
     df["suffix"] = [p[4] for p in parsed]
-    df = df[df.seed.notna() & (df.suffix == "")].copy()
+    df = prefer_tuned(df[df.seed.notna() & (df.suffix == "")].copy())
     df["split"] = df.split.replace({"published S": "published"})
     splits = ["test_id", "test_ood", "ood_region", "published"]
     df = df[df.split.isin(splits)]

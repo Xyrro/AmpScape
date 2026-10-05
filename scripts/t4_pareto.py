@@ -79,7 +79,9 @@ def model_rows(runs: list[pathlib.Path], tier: str) -> pd.DataFrame:
             rows.append(
                 {
                     "split": rr["splits"][0],
-                    "method": re.sub(r"_s\d+$", "", r.name),
+                    "method": re.sub(
+                        r"_s\d+(_t2)?$", lambda m_: " (tuned)" if m_.group(1) else "", r.name
+                    ),
                     "seed": r.name,
                     "n": rr["n_rows"],
                     "cost_s": float(pd.Series(ts).median()) if ts else None,
@@ -108,7 +110,9 @@ def model_rows(runs: list[pathlib.Path], tier: str) -> pd.DataFrame:
             rows.append(
                 {
                     "split": split,
-                    "method": re.sub(r"_s\d+$", "", r.name),
+                    "method": re.sub(
+                        r"_s\d+(_t2)?$", lambda m_: " (tuned)" if m_.group(1) else "", r.name
+                    ),
                     "seed": r.name,
                     "n": e.get("n_rows"),
                     "cost_s": cost,
@@ -139,10 +143,12 @@ def short_label(method: str) -> str:
     """'unet_T4_L (learned, 3 seeds)' -> 'U-Net'; '…_s1_scalenorm (learned, 1 seed)' -> 'U-Net (scale-aware)'; solver rows unchanged."""
     import re as _re
 
-    mm = _re.match(r"^(unet|fno|vit|gnn)_T4_\w+?(_s\d+)?(_scalenorm)? \(learned", method)
+    mm = _re.match(
+        r"^(unet|fno|vit|gnn|mgno)_T4_\w+?(?: \(tuned\))?(_s\d+)?(_scalenorm)? \(learned", method
+    )
     if not mm:
         return method
-    name = {"unet": "U-Net", "fno": "FNO", "vit": "ViT", "gnn": "GNN"}[mm.group(1)]
+    name = {"unet": "U-Net", "fno": "FNO", "vit": "ViT", "gnn": "GNN", "mgno": "MgNO"}[mm.group(1)]
     return name + (" (scale-aware)" if mm.group(3) else "")
 
 
