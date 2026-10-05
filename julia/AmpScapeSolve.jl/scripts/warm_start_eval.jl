@@ -7,9 +7,14 @@ using AmpScapeSolve, HDF5, JSON
 const E = AmpScapeSolve
 src, preds, outjson = ARGS[1], ARGS[2], ARGS[3]
 rtol = length(ARGS) >= 4 ? parse(Float64, ARGS[4]) : 1e-6
-fs = h5open(src, "r"); fp = h5open(preds, "r")
-root = haskey(fs, "samples") ? fs["samples"] : fs          # inputs shard or final shard
+# 2026-10-05: ARGS[1] may be a .txt list of shard paths (one per line) — one Julia process per split instead of one
+# per shard (hundreds of start-ups per split made the evaluation hours long)
+shards = endswith(src, ".txt") ? filter(!isempty, readlines(src)) : [src]
+fp = h5open(preds, "r")
 res = Any[]
+for src in shards
+fs = h5open(src, "r")
+root = haskey(fs, "samples") ? fs["samples"] : fs          # inputs shard or final shard
 for sid in keys(fp)
     haskey(root, sid) || continue
     g = root[sid]
@@ -41,6 +46,8 @@ for sid in keys(fp)
                         "converged_zero" => zero["converged_$key"], "n_free" => zero["n_free"]))
     end
 end
-close(fs); close(fp)
+close(fs)
+end
+close(fp)
 open(outjson, "w") do io; JSON.print(io, E.sanitize_nan(res), 1); end
 println("wrote ", outjson, " (", length(res), " systems)")

@@ -398,11 +398,7 @@ def evaluate(
         with h5py.File(pred_dir / "predictions.h5", "r") as fp:
             pred_cfgs = {c for sid in list(fp.keys())[:50] for c in fp[sid].keys()}
         srcs = sorted({r["path"] for r in all_rows if r["config"] in pred_cfgs})
-        recs = []
-        for s in srcs:
-            recs += run_warm_start_eval(
-                s, pred_dir / "predictions.h5", pred_dir / f"warm_start_{pathlib.Path(s).stem}.json"
-            )
+        recs = run_warm_start_eval(srcs, pred_dir / "predictions.h5", pred_dir / "warm_start.json")
         result["acceleration"] = {"summary": summarize(recs), "records": recs}
     if out_dir:
         out_dir = pathlib.Path(out_dir)
