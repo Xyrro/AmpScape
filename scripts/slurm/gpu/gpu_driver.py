@@ -733,7 +733,13 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 log(
                     f"scratch {quota_gb() - freed[0]:.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {limit:.0f} GB even after evictions; draining {sorted(draining)}"
                 )
-                break  # strict priority: do not stage a later group before this one
+                if draining:
+                    # a drain is in progress (running jobs pin the space): later groups may be staged meanwhile —
+                    # the eviction order (furthest next use first, never a group needed before the target) hands
+                    # the space back to this group when its turn comes (07:30Z 2026-10-05: GPUs idled for hours
+                    # behind one long GNN run while S-tier jobs could have run)
+                    continue
+                break  # quota truly full: do not stage a later group before this one
         stage(tier, group)
         if staged(tier, group):
             freed[0] -= size
