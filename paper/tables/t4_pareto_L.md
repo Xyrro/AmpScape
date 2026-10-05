@@ -12,14 +12,6 @@
 | test_id | block 5 (correct_artifacts=0) | 24 | 638 | 0.1011 | 0.1141 | 0.0217 | 0.7710 | 0.9767 | 0.9870 |
 | test_id | production block 5 (correct_artifacts=1) | 24 | 566 | 0.0315 | 0.0359 | 0.0135 | 0.9344 | 0.9319 | 0.9979 |
 | test_id | block 11 (correct_artifacts=1) | 24 | 164 | 0.0854 | 0.0954 | 0.0409 | 0.8317 | 0.8183 | 0.9895 |
-| test_id | gnn_T4_L_s1_scalenorm (learned, 1 seed) | 1927 | 0.0665 | 0.1407 | – | 0.0733 | 0.6306 | 0.7139 | 0.9609 |
-| test_id | gnn_T4_L (learned, 3 seeds) | 1927 | 0.0658 | 0.1416 | – | 0.0738 | 0.6321 | 0.7041 | 0.9604 |
-| test_id | vit_T4_L (learned, 3 seeds) | 1927 | 0.0141 | 0.1586 | – | 0.0973 | 0.6046 | 0.7348 | 0.9529 |
-| test_id | vit_T4_L_s1_scalenorm (learned, 1 seed) | 1927 | 0.0125 | 0.1614 | – | 0.0983 | 0.6017 | 0.7361 | 0.9513 |
-| test_id | fno_T4_L_s1_scalenorm (learned, 1 seed) | 1927 | 0.00744 | 0.1199 | – | 0.0735 | 0.7145 | 0.5492 | 0.9734 |
-| test_id | unet_T4_L (learned, 3 seeds) | 1927 | 0.00652 | 0.0810 | – | 0.0377 | 0.8122 | 0.8254 | 0.9916 |
-| test_id | fno_T4_L (learned, 3 seeds) | 1927 | 0.00541 | 0.1198 | – | 0.0729 | 0.7132 | 0.5531 | 0.9735 |
-| test_id | unet_T4_L_s1_scalenorm (learned, 1 seed) | 1927 | 0.00538 | 0.0804 | – | 0.0385 | 0.8070 | 0.8262 | 0.9913 |
 | test_ood | block 1 (exact, reference) | 16 | 1.4e+04 | 0.0000 | 0.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 |
 | test_ood | block 3 (correct_artifacts=1) | 16 | 2.02e+03 | 0.0175 | 0.0267 | 0.0065 | 0.9388 | 0.9503 | 0.9978 |
 | test_ood | block 5 (correct_artifacts=0) | 16 | 764 | 0.1004 | 0.1480 | 0.0405 | 0.7137 | 0.9802 | 0.9783 |

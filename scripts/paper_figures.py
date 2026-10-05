@@ -234,17 +234,10 @@ def scale_transfer(out: pathlib.Path) -> None:
         base, task, tier, seed, suffix = split_run_name(run.name)
         if seed is None:
             continue
-        tuned = "_t2" in run.name
-        if (
-            not tuned
-            and (
-                run.parent
-                / (run.name.replace(f"_s{seed}", f"_s{seed}_t2") if suffix == "" else run.name)
-            )
-            .joinpath("results_transfer.json")
-            .exists()
-        ):
-            continue  # a tier-tuned counterpart exists: it is the official L model
+        if suffix == "" and "_t2" not in run.name:
+            t2 = run.parent / f"{base}_{task}_{tier}_s{seed}_t2"
+            if (t2 / "results_transfer.json").exists():
+                continue  # a tier-tuned counterpart exists: it is the official L model
         ev = json.loads(pathlib.Path(p).read_text())["eval"]
         for tag, v in ev.items():
             m = re.match(r"^[^_]+_(XL|XXL)_(test_id|test_ood|ood_region)$", tag)

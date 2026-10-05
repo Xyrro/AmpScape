@@ -809,6 +809,12 @@ def seed_baselines(
         if not d.is_dir():
             continue
         p = parse_run_name(d.name)
+        tuned = False
+        if p is None and d.name.endswith(
+            "_t2"
+        ):  # tier-tuned official configuration (item 2, 2026-10-05)
+            p = parse_run_name(d.name[:-3])
+            tuned = p is not None
         if p is None:
             if re.match(r"^[a-z0-9]+_T\d[A-Z]?_(S|M|L|XL|XXL)_s\d+_", d.name):
                 warnings.append(f"skipped variant run {d.name}")
@@ -816,10 +822,14 @@ def seed_baselines(
         if not (d / "results.json").exists():
             warnings.append(f"skipped {d.name}: no results.json")
             continue
-        groups.setdefault((p["model"], p["task"], p["tier"]), []).append((p["seed"], d))
+        groups.setdefault((p["model"], p["task"], p["tier"]), []).append((p["seed"], d, tuned))
     entries: list[dict] = []
-    for (model, task, tier), seed_runs in sorted(groups.items()):
-        seed_runs.sort()
+    for (model, task, tier), seed_runs3 in sorted(groups.items()):
+        # one run per seed: the tier-tuned run replaces the pre-tuning one when both exist
+        by_seed: dict[int, tuple[int, pathlib.Path]] = {}
+        for sd, d, _tuned in sorted(seed_runs3, key=lambda x: (x[0], x[2])):
+            by_seed[sd] = (sd, d)
+        seed_runs = sorted(by_seed.values())
         name = MODEL_NAMES.get(model, model)
         results = [(s, d, json.loads((d / "results.json").read_text())) for s, d in seed_runs]
         cfgs = [r["config"] for _, _, r in results]
