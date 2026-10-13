@@ -286,6 +286,44 @@ def quota_gb() -> float:
     return 0.0
 
 
+# scratch a run still writes before the offloader frees it (predictions + last.pt; measured: S 2.6, M/T4 L 5.4,
+# FNO T1 L 6.5 GB) and the predictions.h5 an in-flight T4 reference backfill fetches from the Hub
+PRED_GB = {"S": 3.0, "M": 5.5, "L": 7.0, "XL": 13.0, "XXL": 13.0}
+QUOTA_SOFT_GB = 295.0  # the 300 GB quota minus the slack for logs/checkpoints
+RECENT_STAGE_S = 900.0
+
+
+def footprint_gb(active: dict[str, str], jobs: list[dict]) -> float:
+    """GB that queued/running work will still write to scratch: the predictions of every training leg whose run is
+    not yet offloaded and the predictions.h5 of every in-flight T4 reference backfill (2026-10-13 22:50Z: with L/T3 and
+    L/T4 staged (146 GB) the 7 GNN legs, 8 L legs and 16 L backfills would have written ≈ 190 GB into 17 GB of
+    quota)."""
+    by = {j["name"]: j for j in jobs}
+    tot = 0.0
+    for n in active:
+        if n.startswith("t4ref-"):
+            tot += PRED_GB["L"]
+        elif n.startswith(("stats-", "accel-", "xfer_")):
+            continue  # transfer bursts have their own bound (XFER_QUOTA_GB, MAX_XFER)
+        elif n in by and not (RUNS / n / ".offloaded").exists():
+            tot += PRED_GB.get(by[n]["tier"], 7.0)
+    return tot
+
+
+def committed_gb(st: dict, footprint: float) -> float:
+    """Scratch the driver must treat as used: the quota reading, plus the groups staged in the last 15 min (Lustre's
+    quota accounting lags writes by minutes — at 22:48Z L/T3 had just landed, the reading said it fitted, and L/T4 was
+    staged beside it), plus `footprint`."""
+    now = time.time()
+    q = quota_gb()
+    # each entry [ts, gb, q0]: the reading at the stage start plus the staged GB is what the reading must reach; the
+    # compensation decays to 0 as the accounting catches up (an eviction in between over-compensates for ≤ 15 min)
+    recent = max(
+        [q0 + gb - q for ts, gb, q0 in st.get("recent_stagings", []) if now - ts < RECENT_STAGE_S] + [0.0]
+    )
+    return q + recent + footprint
+
+
 def staged(tier: str, group: str) -> bool:
     return (CACHE / "staged" / f"{tier}_{group}.json").exists()
 
@@ -579,7 +617,7 @@ def alert(msg: str) -> None:
     log("ALERT: " + msg)
 
 
-def submit_t4_reference_backfill(jobs: list[dict], st: dict) -> None:
+def submit_t4_reference_backfill(jobs: list[dict], st: dict, headroom: list[float] | None = None) -> None:
     """T4 at M/L: the exact block-1 reference evaluation runs at the end of the training job; legs submitted before
     2026-09-24 12:30Z looked for predictions under the wrong path and skipped it. Any finished run without
     eval_t4_reference/ gets a CPU job that runs the same evaluate.py command (the offloader waits for it)."""
@@ -597,6 +635,10 @@ def submit_t4_reference_backfill(jobs: list[dict], st: dict) -> None:
         tier = j["tier"]
         if not staged(tier, "T4"):
             continue  # the harness reads the shards; the staging block above requests the group
+        if headroom is not None:
+            if headroom[0] < PRED_GB["L"]:
+                continue  # its fetched predictions.h5 would not fit under the quota beside the running work
+            headroom[0] -= PRED_GB["L"]
         fetch = ""
         if not (
             pred / "predictions.h5"
@@ -719,9 +761,17 @@ def gnn_phase(j: dict) -> bool:
 def cycle(jobs: list[dict], st: dict) -> None:
     note_bad_nodes(jobs)
     note_oom(jobs, st)
-    submit_t4_reference_backfill(jobs, st)
-    submit_accel_backfill(jobs, st)
     active = our_jobs()
+    fp = footprint_gb(active, jobs)
+    st["recent_stagings"] = [
+        x for x in st.get("recent_stagings", []) if time.time() - x[0] < RECENT_STAGE_S
+    ]
+
+    def used_gb() -> float:
+        return committed_gb(st, fp)
+
+    headroom = [QUOTA_SOFT_GB - used_gb()]  # GB of predictions that may still be committed this cycle
+    submit_accel_backfill(jobs, st)
     running = {n for n, s in active.items() if not n.startswith(("stats-", "t4ref-", "accel-"))}
     pending = [j for j in jobs if not done(j) and j["name"] not in running]
     # staging: data of the next pending jobs, in priority order, only when the group fits under the quota guard
@@ -787,7 +837,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
     freed = [
         0.0
     ]  # GB evicted this cycle: pace-quota lags a few minutes behind deletions (09:59Z: read 271 after
-    # evicting 30 GB), so the fit test uses quota_gb() - freed
+    # evicting 30 GB), so the fit test uses used_gb() - freed
 
     def evict_until(size: float, target_use: int, limit: float = SCRATCH_LIMIT_GB) -> None:
         # never evict a group whose next pending use comes before the target's (10:18Z: the driver staged M/T4 and
@@ -809,13 +859,13 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 continue
             cands.append((first_use.get((t_, g_), 10**6), t_, g_))
         if not evictions_suffice(
-            quota_gb() - freed[0], [GROUP_GB.get((t_, g_), 60.0) for _, t_, g_ in cands], size, limit
+            used_gb() - freed[0], [GROUP_GB.get((t_, g_), 60.0) for _, t_, g_ in cands], size, limit
         ):
             return  # 21:48Z: XXL/T1 (staged 16 min earlier for the transfer legs) was evicted for L/T3, which still
             # did not fit behind the running L/T1 legs — evict only when the evictable groups make the target fit;
             # once the drained legs finish, their group joins the candidates and the fit test passes
         for _, t_, g_ in sorted(cands, reverse=True):
-            if quota_gb() - freed[0] + size <= limit:
+            if used_gb() - freed[0] + size <= limit:
                 return  # (02:50Z 2026-09-26: this compared against the 280 GB guard while the caller wanted 193)
             subprocess.run(
                 [
@@ -848,13 +898,13 @@ def cycle(jobs: list[dict], st: dict) -> None:
             else SCRATCH_LIMIT_GB
         )  # 2026-10-02: measured against the hard guard, not the transfer threshold — the old limit (201) sat
         # below the scratch floor + one XL group (156 + 61) and the driver idled for six days with an empty queue
-        if quota_gb() - freed[0] + size > limit:
+        if used_gb() - freed[0] + size > limit:
             evict_until(size, first_use.get((tier, group), 10**6), limit)
-            if quota_gb() - freed[0] + size > limit:
+            if used_gb() - freed[0] + size > limit:
                 # mark the pinned groups (furthest next use first) that would free enough space as draining —
                 # not for a transfer-only group: its predecessors' transfer legs must simply finish first (22:49Z:
                 # draining XL/T1 would have blocked the very T1 transfer legs the T4 group was waiting behind)
-                need = 0.0 if (tier, group) in xfer_only else quota_gb() - freed[0] + size - limit
+                need = 0.0 if (tier, group) in xfer_only else used_gb() - freed[0] + size - limit
                 # small tiers first (their legs end within 2 h; an M/L group stays pinned for hours), then the
                 # group whose next pending use is furthest away
                 # cost-free first: groups with no unsubmitted job (draining them blocks nothing), then small tiers
@@ -879,7 +929,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
                     draining.add(g_)
                     need -= GROUP_GB.get(g_, 60.0)
                 log(
-                    f"scratch {quota_gb() - freed[0]:.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {limit:.0f} GB even after evictions; draining {sorted(draining)}"
+                    f"scratch {used_gb() - freed[0]:.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {limit:.0f} GB even after evictions; draining {sorted(draining)}"
                 )
                 if draining:
                     # a drain is in progress (running jobs pin the space): later groups may be staged meanwhile —
@@ -888,9 +938,11 @@ def cycle(jobs: list[dict], st: dict) -> None:
                     # behind one long GNN run while S-tier jobs could have run)
                     continue
                 break  # quota truly full: do not stage a later group before this one
+        q0 = quota_gb()
         stage(tier, group)
         if staged(tier, group):
             freed[0] -= size
+            st.setdefault("recent_stagings", []).append([time.time(), size, q0])
         if staged(tier, group) and tier in TRAIN_TIERS and not stats_ready(tier):
             submit_stats(tier, group, st)
     # submission in priority order; none while scratch is within 10 GB of the quota (predictions of finishing runs
@@ -905,10 +957,10 @@ def cycle(jobs: list[dict], st: dict) -> None:
         ),
         None,
     )
-    if first_xfer is not None and quota_gb() > XFER_QUOTA_GB:
+    if first_xfer is not None and used_gb() > XFER_QUOTA_GB:
         # 12 h idle on 2026-09-25: all four XL/XXL groups (166 GB) kept the scratch above the transfer threshold and
         # nothing triggered an eviction — free the groups whose next use is later than the first runnable transfer
-        before = quota_gb()
+        before = used_gb()
         evict_until(
             0.0, first_xfer, XFER_QUOTA_GB
         )  # until quota - freed <= XFER_QUOTA_GB; only groups outside the lookahead (23:22Z: a 1 GB overshoot evicted XXL/T1 four jobs ahead of its use)
@@ -917,9 +969,11 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 f"transfer legs held by scratch {before:.0f} GB > {XFER_QUOTA_GB:.0f}: evicted later-use groups "
                 f"({freed[0]:.0f} GB)"
             )
-    if quota_gb() > 290.0:
-        log(f"scratch {quota_gb():.0f} GB > 290: no submissions this cycle")
+    if used_gb() > 290.0:
+        log(f"scratch {used_gb():.0f} GB > 290: no submissions this cycle")
         slots = 0
+    headroom[0] += freed[0]  # evictions this cycle
+    held_log = [False]
     for j in pending:
         if slots <= 0 or n_queued_total() >= MAX_QUEUED_TOTAL:
             break
@@ -936,18 +990,30 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 continue  # the L-trained source run is not finished, or its XL/XXL data is not staged
             if any(n.startswith(f"xfer_{j['src']}_") for n in running):
                 continue  # one transfer leg per source run at a time (2026-10-04: concurrent legs raced on the summary)
-            if n_xfer_running >= MAX_XFER or quota_gb() - freed[0] > XFER_QUOTA_GB:
+            if n_xfer_running >= MAX_XFER or used_gb() - freed[0] > XFER_QUOTA_GB:
                 continue  # scratch: bounded number of prediction bursts in flight
         elif not (staged(*key) and stats_ready(j["tier"])):
             continue
         if key in draining and not local_fetch(j) and not (RUNS / j["name"] / "done.json").exists():
             continue  # its group is about to be evicted for a higher-priority group (evaluation-only legs still go)
+        if j.get("kind") != "transfer" and not (RUNS / j["name"] / ".offloaded").exists():
+            need = PRED_GB.get(j["tier"], 7.0)
+            if need > headroom[0]:
+                if not held_log[0]:
+                    log(
+                        f"scratch {QUOTA_SOFT_GB - headroom[0]:.0f} GB committed (quota + recent stagings + predictions of running work): {j['name']} held, its {need:.0f} GB of predictions would not fit under {QUOTA_SOFT_GB:.0f}"
+                    )
+                    held_log[0] = True
+                continue
+            headroom[0] -= need
         # a paused run whose leg is no longer in the queue (self re-queue failed, e.g. at the submit cap; six runs sat
         # for 20 h on 2026-09-25) is simply submitted again: train.py --resume continues from last.pt / done.json
         submit(j, st)
         slots -= 1
         if j.get("kind") == "transfer":
             n_xfer_running += 1
+    # CPU backfills after the GPU legs: each fetches ≈ 7 GB of predictions from the Hub and takes what headroom is left
+    submit_t4_reference_backfill(jobs, st, headroom)
     save_state(st)
 
 

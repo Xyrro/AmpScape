@@ -45,3 +45,20 @@ def test_evictions_only_when_they_make_the_target_fit():
     # once the L/T1 legs finish, L/T1 (84 GB) joins the candidates: 251 - 105 + 64 = 210 → evict
     assert g.evictions_suffice(251, [21, 84], 64, 280)
     assert g.evictions_suffice(200, [], 64, 280)
+
+
+def test_footprint_and_committed_scratch(tmp_path, monkeypatch):
+    monkeypatch.setattr(g, "RUNS", tmp_path)
+    (tmp_path / "done_run").mkdir()
+    (tmp_path / "done_run" / ".offloaded").write_text("{}")
+    jobs = [{"name": "gnn_T1_M_s1_t2", "tier": "M"}, {"name": "fno_T4_L_s1_t2", "tier": "L"}, {"name": "done_run", "tier": "L"}]
+    active = {"gnn_T1_M_s1_t2": "R", "fno_T4_L_s1_t2": "PD", "done_run": "R", "t4ref-unet_T4_L_s1": "R", "xfer_x_XL": "R", "stats-L": "R"}
+    assert g.footprint_gb(active, jobs) == g.PRED_GB["M"] + g.PRED_GB["L"] + g.PRED_GB["L"]
+    monkeypatch.setattr(g, "quota_gb", lambda: 220.0)
+    now = g.time.time()
+    # a stage finished 1 min ago from a 150 GB reading: the quota must reach 232 → 12 GB not yet accounted
+    st = {"recent_stagings": [[now - 60, 82.0, 150.0], [now - 3600, 64.0, 100.0]]}
+    assert g.committed_gb(st, 10.0) == 220.0 + 12.0 + 10.0
+    # accounting caught up → no compensation
+    monkeypatch.setattr(g, "quota_gb", lambda: 240.0)
+    assert g.committed_gb(st, 0.0) == 240.0
