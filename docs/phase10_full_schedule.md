@@ -57,15 +57,28 @@ S runs; GNN last because it is two thirds of the budget and its receptive field,
   `memory.max`); the kernel did not reclaim our clean page cache (≈ 3.85 GB of `file` in `memory.stat` after scratch
   I/O), `memory.reclaim` is not writable by the user, and the cgroup OOM-killed instead: on 2026-10-10 the driver's Hub
   staging subprocesses died within seconds in a loop (no job submitted) and the owner's tmux/screen attaches and SSH
-  session were SIGKILLed. `posix_fadvise(DONTNEED)` over the scratch roots cleared it. Permanent fix: every file a
-  login-node daemon writes (fsync first) or reads is advised DONTNEED after use (`ampscape/io/pagecache.py`, wired
-  into `stage_data.py`, `push_aux.py`, `ampscape/io/sync.py`); the keepalive runs `scripts/evict_cache.py` every
-  10 min and whenever `memory.current` > 2.5 GiB (lines in `logs/keepalive.log`). Manual: `python scripts/evict_cache.py`;
-  check: `cat /sys/fs/cgroup/user.slice/user-$(id -u).slice/memory.current`.
-- **No pattern kills (2026-10-13 audit).** Stop a daemon via its lease / pid file only (`logs/lease_<name>.json`,
-  `logs/keepalive.pid`); the repository contains no `pkill`, `killall`, `kill -9`, `pgrep -f` or `kill -f`, and
-  `tests/test_no_pattern_kills.py` fails the build on any process selector that could match tmux, screen, sshd, bash
-  or the Claude CLI.
+  session were SIGKILLed; on 2026-10-13 the first fix (drop the cache *after* a group) was not enough — `snapshot_download`
+  with 8 workers filled the slice in seconds, the L/T1 and M/T4 staging subprocesses were killed at 20–25 %, and the
+  OOM killer also took the Claude CLI session that was fixing it. Rules now:
+  1. **During a transfer, not after it.** `stage_data.py stage` downloads per file with `--workers 2` (hf_hub_download),
+     fsyncs + advises DONTNEED each file on completion, and runs `ampscape.io.pagecache.CacheSweeper` (a thread that
+     sweeps the group dir, the `.cache/huggingface/download` temp dir, index/splits and `$HF_HOME/xet` every 5 s).
+     `push_aux.py` (offloader, aux uploads) runs the same sweeper over the source dir and the xet cache for the whole
+     push, plus the per-file drop after each commit. Test (2026-10-13 06:39Z, login node, logged `memory.current` every
+     5 s): staging 101 new M/T4 shards (10.4 GB, 2 workers, 70 s) peaked at 1.08 GiB (0.82 GiB before), never above
+     1.5 GiB; `python scripts/slurm/gpu/stage_data.py stage --tier M --group T4 --max-files 240` reproduces it (partial
+     stage, no marker).
+  2. The keepalive still runs `scripts/evict_cache.py` every 10 min and whenever `memory.current` > 2.5 GiB (lines in
+     `logs/keepalive.log`); manual: `python scripts/evict_cache.py`; check: `cat .../memory.current`, OOM count:
+     `grep oom_kill .../memory.events`.
+  3. Nothing on the login node reads or writes large files without `drop_file_cache` / a sweeper
+     (`ampscape/io/pagecache.py`; `tests/test_pagecache.py`).
+- **No pattern kills (2026-10-13 audit, widened the same day).** Stop a daemon via its lease / pid file only
+  (`logs/lease_<name>.json`, `logs/keepalive.pid`; the offloader by the pid of the exact `python scripts/slurm/gpu/offload_runs.py`
+  line). The audit covered every tracked file (scripts, package, Julia, tests, Makefile), `work/`, the git hooks and the
+  Claude settings/hooks: no `pkill`, `killall`, `kill -9`, `pgrep -f`, `kill -f`, `killpg` or `xargs kill` anywhere; the only
+  `kill`s are `kill -0 <pid>` liveness probes and `kill $(cat <pidfile>)`. `tests/test_no_pattern_kills.py` scans the
+  same scope and fails on any selector that could match tmux, screen, sshd, bash or the Claude CLI.
 
 ## 4. Storage rule for runs (2026-09-24)
 

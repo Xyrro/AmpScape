@@ -126,3 +126,60 @@ def cgroup_memory() -> dict:
     except (OSError, ValueError):
         pass
     return out
+
+
+class CacheSweeper:
+    """Keep the page cache low *during* a long download or upload, not only after it (2026-10-13: a staging
+    subprocess writing an 84 GB group was OOM-killed at 23 % — the post-group drop never ran; the OOM killer also took
+    the Claude CLI that was fixing it). A daemon thread advises DONTNEED over `roots` every `interval` seconds while
+    the transfer is in flight and once more (with fsync) on exit; the transfer itself drops each file on completion
+    and runs with 1–2 workers so the cache cannot outrun the sweeper. Records the cgroup high-water mark.
+
+        with CacheSweeper([group_dir, download_tmp_dir]) as sw:
+            ...download...
+        sw.stats  # {"sweeps", "files", "bytes", "peak_mem", "max_sweep_s"}
+    """
+
+    def __init__(
+        self,
+        roots: Iterable[str | os.PathLike],
+        *,
+        interval: float = 5.0,
+        max_age_s: float | None = None,
+        skip_dirs: frozenset[str] = SKIP_DIRS,
+    ) -> None:
+        import threading
+
+        self.roots = [os.fspath(r) for r in roots]
+        self.interval = interval
+        self.max_age_s = max_age_s
+        self.skip_dirs = skip_dirs
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, name="cache-sweeper", daemon=True)
+        self.stats = {"sweeps": 0, "files": 0, "bytes": 0, "peak_mem": 0, "max_sweep_s": 0.0}
+
+    def _sweep(self, *, fsync: bool = False) -> None:
+        r = drop_tree_cache(
+            self.roots, max_age_s=self.max_age_s, fsync=fsync, skip_dirs=self.skip_dirs
+        )
+        self.stats["sweeps"] += 1
+        self.stats["files"] += r["files"]
+        self.stats["bytes"] += r["bytes"]
+        self.stats["max_sweep_s"] = max(self.stats["max_sweep_s"], r["seconds"])
+        self.stats["peak_mem"] = max(self.stats["peak_mem"], cgroup_memory().get("current", 0))
+
+    def _run(self) -> None:
+        while not self._stop.wait(self.interval):
+            try:
+                self._sweep()
+            except Exception:  # noqa: BLE001 — hygiene must never kill the transfer
+                pass
+
+    def __enter__(self) -> "CacheSweeper":
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self._stop.set()
+        self._thread.join(timeout=max(30.0, self.interval * 4))
+        self._sweep(fsync=True)

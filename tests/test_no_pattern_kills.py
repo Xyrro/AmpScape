@@ -18,14 +18,34 @@ import subprocess
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SCAN_DIRS = ["scripts", "ampscape", "tests"]
-FILES = sorted(
-    p
-    for d in SCAN_DIRS
-    for ext in ("*.py", "*.sh", "*.sbatch", "*.jl")
-    for p in (ROOT / d).rglob(ext)
-    if "__pycache__" not in p.parts and p.name != "test_no_pattern_kills.py"
-)
+SCAN_DIRS = ["scripts", "ampscape", "tests", "AmpScapeSolve.jl", ".claude", "work"]
+EXTS = (".py", ".sh", ".sbatch", ".jl", ".bash")
+NAMED = ("Makefile", "justfile")
+
+
+def _tracked() -> list[pathlib.Path]:
+    """Every tracked file plus the scan dirs (untracked helpers in work/ and .claude/ hooks included): the 2026-10-13
+    audit widened the scope from scripts/ampscape/tests to the whole repository and the Claude hook scripts."""
+    out: set[pathlib.Path] = set()
+    try:
+        ls = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout
+        out.update(ROOT / ln for ln in ls.splitlines() if ln)
+    except (OSError, subprocess.CalledProcessError):
+        pass
+    for d in SCAN_DIRS:
+        if (ROOT / d).exists():
+            out.update(p for p in (ROOT / d).rglob("*") if p.is_file())
+    return sorted(
+        p
+        for p in out
+        if (p.suffix in EXTS or p.name in NAMED)
+        and "__pycache__" not in p.parts
+        and ".venv" not in p.parts
+        and p.name != "test_no_pattern_kills.py"
+    )
+
+
+FILES = _tracked()
 FORBIDDEN = [
     (re.compile(r"\bpkill\b"), "pkill"),
     (re.compile(r"\bkillall\b"), "killall"),

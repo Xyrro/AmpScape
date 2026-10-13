@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased] — Phase 10-full (GPU baselines)
+- Login-node transfers keep the page cache low *during* the transfer: `ampscape.io.pagecache.CacheSweeper` (5-s DONTNEED sweeper thread), `stage_data.py stage` per-file download with `--workers 2` / `--max-files` (test), `push_aux.py` sweeper; `tests/test_pagecache.py`; `tests/test_no_pattern_kills.py` scans every tracked code file. Phase 14 (tuned-config M re-runs) plan merged behind the phase 13c remainder (2026-10-13).
 - Login-node memory hygiene: `ampscape/io/pagecache.py` (posix_fadvise DONTNEED after writes/reads), `scripts/evict_cache.py`, keepalive sweep every 10 min / above 2.5 GiB `memory.current`; staging, uploader and hash reads drop their page cache. `tests/test_no_pattern_kills.py`: no pattern kills in scripts (2026-10-13).
 - `scripts/slurm/gpu/cuda_smoke.sbatch`: one-epoch GPU smoke test on `cuda13` nodes (2026-10-13).
 - `aux/t1_pair1/` published: first-pair voltages of every T1 landscape at S/M/L (170,000 systems, Circuitscape advanced mode, CHOLMOD; 30 GB) for the solver-acceleration track (2026-10-05).

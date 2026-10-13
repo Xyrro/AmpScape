@@ -12,11 +12,12 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import pathlib
 import sys
 import time
 
-from ampscape.io.pagecache import drop_file_cache
+from ampscape.io.pagecache import CacheSweeper, drop_file_cache
 from ampscape.io.sync import remote_sha256, sha256
 
 
@@ -42,12 +43,20 @@ def main() -> int:
     ap.add_argument("--commit-gb", type=float, default=3.0)
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
-    from huggingface_hub import CommitOperationAdd, HfApi
-
     src = pathlib.Path(a.src)
     rec_f = src / ".hub_pushed.json"
     rec = json.loads(rec_f.read_text()) if rec_f.exists() else {}
     files = collect(src, a.include)
+    # login-node 4 GB memory cgroup: hashing and the upload re-read every file — sweep DONTNEED over the source
+    # and the xet chunk cache every 5 s for the whole push (plus the per-file drop after each batch)
+    hf_home = pathlib.Path(os.environ.get("HF_HOME", str(pathlib.Path.home() / ".cache/huggingface")))
+    with CacheSweeper([src, hf_home / "xet"], interval=5.0):
+        return _push(a, src, rec_f, rec, files)
+
+
+def _push(a, src: pathlib.Path, rec_f: pathlib.Path, rec: dict, files: list[pathlib.Path]) -> int:
+    from huggingface_hub import CommitOperationAdd, HfApi
+
     todo = []
     for p in files:
         rel = str(p.relative_to(src))
