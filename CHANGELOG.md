@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased] — Phase 10-full (GPU baselines)
+- Offloader re-pushes a recomputed `eval_t4_reference/` of an already offloaded run (`reference_stale`, `tests/test_offload_reference.py`); `scripts/tuning_effect.py` → `docs/tables/tuning_effect.md` (pre-tuning official runs vs tier-tuned `_t2` re-runs per task/tier/split); phase 15 (FNO w48 L re-runs, scale-aware variants, XL/XXL transfer legs) merged into the driver plan (2026-10-13).
 - GPU driver: two QoS pools (coc-ice + coe-ice, 16 two-hour legs each, `choose_pool`/`QOS_LEGS`); GNN legs fetch their data group to node-local NVMe (`train_full.sbatch LOCALDATA=1`) instead of pinning scratch; `tests/test_gpu_driver_pools.py` (2026-10-13).
 - Training input pipeline: `ampscape/data/packed.py` (loader tensors packed once per job to node-local NVMe memmaps, byte-identical items), `train.py --packed-dir/--prefetch`, `train_full.sbatch PACK=1`; GPU driver pools (`ice-gpu` H200/H100 first, spill to L40S/A100) and `gpu_probe.sbatch`; epoch at M: U-Net 170 → 56 s, FNO 208 → 59 s (2026-10-13).
 - Login-node transfers keep the page cache low *during* the transfer: `ampscape.io.pagecache.CacheSweeper` (5-s DONTNEED sweeper thread), `stage_data.py stage` per-file download with `--workers 2` / `--max-files` (test), `push_aux.py` sweeper; `tests/test_pagecache.py`; `tests/test_no_pattern_kills.py` scans every tracked code file. Phase 14 (tuned-config M re-runs) plan merged behind the phase 13c remainder (2026-10-13).

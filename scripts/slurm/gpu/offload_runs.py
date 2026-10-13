@@ -9,6 +9,7 @@ log.csv, best.pt and the T4-reference evaluation stay local. Login node only (Hu
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import pathlib
 import subprocess
@@ -89,6 +90,49 @@ def offload(run: pathlib.Path) -> None:
 
 XFER_SPLITS = ("test_id", "test_ood", "ood_region")
 
+REFERENCE = "eval_t4_reference/results.json"
+
+
+def reference_stale(run: pathlib.Path) -> bool:
+    """An offloaded T4 run whose local exact-reference evaluation differs from the one pushed (2026-10-13: the
+    reference evaluation of 28 M/L T4 runs was recomputed after their offload — the old one is kept as
+    eval_t4_reference_prodtarget_wrong/ — and the `.offloaded` mark made the offloader skip them, so the Hub kept
+    the superseded results.json/results.md)."""
+    ref = run / REFERENCE
+    if not (run / ".offloaded").exists() or not ref.exists():
+        return False
+    try:
+        rec = json.loads((run / ".hub_pushed.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return True
+    return rec.get(REFERENCE, {}).get("sha256") != hashlib.sha256(ref.read_bytes()).hexdigest()
+
+
+def repush_reference(run: pathlib.Path) -> None:
+    """Push a recomputed eval_t4_reference/ of an already offloaded run (push_aux.py uploads only the files whose
+    sha256 changed, so the Hub copy is replaced in place and .hub_pushed.json records the new hash)."""
+    if not reference_stale(run):
+        return
+    r = subprocess.run(
+        [
+            sys.executable,
+            "scripts/push_aux.py",
+            "--src",
+            str(run),
+            "--dest",
+            f"aux/results/runs_full/{run.name}",
+            "--include",
+            "eval_t4_reference",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(ROOT),
+    )
+    if r.returncode != 0 or "MISMATCH" in r.stdout or reference_stale(run):
+        print(f"{run.name}: eval_t4_reference re-push failed\n{r.stdout[-400:]}\n{r.stderr[-400:]}", flush=True)
+        return
+    print(f"{run.name}: recomputed eval_t4_reference re-pushed (Hub copy replaced)", flush=True)
+
 
 def offload_transfer(run: pathlib.Path) -> None:
     """Scale-transfer outputs (transfer_eval.py) land in an already-offloaded run: push each finished split's
@@ -155,6 +199,7 @@ def main():
                 try:
                     offload(run)
                     offload_transfer(run)
+                    repush_reference(run)
                 except Exception as e:  # noqa: BLE001
                     print(f"{run.name}: {e!r}", flush=True)
         if not a.loop:

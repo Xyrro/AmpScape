@@ -96,6 +96,12 @@ A finished S run holds ≈ 2.6 GB of predictions (26 k test items), so 133 runs 
 T4-reference evaluation) to `aux/results/runs_full/<run>/` on the Hub with sha256 verification and then removes the
 local `predictions/*.h5` and `last.pt`; results, config, log and best.pt stay local. Tables are built from the local
 `results.json` files; predictions are re-downloadable per run for figures.
+A run that is already offloaded (`.offloaded`) is pushed again only for a recomputed `eval_t4_reference/` whose
+sha256 differs from `.hub_pushed.json` (`offload_runs.reference_stale`, 2026-10-13: the exact-reference evaluations of
+the 28 T4 M/L runs were recomputed after their offload — the superseded one stays local as
+`eval_t4_reference_prodtarget_wrong/` — and the Hub kept the old results until the re-push); `push_aux.py` uploads only
+changed files, so the Hub copy is replaced in place. Verify with the sha check in `tests/test_offload_reference.py`'s
+predicate over `runs/full/*_T4_[ML]_s*` before regenerating the T4 Pareto tables.
 
 
 ## 5. XL and XXL rows: scale transfer, not training (2026-09-24 22:40Z)
