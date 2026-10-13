@@ -31,7 +31,20 @@ L tier (T1, batch 4, 8 workers; the group fetched from the Hub straight to the n
 | FNO | H100 | packed (77 GB in 101 s) | 88 s | 322 s | 3.7× |
 
 The matching H200 L probe waited 67 min on "Priority" (2 free H200 GPUs) and was cancelled; H100 had ≥ 60 free GPUs
-all morning, so the driver's pool order is H100 → H200 → L40S → A100.
+all morning, so the driver's pool order was H100 → H200 → L40S → A100 until the evening probe below.
+
+Phase 15 config (FNO w48 + dist, T1 L, batch 4, 8 workers, packed from the staged scratch copy; 2 epochs, 21:00Z,
+QoS coe-ice on coe-gpu, 1–2 s queue wait on both):
+
+| model | GPU | pack | epoch 1 | epoch 2 | job |
+|---|---|---|---|---|---|
+| FNO w48 | H100 | — | 188 s | 188 s | 6243138 |
+| FNO w48 | H200 | 77 GB in 143 s (+ val 14 GB in 30 s) | 120 s | 103 s | 6243139 |
+
+H200 is 1.8× faster for the wider FNO (the official m64 FNO ran 88 s/epoch on H100 in the morning probe), so the
+driver's pool order is now **coe-gpu H200 → ice-gpu H200 → coe-gpu H100 → ice-gpu H100 → L40S → A100**; coe-gpu before
+ice-gpu because ice-gpu reaches only the 6 H200 nodes it shares with coe-gpu (1 free GPU at 21:15Z, the first four
+legs sat on "Priority") while coe-gpu had 24 free H200 GPUs on 18 nodes.
 
 Node facts (`logs/probe/nodeinfo_*.out`): every GPU node has a local NVMe RAID at `/tmp` (= `/scratch`, 11–28 TB, ≥ 96 %
 free), 755 GB–2 TB RAM, 64 cores (8 per GPU). The cu126 torch 2.14 wheel runs on H100/H200 (sm 9.0) under driver
