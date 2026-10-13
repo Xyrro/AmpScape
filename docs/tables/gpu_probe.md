@@ -20,7 +20,18 @@ Queue wait = submit → start. All jobs under QoS coc-ice except the two coe-gpu
 | U-Net | H200 | (c) packed memmaps | 12 | 473 s | 57 s | 56 s | pack in 57 s |
 | FNO | L40S | (c) packed memmaps | 12 | 234 s | 185 s | 183 s | FNO is compute-bound on L40S |
 | FNO | H200 | (c) packed memmaps | 12 | 193 s | 61 s | 59 s | |
-| U-Net | L40S | (b) batch 16, prefetch 4, HDF5 | 12 | | | | see below (information only; batch is part of the official config) |
+| U-Net | L40S | (b) batch 16, prefetch 4, HDF5 | 12 | 1 s | 108 s | | information only; the batch is part of the official config |
+| U-Net | L40S | (c) packed, RNG-preserving re-run | 6 | 1 s | 87 s | | losses 0.07356 / 0.02498 = the HDF5 run's exactly |
+
+L tier (T1, batch 4, 8 workers; the group fetched from the Hub straight to the node's NVMe in 1 122 s — 79 GB — then packed):
+
+| model | GPU | loader | epoch | official L40S/HDF5 run (log.csv) | speed-up |
+|---|---|---|---|---|---|
+| U-Net | H100 | packed (64 GB in 85 s) | 115 s | 178 s | 1.55× |
+| FNO | H100 | packed (77 GB in 101 s) | 88 s | 322 s | 3.7× |
+
+The matching H200 L probe waited 67 min on "Priority" (2 free H200 GPUs) and was cancelled; H100 had ≥ 60 free GPUs
+all morning, so the driver's pool order is H100 → H200 → L40S → A100.
 
 Node facts (`logs/probe/nodeinfo_*.out`): every GPU node has a local NVMe RAID at `/tmp` (= `/scratch`, 11–28 TB, ≥ 96 %
 free), 755 GB–2 TB RAM, 64 cores (8 per GPU). The cu126 torch 2.14 wheel runs on H100/H200 (sm 9.0) under driver

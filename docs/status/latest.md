@@ -24,10 +24,12 @@
   not help. Packing the loader's own tensors once per job (`ampscape/data/packed.py`, 41 GB in 57–95 s on the node's
   NVMe RAID; byte-identical items; RNG state preserved → the packed run reproduces the HDF5 run's losses exactly) makes
   the epoch GPU-bound: U-Net 3.0× and FNO 3.5× faster on H200 than before; FNO alone is 3.1× faster on H200 than on L40S.
-- L tier: probe running (U-Net + FNO on T1 L, group fetched to the node's NVMe directly since scratch cannot hold L/T1
-  until the M/T4 legs end) — numbers follow in this file.
-- Applied (driver restarted 07:53Z, commit dec252d): every non-GNN training leg runs `PACK=1`; legs go to `ice-gpu` H200
-  → H100 → `coc-gpu` L40S → A100 (spill after 3 pending on a type), all under coc-ice. GNN keeps the HDF5/graph path.
+- L tier (T1, batch 4, packed, H100; the group fetched straight to the node's NVMe in 19 min because scratch cannot hold
+  L/T1 until the M/T4 legs end): U-Net 115 s/epoch vs 178 s in the official L40S/HDF5 run (1.55×), FNO 88 s vs 322 s
+  (3.7×). The H200 twin of that probe waited 67 min on "Priority" and was cancelled; pool order is now H100 → H200 →
+  L40S → A100 (driver restarted 09:05Z).
+- Applied (driver restarted 07:53Z, commit dec252d): every non-GNN training leg runs `PACK=1`; legs go to `ice-gpu` H100
+  → H200 → `coc-gpu` L40S → A100 (spill after 3 pending on a type), all under coc-ice. GNN keeps the HDF5/graph path.
   Probing cost ≈ 2.5 GPU-h (three probes re-run after I deleted their output directory while they ran — my error).
 
 ## Plan order and storage

@@ -60,9 +60,9 @@ ALT_AFTER = 4
 # its GPU type and spill down the list; all pools run under the coc-ice QoS (one 1 920 GPU-minute budget). `ice-gpu`
 # reaches 6 H100 and 6 H200 nodes (AllowQos=ALL); coe-gpu (the other 25 H100/H200 nodes) needs the coe-ice QoS and is
 # not used without the owner's decision on its separate budget. PACK=1: node-local packed training items (train_full.sbatch).
-POOLS = [
-    ("ice-gpu", "gpu:h200:1"),
+POOLS = [  # H100 first (09:00Z): ≥ 60 free H100 GPUs all morning, while an H200 probe waited 67 min on "Priority"
     ("ice-gpu", "gpu:h100:1"),
+    ("ice-gpu", "gpu:h200:1"),
     ("coc-gpu", "gpu:l40s:1"),
     ("coc-gpu", "gpu:a100:1"),
 ]
