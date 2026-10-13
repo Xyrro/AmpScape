@@ -405,13 +405,19 @@ def submit_transfer(j: dict, st: dict, gres: str, exclude: list[str]) -> None:
 
 def choose_pool(queued: list[str]) -> tuple[str, str, str] | None:
     """(partition, qos, gres) for the next training leg, or None when every QoS is at its leg budget. `queued` =
-    squeue lines "name|qos|gres|state" of our jobs (queued + running). A pool is used when its QoS has fewer than
+    squeue lines "name|qos|gres|state|reason" of our jobs (queued + running). A pool is used when its QoS has fewer than
     QOS_LEGS GPU legs queued+running and fewer than SPILL_AFTER of ours pending on its (qos, GPU type)."""
     rows = [x.split("|") for x in queued if x.startswith("phase10-") and "gpu" in x]
     for partition, qos, gres in POOLS:
         gtype = gres.split(":")[1]
         n_qos = sum(1 for r in rows if len(r) > 1 and r[1] == qos)
-        n_pd = sum(1 for r in rows if len(r) > 3 and r[1] == qos and gtype in r[2] and r[3] == "PD")
+        # pending with a real reason only: a leg submitted seconds ago shows PD/None and must not count as backlog
+        # (16:22Z: six quick submissions spilled the next two legs onto H200, where they waited on Priority)
+        n_pd = sum(
+            1
+            for r in rows
+            if len(r) > 3 and r[1] == qos and gtype in r[2] and r[3] == "PD" and (len(r) < 5 or r[4] not in ("None", ""))
+        )
         if n_qos < QOS_LEGS.get(qos, 16) and n_pd < SPILL_AFTER:
             return partition, qos, gres
     return None
@@ -438,7 +444,7 @@ def submit(j: dict, st: dict) -> None:
     # GPU type: keep the L40S pool (16 healthy GPUs) as the default and spill to A100 (8 GPUs) only while ≥ ALT_AFTER
     # of our jobs are pending on L40S and fewer than 4 are pending on A100
     queued = sh(
-        ["squeue", "-u", os.environ.get("USER", "yxiao413"), "-h", "-t", "PD,R", "-o", "%j|%q|%b|%t"]
+        ["squeue", "-u", os.environ.get("USER", "yxiao413"), "-h", "-t", "PD,R", "-o", "%j|%q|%b|%t|%r"]
     ).splitlines()
     pool = choose_pool(queued)
     if pool is None and j.get("kind") != "transfer":

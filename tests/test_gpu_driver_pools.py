@@ -13,7 +13,7 @@ g = importlib.import_module("gpu_driver")
 
 def _rows(n_coc=0, n_coe=0, pd_h100_coc=0):
     rows = [f"phase10-a{i}|coc-ice|gres/gpu:l40s:1|R" for i in range(n_coc - pd_h100_coc)]
-    rows += [f"phase10-p{i}|coc-ice|gres/gpu:h100:1|PD" for i in range(pd_h100_coc)]
+    rows += [f"phase10-p{i}|coc-ice|gres/gpu:h100:1|PD|Priority" for i in range(pd_h100_coc)]
     rows += [f"phase10-b{i}|coe-ice|gres/gpu:h100:1|R" for i in range(n_coe)]
     return rows
 
@@ -26,6 +26,8 @@ def test_choose_pool_prefers_h100_then_spills_and_respects_qos_budgets():
     assert g.choose_pool(_rows(n_coc=16))[1] == "coe-ice"
     # both budgets full → None
     assert g.choose_pool(_rows(n_coc=16, n_coe=16)) is None
+    # legs pending only because they were just submitted (reason None) are not backlog
+    assert g.choose_pool(["phase10-n|coc-ice|gres/gpu:h100:1|PD|None"] * 5) == ("ice-gpu", "coc-ice", "gpu:h100:1")
     # non-phase10 jobs (probes, CPU jobs) do not count
     assert g.choose_pool(["probe-x|coc-ice|gres/gpu:h100:1|PD"] * 5) == ("ice-gpu", "coc-ice", "gpu:h100:1")
 
