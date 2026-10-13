@@ -15,6 +15,26 @@ echo "host=$(hostname) gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader |
 # leave 15 min of the walltime for the checkpoint + (on the final leg) evaluation; the walltime is in $SLURM_JOB_END_TIME
 if [ -n "${SLURM_JOB_END_TIME:-}" ]; then BUDGET=$(( ( SLURM_JOB_END_TIME - $(date +%s) ) / 60 - 15 )); else BUDGET=${BUDGET_MIN:-100}; fi
 [ "$BUDGET" -lt 20 ] && BUDGET=20
+# LOCALDATA=1 (2026-10-13, GNN legs): fetch the (TIER, GROUP) group from the Hub straight to the node's NVMe
+# (compute nodes have outbound HTTPS; 79 GB in ≈ 19 min with 8 workers) and train from there — no scratch pinning.
+# One copy per node, keyed by tier/group, lock-protected, reused by later legs on the same node, 2-day cleanup.
+if [ "${LOCALDATA:-0}" = "1" ]; then
+  LBASE=${TMPDIR:-/tmp}/ampscape_$USER/hfcache; mkdir -p "$LBASE"
+  find "$LBASE" -mindepth 1 -maxdepth 1 -type d -mtime +2 -exec rm -rf {} + 2>/dev/null
+  LROOT=$LBASE/${TIER}_${GROUP}; mkdir -p "$LROOT/stats"
+  cp "$ROOT/stats/norm_stats.json" "$LROOT/stats/"
+  (
+    flock 9
+    if [ ! -f "$LROOT/staged/${TIER}_${GROUP}.json" ]; then
+      T0=$(date +%s)
+      python scripts/slurm/gpu/stage_data.py stage --cache "$LROOT" --tier "$TIER" --group "$GROUP" --workers "${FETCH_WORKERS:-16}" 2>&1 | tail -1
+      echo "fetched $TIER/$GROUP to $LROOT in $(( $(date +%s) - T0 )) s ($(du -sh "$LROOT" | cut -f1); $(df -h "$LROOT" | tail -1 | awk '{print $4" free"}'))"
+    else
+      echo "local copy of $TIER/$GROUP on $(hostname) reused"
+    fi
+  ) 9>"$LROOT.lock"
+  if [ -f "$LROOT/staged/${TIER}_${GROUP}.json" ]; then ROOT=$LROOT; else echo "local fetch failed; falling back to $ROOT"; fi
+fi
 ARGS=(--model "$MODEL" --task "$TASK" --tier "$TIER" --root "$ROOT" --out "$OUT" --seed "$SEED" --epochs "$EPOCHS" --batch "$BATCH" \
       --patience "$PATIENCE" --workers "$WORKERS" --time-budget-min "$BUDGET" --resume --pause-exit \
       --eval-splits test_id,test_ood,ood_region --published-root data/builds/published --published-tiers "$TIER")
@@ -37,9 +57,9 @@ EXCL=""; [ -s logs/gpu_bad_nodes.txt ] && EXCL="--exclude=$(tr '\n' ',' < logs/g
 if [ -f "$OUT/paused.json" ] && [ ! -f "$OUT/results.json" ] && [ "$PJ" = "$SLURM_JOB_ID" ] && [ "$NRQ" -lt 120 ]; then
   echo $((NRQ + 1)) > "$OUT/requeues.txt"
   echo "paused at $(cat "$OUT/paused.json"); re-queueing with --resume (re-queue $((NRQ + 1)), $EXCL)"
-  sbatch --parsable $EXCL -A coc -q coc-ice -p "${SLURM_JOB_PARTITION}" -N1 -n1 -c "${SLURM_CPUS_PER_TASK:-6}" --mem="${MEM:-48G}" \
+  sbatch --parsable $EXCL -A coc -q "${QOS:-coc-ice}" -p "${SLURM_JOB_PARTITION}" -N1 -n1 -c "${SLURM_CPUS_PER_TASK:-6}" --mem="${MEM:-48G}" \
     --gres="${GRES:-gpu:1}" -t "${WALL:-16:00:00}" -J "$SLURM_JOB_NAME" -o "$OUT/slurm_%j.out" \
-    --export=ALL,MODEL="$MODEL",TASK="$TASK",TIER="$TIER",SEED="$SEED",OUT="$OUT",ROOT="$ROOT",EPOCHS="$EPOCHS",BATCH="$BATCH",PATIENCE="$PATIENCE",WORKERS="$WORKERS",MAXTRAIN="$MAXTRAIN",EXTRA="$EXTRA",MEM="${MEM:-48G}",GRES="${GRES:-gpu:1}",WALL="${WALL:-16:00:00}",PACK="${PACK:-0}",PREFETCH="${PREFETCH:-2}" \
+    --export=ALL,MODEL="$MODEL",TASK="$TASK",TIER="$TIER",SEED="$SEED",OUT="$OUT",ROOT="$ROOT",EPOCHS="$EPOCHS",BATCH="$BATCH",PATIENCE="$PATIENCE",WORKERS="$WORKERS",MAXTRAIN="$MAXTRAIN",EXTRA="$EXTRA",MEM="${MEM:-48G}",GRES="${GRES:-gpu:1}",WALL="${WALL:-16:00:00}",PACK="${PACK:-0}",PREFETCH="${PREFETCH:-2}",QOS="${QOS:-coc-ice}",LOCALDATA="${LOCALDATA:-0}",GROUP="${GROUP:-}" \
     scripts/slurm/gpu/train_full.sbatch
   exit 0
 fi

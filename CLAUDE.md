@@ -19,7 +19,7 @@
 - Before writing any job script, inspect the cluster (`sinfo`, `scontrol show partition`, `sacctmgr show qos`, `module avail`, `pace-quota`, `nvidia-smi` on a GPU node if available) and record findings in `docs/compute_env.md`.
 - Home directory quota is small. Put all data, the Julia depot (`JULIA_DEPOT_PATH`), package caches, and Python environments under the scratch directory. Never write large files to `$HOME`.
 - Scratch may be purged periodically and is capped at 300 GB. Finished shards are synced to the private HF dataset repo `Xirro/AmpScape` (validate → upload → checksum-verify → delete locally); keep the local working set under 150 GB.
-- Assume compute nodes have **no internet access**. Downloads, package installs, and Hugging Face pushes run on the login node only, never inside `sbatch` jobs.
+- Compute nodes **do** have outbound HTTPS on PACE-ICE (verified 2026-10-13: Hub fetches from GPU nodes, `docs/compute_env.md`); the owner-approved exception is a job fetching its own data group to node-local NVMe (`train_full.sbatch LOCALDATA=1`). Package installs and Hugging Face pushes still run on the login node only.
 - Login nodes are shared: do not run heavy computation on them. Anything more than a few minutes of CPU goes through Slurm.
 - Generation jobs must be resumable: Slurm job arrays, ≤ 4 hours per job, one shard per job, skip shards that already exist and validate.
 - Use `module load` for Julia, GDAL, Python/Anaconda if available; otherwise install to scratch.

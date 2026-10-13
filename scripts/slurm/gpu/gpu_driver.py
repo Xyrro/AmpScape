@@ -31,7 +31,7 @@ CACHE = ROOT / "data" / "hfcache"
 RUNS = ROOT / "runs" / "full"
 STATE = LOGS / "gpu_driver_state.json"
 
-MAX_GPU = 18  # concurrent jobs of ours on coc-gpu (16 healthy L40S + A100 spill-over; 1 920 GPU-run-minutes per user)
+MAX_GPU = 32  # concurrent GPU jobs of ours: 16 two-hour legs per QoS × 2 QoS (coc-ice, coe-ice), see QOS_LEGS
 MAX_QUEUED_TOTAL = 45  # QoS MaxSubmitPU = 50
 SCRATCH_LIMIT_GB = 280.0  # 2026-09-24 10:30Z: 265 → 275 → 280 (M/T4 missed the 275 guard by 1 GB; offloader every 10 min keeps runs/full small; submissions hold above 290). total quota guard (300 GB): base ≈ 117 GB, so ≈ 150 GB of staged groups at most
 LOOKAHEAD = 12  # pending jobs whose data is staged ahead
@@ -60,13 +60,19 @@ ALT_AFTER = 4
 # its GPU type and spill down the list; all pools run under the coc-ice QoS (one 1 920 GPU-minute budget). `ice-gpu`
 # reaches 6 H100 and 6 H200 nodes (AllowQos=ALL); coe-gpu (the other 25 H100/H200 nodes) needs the coe-ice QoS and is
 # not used without the owner's decision on its separate budget. PACK=1: node-local packed training items (train_full.sbatch).
-POOLS = [  # H100 first (09:00Z): ≥ 60 free H100 GPUs all morning, while an H200 probe waited 67 min on "Priority"
-    ("ice-gpu", "gpu:h100:1"),
-    ("ice-gpu", "gpu:h200:1"),
-    ("coc-gpu", "gpu:l40s:1"),
-    ("coc-gpu", "gpu:a100:1"),
+POOLS = [  # (partition, qos, gres): H100 first (≥ 60 free all morning; an H200 probe waited 67 min), each QoS a pool
+    ("ice-gpu", "coc-ice", "gpu:h100:1"),
+    ("coe-gpu", "coe-ice", "gpu:h100:1"),
+    ("ice-gpu", "coc-ice", "gpu:h200:1"),
+    ("coe-gpu", "coe-ice", "gpu:h200:1"),
+    ("coc-gpu", "coc-ice", "gpu:l40s:1"),
+    ("coc-gpu", "coc-ice", "gpu:a100:1"),
 ]
 SPILL_AFTER = 3
+# 2026-10-13 (owner): MaxTRESRunMinsPU gres/gpu = 1 920 min and MaxSubmitPU = 50 are per user *per QoS* (verified in
+# `scontrol show assoc_mgr`: coc-ice 1920(442) / 50(7) while coe-ice showed 0) — coc-ice and coe-ice are two pools of
+# 16 two-hour legs each; MAX_QUEUED_TOTAL keeps our total under 50.
+QOS_LEGS = {"coc-ice": 16, "coe-ice": 16}
 PACK = "1"
 PARTITION = "coc-gpu"
 WALL = "02:00:00"  # 2026-09-24: QoS MaxTRESRunMinsPU gres/gpu=1920 → short jobs + self re-queue give ≈ 16 concurrent GPUs
@@ -397,15 +403,25 @@ def submit_transfer(j: dict, st: dict, gres: str, exclude: list[str]) -> None:
         log(f"submit failed for {j['name']}: {jid[-200:]}")
 
 
-def choose_pool(pend: list[str]) -> tuple[str, str]:
-    """(partition, gres) for the next training leg: the first pool with fewer than SPILL_AFTER of our jobs pending on
-    its GPU type; the last pool otherwise. `pend` = squeue lines "name|gres" of our pending jobs."""
-    for partition, gres in POOLS:
+def choose_pool(queued: list[str]) -> tuple[str, str, str] | None:
+    """(partition, qos, gres) for the next training leg, or None when every QoS is at its leg budget. `queued` =
+    squeue lines "name|qos|gres|state" of our jobs (queued + running). A pool is used when its QoS has fewer than
+    QOS_LEGS GPU legs queued+running and fewer than SPILL_AFTER of ours pending on its (qos, GPU type)."""
+    rows = [x.split("|") for x in queued if x.startswith("phase10-") and "gpu" in x]
+    for partition, qos, gres in POOLS:
         gtype = gres.split(":")[1]
-        n = sum(1 for x in pend if x.startswith("phase10-") and gtype in x.split("|", 1)[-1])
-        if n < SPILL_AFTER:
-            return partition, gres
-    return POOLS[-1]
+        n_qos = sum(1 for r in rows if len(r) > 1 and r[1] == qos)
+        n_pd = sum(1 for r in rows if len(r) > 3 and r[1] == qos and gtype in r[2] and r[3] == "PD")
+        if n_qos < QOS_LEGS.get(qos, 16) and n_pd < SPILL_AFTER:
+            return partition, qos, gres
+    return None
+
+
+def local_fetch(j: dict) -> bool:
+    """GNN training legs fetch their (tier, group) from the Hub straight to the compute node's NVMe (train_full.sbatch
+    LOCALDATA=1; compute nodes have outbound HTTPS, docs/compute_env.md) instead of reading the scratch cache: a GNN
+    leg pins its group for ≈ 12 h, which deadlocked the staging of every other group under the scratch guard."""
+    return j.get("model") == "gnn" and j.get("kind") != "transfer"
 
 
 def submit(j: dict, st: dict) -> None:
@@ -421,14 +437,19 @@ def submit(j: dict, st: dict) -> None:
         res["mem"] = f"{min(int(res['mem'].rstrip('G')) * 2 ** prev['oom'], 180)}G"
     # GPU type: keep the L40S pool (16 healthy GPUs) as the default and spill to A100 (8 GPUs) only while ≥ ALT_AFTER
     # of our jobs are pending on L40S and fewer than 4 are pending on A100
-    pend = sh(
-        ["squeue", "-u", os.environ.get("USER", "yxiao413"), "-h", "-t", "PD", "-o", "%j|%b"]
+    queued = sh(
+        ["squeue", "-u", os.environ.get("USER", "yxiao413"), "-h", "-t", "PD,R", "-o", "%j|%q|%b|%t"]
     ).splitlines()
-    partition, gres = choose_pool(pend)
+    pool = choose_pool(queued)
+    if pool is None and j.get("kind") != "transfer":
+        log(f"no pool with free legs for {j['name']} (per-QoS budgets full)")
+        return
+    partition, qos, gres = pool or ("coc-gpu", "coc-ice", GRES)
     export = (
         f"ALL,MODEL={j['model']},TASK={j['task']},TIER={j['tier']},SEED={j['seed']},OUT={out},ROOT={CACHE},"
         f"EPOCHS={j.get('epochs', 30)},BATCH={batch},PATIENCE=8,WORKERS={res['cpus']},MAXTRAIN={j.get('maxtrain', '')},"
-        f"EXTRA={j.get('extra', '')},MEM={res['mem']},GRES={gres},WALL={WALL},PACK={PACK if j['model'] != 'gnn' else '0'}"
+        f"EXTRA={j.get('extra', '')},MEM={res['mem']},GRES={gres},WALL={WALL},QOS={qos},"
+        f"PACK={PACK if j['model'] != 'gnn' else '0'},LOCALDATA={'1' if local_fetch(j) else '0'},GROUP={GROUP[j['task']]}"
     )
     bad = (
         LOGS / "gpu_bad_nodes.txt"
@@ -449,7 +470,7 @@ def submit(j: dict, st: dict) -> None:
             "-A",
             "coc",
             "-q",
-            "coc-ice",
+            qos,
             "-p",
             partition,
             "-N1",
@@ -707,6 +728,8 @@ def cycle(jobs: list[dict], st: dict) -> None:
         jj for jj in pending if not (earlier_pending and gnn_phase(jj))
     ]
     for j in stageable[:LOOKAHEAD]:
+        if local_fetch(j):
+            continue  # fetched on the node, nothing to stage
         key = (j["tier"], GROUP[j["task"]])
         if key not in needed:
             needed.append(key)
@@ -736,10 +759,12 @@ def cycle(jobs: list[dict], st: dict) -> None:
     # (re-staging a group takes ≈ 3 min at the measured 8–10 GB/min). 2026-09-24: the S groups were pinning 87 GB and
     # blocking the headline M/L runs.
     running_jobs = [j for j in jobs if j["name"] in running]
-    running_groups = {(jj["tier"], GROUP[jj["task"]]) for jj in running_jobs}
+    running_groups = {(jj["tier"], GROUP[jj["task"]]) for jj in running_jobs if not local_fetch(jj)}
     first_use = {}
     first_use_soon = {}  # ignoring the GNN phase (P4/XF4), which cannot start before everything else anyway
     for k, jj in enumerate(pending):
+        if local_fetch(jj):
+            continue
         first_use.setdefault((jj["tier"], GROUP[jj["task"]]), k)
         if not gnn_phase(jj):
             first_use_soon.setdefault((jj["tier"], GROUP[jj["task"]]), k)
@@ -879,11 +904,14 @@ def cycle(jobs: list[dict], st: dict) -> None:
         if slots <= 0 or n_queued_total() >= MAX_QUEUED_TOTAL:
             break
         key = (j["tier"], GROUP[j["task"]])
-        if gnn_phase(j) and j.get("kind") != "transfer" and any(
+        if gnn_phase(j) and j.get("kind") != "transfer" and not local_fetch(j) and any(
             not gnn_phase(jj) for jj in pending if jj["name"] not in running
         ):
             continue  # GNN strictly last: never ahead of a P1–P3/WP4/XF job that is only waiting for its data
-        if j.get("kind") == "transfer":
+        if local_fetch(j):
+            if not stats_ready(j["tier"]):
+                continue  # norm stats (scratch) are copied to the node's cache by the leg
+        elif j.get("kind") == "transfer":
             if not done({"name": j["src"]}) or not staged(*key):
                 continue  # the L-trained source run is not finished, or its XL/XXL data is not staged
             if any(n.startswith(f"xfer_{j['src']}_") for n in running):
@@ -892,7 +920,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 continue  # scratch: bounded number of prediction bursts in flight
         elif not (staged(*key) and stats_ready(j["tier"])):
             continue
-        if key in draining and not (RUNS / j["name"] / "done.json").exists():
+        if key in draining and not local_fetch(j) and not (RUNS / j["name"] / "done.json").exists():
             continue  # its group is about to be evicted for a higher-priority group (evaluation-only legs still go)
         # a paused run whose leg is no longer in the queue (self re-queue failed, e.g. at the submit cap; six runs sat
         # for 20 h on 2026-09-25) is simply submitted again: train.py --resume continues from last.pt / done.json
