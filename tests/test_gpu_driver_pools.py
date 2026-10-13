@@ -37,3 +37,11 @@ def test_local_fetch_only_for_gnn_training_legs():
     assert not g.local_fetch({"model": "gnn", "kind": "transfer"})
     assert not g.local_fetch({"model": "unet"})
     assert g.gnn_phase({"model": "gnn", "tag": "RERUN_M"}) and g.gnn_phase({"model": "unet", "tag": "P4"})
+
+
+def test_evictions_only_when_they_make_the_target_fit():
+    # 251 GB used, XXL/T1 (21 GB) evictable, L/T3 (64 GB) wanted: 251 - 21 + 64 = 294 > 280 → do not evict
+    assert not g.evictions_suffice(251, [21], 64, 280)
+    # once the L/T1 legs finish, L/T1 (84 GB) joins the candidates: 251 - 105 + 64 = 210 → evict
+    assert g.evictions_suffice(251, [21, 84], 64, 280)
+    assert g.evictions_suffice(200, [], 64, 280)

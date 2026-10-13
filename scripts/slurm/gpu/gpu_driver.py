@@ -808,6 +808,12 @@ def cycle(jobs: list[dict], st: dict) -> None:
             ):
                 continue
             cands.append((first_use.get((t_, g_), 10**6), t_, g_))
+        if not evictions_suffice(
+            quota_gb() - freed[0], [GROUP_GB.get((t_, g_), 60.0) for _, t_, g_ in cands], size, limit
+        ):
+            return  # 21:48Z: XXL/T1 (staged 16 min earlier for the transfer legs) was evicted for L/T3, which still
+            # did not fit behind the running L/T1 legs — evict only when the evictable groups make the target fit;
+            # once the drained legs finish, their group joins the candidates and the fit test passes
         for _, t_, g_ in sorted(cands, reverse=True):
             if quota_gb() - freed[0] + size <= limit:
                 return  # (02:50Z 2026-09-26: this compared against the 280 GB guard while the caller wanted 193)
@@ -943,6 +949,11 @@ def cycle(jobs: list[dict], st: dict) -> None:
         if j.get("kind") == "transfer":
             n_xfer_running += 1
     save_state(st)
+
+
+def evictions_suffice(used_gb: float, cand_gb: list[float], size: float, limit: float) -> bool:
+    """True when evicting every evictable candidate would let a `size` GB group fit under `limit`."""
+    return used_gb - sum(cand_gb) + size <= limit
 
 
 def load_plan_file(path: pathlib.Path) -> list[dict]:
