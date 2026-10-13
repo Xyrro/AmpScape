@@ -1,64 +1,34 @@
-# Status — 2026-10-13 17:25Z: packed input + H100/H200 pools in production; two QoS budgets; GNN legs off scratch; phase 14 M re-runs 24/30 done; L decision: FNO w48 re-runs needed (phase 15 plan, gated)
+# Status — 2026-10-13 21:30Z: phase 15 launched (FNO w48 L re-runs, H200 first); Hub copies of the recomputed T4 reference evaluations being replaced; tables regenerate once the 16 L recomputes and the GNN L candidate are in
 
-## Owner follow-ups (both done)
-1. **GNN legs fetch their data group to the node's NVMe** (`train_full.sbatch LOCALDATA=1`): the probe's fetch had run on
-   the compute node itself over outbound HTTPS (no proxy; `docs/compute_env.md` line 108) — the CLAUDE.md "no internet on
-   compute nodes" assumption was outdated and is corrected. One lock-protected copy per node per group, reused by later
-   legs on that node, 2-day cleanup; scratch staging stays as the fallback. The driver neither stages nor pins scratch
-   groups for GNN legs and no longer holds them: all seven GNN jobs (six M re-runs, the L tuning candidate) started at
-   16:22Z on H100 across both QoS while L/T1 stayed staged for the L candidates.
-2. **coe-ice is a separate budget** — `scontrol show assoc_mgr` shows per-user per-QoS counters (coc-ice 1920(442)
-   GPU-min / 50(7) jobs, coe-ice 0 / 0). The driver fills two pools of 16 two-hour legs (coc-ice: ice-gpu H100, H200,
-   coc-gpu L40S, A100; coe-ice: coe-gpu H100, H200), ≤ 45 queued in total. Spill counts only legs pending with a real
-   reason (just-submitted legs briefly show PD/None and had spilled two legs onto an H200 queue).
+## Done since 17:25Z
+- **Phase 15 launched** (owner approval; ≈ 32 GPU-h): the 27 jobs of `docs/plans/phase15_plan.json` run behind the
+  phase 13c/14 remainder in one plan file (`docs/plans/phase13c_15_plan.json`). The four FNO T1 L legs (3 seeds +
+  scale-aware) started 21:12Z on H200; the five T4 L legs follow once L/T1 is evicted and L/T4 staged; the 16 XL/XXL
+  transfer legs run after their source runs on L40S.
+- **H200 first.** Probe of the phase 15 config (FNO w48 + dist, T1 L, packed, batch 4): 103 s/epoch on H200 vs 188 s
+  on H100 (1.8×; 2-s queue wait on coe-gpu for both). Pool order is now coe-gpu H200 → ice-gpu H200 → coe-gpu H100 →
+  ice-gpu H100 → L40S → A100; coe-gpu before ice-gpu because ice-gpu reaches only the 6 shared H200 nodes (1 free GPU
+  at 21:15Z; the first four legs sat on "Priority" and were cancelled before any epoch and resubmitted on coe-gpu).
+- **T4 reference evaluations on the Hub.** All 28 T4 M/L runs with a recomputed exact-reference evaluation were already
+  offloaded, and the `.offloaded` mark made the offloader skip them — the Hub still held the superseded
+  `eval_t4_reference/`. The offloader now re-pushes an offloaded run's `eval_t4_reference/` whenever its sha256 differs
+  from `.hub_pushed.json` (`reference_stale`, `tests/test_offload_reference.py`): the 12 M runs were replaced at 21:05Z;
+  the 16 L runs (official + scale-aware U-Net/FNO/ViT/GNN) get their CPU recompute as soon as L/T4 is staged
+  (≈ 22:30Z) and are re-pushed within 10 min of it. Tables/figures are regenerated only after the sha check over
+  `runs/full/*_T4_[ML]_s*` passes.
+- Housekeeping: a 16:18Z driver restart had left a 41.7 GB partial M/T1 staging without marker on scratch (neither used
+  nor evicted); evicted by hand, scratch 257 → 218 GB.
+- `scripts/tuning_effect.py` → `docs/tables/tuning_effect.md`: pre-tuning official runs vs tier-tuned `_t2` re-runs per
+  task / tier / split (mean ± std over seeds, Δ %), plus the configuration-change table from `tuning_full.json`
+  (generated at the end, with the regenerated tables).
 
-## Epoch time before → after packing (per epoch; before = L40S, HDF5 loader, 6 workers)
-| run | before | after | GPU | speed-up |
-|---|---|---|---|---|
-| U-Net T4 M (probe, official) | 170 s | 56 s | H200 | 3.0× |
-| FNO T4 M (probe, official) | 208 s | 59 s | H200 | 3.5× |
-| U-Net w64 T1/T3 M (production re-runs) | 254 s | 108–111 s | H100 | 2.3× |
-| FNO w48 T1 M (production re-run) | 361–371 s | 84 s | H200 | 4.3× |
-| U-Net T1 L (probe, official) | 178 s | 115 s | H100 | 1.55× |
-| FNO T1 L (probe, official) | 322 s | 88 s | H100 | 3.7× |
+## Running
+- Phase 14 GNN M re-runs (6, H100, node-local data): epochs 8–12 of 30 at 21:30Z → end ≈ 2026-10-14 00:30Z.
+- GNN L tuning candidate (ms8): ≈ 02:30Z → L decision for GNN, `scripts/tuning_select.py` re-run.
+- Phase 15: T1 L legs ≈ 22:10Z; L/T4 staging + T4 L legs + 16 recomputes ≈ 23:30Z; XL/XXL transfer legs ≈ 01:30Z.
 
-Packed items are byte-identical to the HDF5 loader's and, with the RNG state preserved, a packed run reproduces the
-HDF5 run's losses exactly (`docs/tables/gpu_probe.md`). GNN legs keep the HDF5 graph path (unchanged epoch time).
-
-## Progress
-- Phase 14: 24 of 30 M re-runs done (all U-Net w64, FNO w48, ViT p16g16); the 6 GNN re-runs are running (started 16:22Z).
-- 13c remainder: MgNO ×4, T1V S/M, T4 reference backfills done; the five non-GNN L tuning candidates finished 16:56Z;
-  T1V L: FNO running, U-Net resubmitted on H100; GNN L candidate running.
-
-## L re-run decision (val loss, seed 1, selection rule: beat the official by more than its seed spread)
-| model | official L | best candidate | decision |
-|---|---|---|---|
-| U-Net | 0.0887 ± 0.0056 | wide 0.0832 (−6.1 %) | inside the spread → official kept |
-| FNO | 0.0628 ± 0.0003 | **w48 0.0605 (−3.7 %)** | **config changes → L re-runs** |
-| ViT | 0.2636 ± 0.0038 | p16g32 0.3895 (+48 %) | official kept |
-| GNN | 0.3126 ± 0.0068 | ms8 — running (table row = epoch 1) | decided ≈ 2026-10-14 03:00Z |
-
-Phase 15 plan file `docs/plans/phase15_plan.json`: 9 FNO w48 L runs (T1/T3/T4 × 3 seeds, ≈ 1.1 GPU-h each on H100
-packed) + 2 scale-aware variants + 16 XL/XXL transfer legs (L40S) = **≈ 32 GPU-h**, ≈ 3–4 h wall with the two pools.
-Above the 20 GPU-h gate → **waiting for the owner's approval**; the M-tier FNO rows already use w48.
-
-## Measured on the GNN legs (node-local data, H100)
-- Fetch from the Hub to the node's NVMe, 16 workers: M/T1 53 GB in 586 s, M/T4 51 GB in 503 s (286 s on a node that
-  already had part of it), L/T1 79 GB in 752 s — ≈ 100 MB/s per node, seven nodes in parallel.
-- GNN epoch: 715–766 s at M on H100 reading local NVMe vs 1 110 s on L40S from scratch this morning (1.5×); 1 105 s at L.
-  → 30 epochs ≈ 6.2 h at M, 9.2 h at L (2-h legs; a leg landing on a fresh node re-fetches ≈ 10 min).
-- Driver fix (17:20Z): a drain never takes a group whose next pending training use precedes the target's — L/T1 had been
-  drained for L/T4, wanted only by CPU backfill evaluations, which held the pending U-Net T1V L run for 50 min.
-- Surfaced: the 16 finished T4 L runs (official, scale-aware) still carry only the pre-2026-10-05 reference evaluation
-  (`eval_t4_reference_prodtarget_wrong`); their recompute (CPU, needs L/T4 staged) is queued by the driver's backfill
-  after the T1V L run — the Hub copies of those evaluations are the wrong ones until then.
-
-## Revised completion estimate
-- Current plan (13c + 14): the six GNN M re-runs end ≈ 2026-10-14 00:00Z and the GNN L candidate ≈ 02:30Z (started
-  16:22Z; measured epoch times above) → **≈ 2026-10-14 02:30Z** for the GPU work, plus the 16 T4 L reference
-  recomputes on CPU (≈ 20–30 min each, parallel) — before today's changes ≈ 2026-10-15 00:00Z; this morning's estimate
-  2026-10-14 05:00–15:00Z.
-- Phase 15, if approved now: runs alongside the GNN tail in the free legs of both pools → done ≈ 2026-10-13 22:00Z.
-- Then: regenerate tables/figures/sections from the tuned runs, leaderboard push (gate), `paper/draft.md`.
-
-Next: GNN L decision when `gnn_T1_L_s1_tune_ms8` finishes; owner: phase 15 go/no-go.
+## Next (this session, no further gate)
+1. Verify the 16 L reference re-pushes (sha check), 2. GNN L decision, 3. `scripts/paper_figures.py` (baselines table,
+T4 Pareto M/L, error-vs-tier, scale transfer, WP4, OOD, all-splits), `tuning_effect.py`, acceleration table, 4. report
+what the tuning changed per model and tier relative to the pre-tuning table. A GNN L config change would need
+≈ 3 × 9 GPU-h of GNN L re-runs — that would be a new gate.
