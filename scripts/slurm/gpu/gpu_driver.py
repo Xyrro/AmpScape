@@ -850,6 +850,9 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 # cost-free first: groups with no unsubmitted job (draining them blocks nothing), then small tiers
                 # (legs end sooner), then the furthest next use (00:15Z: M/T3 was drained — stalling six seeds —
                 # while L/T4 had every job already submitted)
+                # never drain a group whose next pending training use comes before the target's (17:03Z: L/T1 was
+                # drained for L/T4, wanted only by CPU backfill evaluations, which held the pending T1V L run)
+                target_use = first_use.get((tier, group), 10**6)
                 pinned = sorted(
                     (
                         0 if first_use_soon.get(g_, 10**6) >= 10**6 else 1,
@@ -858,7 +861,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
                         g_,
                     )
                     for g_ in running_groups
-                    if g_ != (tier, group)
+                    if g_ != (tier, group) and first_use_soon.get(g_, 10**6) >= target_use
                 )
                 for _, _, _, g_ in pinned:
                     if need <= 0:
