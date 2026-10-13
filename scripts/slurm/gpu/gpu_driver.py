@@ -60,11 +60,15 @@ ALT_AFTER = 4
 # its GPU type and spill down the list; all pools run under the coc-ice QoS (one 1 920 GPU-minute budget). `ice-gpu`
 # reaches 6 H100 and 6 H200 nodes (AllowQos=ALL); coe-gpu (the other 25 H100/H200 nodes) needs the coe-ice QoS and is
 # not used without the owner's decision on its separate budget. PACK=1: node-local packed training items (train_full.sbatch).
-POOLS = [  # (partition, qos, gres): H100 first (≥ 60 free all morning; an H200 probe waited 67 min), each QoS a pool
-    ("ice-gpu", "coc-ice", "gpu:h100:1"),
-    ("coe-gpu", "coe-ice", "gpu:h100:1"),
-    ("ice-gpu", "coc-ice", "gpu:h200:1"),
+POOLS = [  # (partition, qos, gres), each QoS a pool. 2026-10-13 21:20Z (owner): H200 first — the packed FNO w48 L
+    # epoch takes 103 s on H200 vs 188 s on H100 (probes 6243139/6243138, 2-s queue wait on coe-gpu); the morning's
+    # H100-first order came from a 67-min H200 wait on ice-gpu, which the spill after SPILL_AFTER pending legs absorbs.
+    # coe-gpu before ice-gpu: ice-gpu reaches only the 6 H200 nodes shared with coe-gpu (1 free GPU at 21:15Z, four
+    # legs pending on Priority) while coe-gpu has 18 H200 nodes (24 free GPUs)
     ("coe-gpu", "coe-ice", "gpu:h200:1"),
+    ("ice-gpu", "coc-ice", "gpu:h200:1"),
+    ("coe-gpu", "coe-ice", "gpu:h100:1"),
+    ("ice-gpu", "coc-ice", "gpu:h100:1"),
     ("coc-gpu", "coc-ice", "gpu:l40s:1"),
     ("coc-gpu", "coc-ice", "gpu:a100:1"),
 ]

@@ -11,25 +11,25 @@ sys.path.insert(0, str(ROOT / "scripts/slurm/gpu"))
 g = importlib.import_module("gpu_driver")
 
 
-def _rows(n_coc=0, n_coe=0, pd_h100_coc=0):
-    rows = [f"phase10-a{i}|coc-ice|gres/gpu:l40s:1|R" for i in range(n_coc - pd_h100_coc)]
-    rows += [f"phase10-p{i}|coc-ice|gres/gpu:h100:1|PD|Priority" for i in range(pd_h100_coc)]
-    rows += [f"phase10-b{i}|coe-ice|gres/gpu:h100:1|R" for i in range(n_coe)]
+def _rows(n_coe=0, n_coc=0, pd_h200_coe=0):
+    rows = [f"phase10-a{i}|coe-ice|gres/gpu:h100:1|R" for i in range(n_coe - pd_h200_coe)]
+    rows += [f"phase10-p{i}|coe-ice|gres/gpu:h200:1|PD|Priority" for i in range(pd_h200_coe)]
+    rows += [f"phase10-b{i}|coc-ice|gres/gpu:h200:1|R" for i in range(n_coc)]
     return rows
 
 
-def test_choose_pool_prefers_h100_then_spills_and_respects_qos_budgets():
-    assert g.choose_pool([]) == ("ice-gpu", "coc-ice", "gpu:h100:1")
-    # 3 pending on coc-ice H100 → next pool (coe-ice H100)
-    assert g.choose_pool(_rows(n_coc=3, pd_h100_coc=3)) == ("coe-gpu", "coe-ice", "gpu:h100:1")
-    # coc-ice at its 16-leg budget → coe-ice pools only
-    assert g.choose_pool(_rows(n_coc=16))[1] == "coe-ice"
+def test_choose_pool_prefers_coe_h200_then_spills_and_respects_qos_budgets():
+    assert g.choose_pool([]) == ("coe-gpu", "coe-ice", "gpu:h200:1")
+    # 3 pending on coe-ice H200 → next pool (coc-ice H200 on ice-gpu)
+    assert g.choose_pool(_rows(n_coe=3, pd_h200_coe=3)) == ("ice-gpu", "coc-ice", "gpu:h200:1")
+    # coe-ice at its 16-leg budget → coc-ice pools only
+    assert g.choose_pool(_rows(n_coe=16))[1] == "coc-ice"
     # both budgets full → None
-    assert g.choose_pool(_rows(n_coc=16, n_coe=16)) is None
+    assert g.choose_pool(_rows(n_coe=16, n_coc=16)) is None
     # legs pending only because they were just submitted (reason None) are not backlog
-    assert g.choose_pool(["phase10-n|coc-ice|gres/gpu:h100:1|PD|None"] * 5) == ("ice-gpu", "coc-ice", "gpu:h100:1")
+    assert g.choose_pool(["phase10-n|coe-ice|gres/gpu:h200:1|PD|None"] * 5) == ("coe-gpu", "coe-ice", "gpu:h200:1")
     # non-phase10 jobs (probes, CPU jobs) do not count
-    assert g.choose_pool(["probe-x|coc-ice|gres/gpu:h100:1|PD"] * 5) == ("ice-gpu", "coc-ice", "gpu:h100:1")
+    assert g.choose_pool(["probe-x|coe-ice|gres/gpu:h200:1|PD"] * 5) == ("coe-gpu", "coe-ice", "gpu:h200:1")
 
 
 def test_local_fetch_only_for_gnn_training_legs():
