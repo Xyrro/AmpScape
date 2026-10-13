@@ -908,36 +908,6 @@
   "est_h": 1.1
  },
  {
-  "name": "fno_T3_L_s1_t2",
-  "model": "fno",
-  "task": "T3",
-  "tier": "L",
-  "seed": 1,
-  "tag": "RERUN_L",
-  "extra": "--variant w48 --extra dist",
-  "est_h": 1.1
- },
- {
-  "name": "fno_T3_L_s2_t2",
-  "model": "fno",
-  "task": "T3",
-  "tier": "L",
-  "seed": 2,
-  "tag": "RERUN_L",
-  "extra": "--variant w48 --extra dist",
-  "est_h": 1.1
- },
- {
-  "name": "fno_T3_L_s3_t2",
-  "model": "fno",
-  "task": "T3",
-  "tier": "L",
-  "seed": 3,
-  "tag": "RERUN_L",
-  "extra": "--variant w48 --extra dist",
-  "est_h": 1.1
- },
- {
   "name": "fno_T4_L_s1_t2",
   "model": "fno",
   "task": "T4",
@@ -985,6 +955,36 @@
   "seed": 1,
   "tag": "SN_L",
   "extra": "--variant w48 --extra dist --target-norm scale",
+  "est_h": 1.1
+ },
+ {
+  "name": "fno_T3_L_s1_t2",
+  "model": "fno",
+  "task": "T3",
+  "tier": "L",
+  "seed": 1,
+  "tag": "RERUN_L",
+  "extra": "--variant w48 --extra dist",
+  "est_h": 1.1
+ },
+ {
+  "name": "fno_T3_L_s2_t2",
+  "model": "fno",
+  "task": "T3",
+  "tier": "L",
+  "seed": 2,
+  "tag": "RERUN_L",
+  "extra": "--variant w48 --extra dist",
+  "est_h": 1.1
+ },
+ {
+  "name": "fno_T3_L_s3_t2",
+  "model": "fno",
+  "task": "T3",
+  "tier": "L",
+  "seed": 3,
+  "tag": "RERUN_L",
+  "extra": "--variant w48 --extra dist",
   "est_h": 1.1
  },
  {
