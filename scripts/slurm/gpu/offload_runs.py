@@ -42,6 +42,12 @@ def finished(run: pathlib.Path) -> bool:
         and not (run / "eval_t4_reference").exists()
     ):
         return False  # the reference evaluation runs at the end of the job; wait for it
+    if cfg.get("target_kind") == "voltage" and not all(
+        (run / f"eval_accel_{sp}" / "results.json").exists() for sp in ("test_id", "test_ood")
+    ):
+        return (
+            False  # warm-start evaluations (driver backfill, CPU) read the local predictions first
+        )
     return True
 
 

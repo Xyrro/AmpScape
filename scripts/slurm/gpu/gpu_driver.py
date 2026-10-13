@@ -589,12 +589,81 @@ def submit_t4_reference_backfill(jobs: list[dict], st: dict) -> None:
             log(f"T4 reference evaluation backfill for {j['name']}: job {jid}")
 
 
+ACCEL_SPLITS = ("test_id", "test_ood")
+
+
+def accel_missing(j: dict) -> list[str]:
+    """Splits whose warm-start (solver-acceleration) evaluation is missing for a voltage-head run (item 1)."""
+    if "--target voltage" not in j.get("extra", "") or j.get("kind") == "transfer":
+        return []
+    run = RUNS / j["name"]
+    return [sp for sp in ACCEL_SPLITS if not (run / f"eval_accel_{sp}" / "results.json").exists()]
+
+
+def submit_accel_backfill(jobs: list[dict], st: dict) -> None:
+    """Voltage-head runs (T3 / T1V, `--target voltage`): the AMG-PCG warm-start evaluation is a CPU job per split
+    (evaluate.py --acceleration, Julia) that reads the run's local predictions and the staged shards; until
+    2026-10-13 these were submitted by hand. The offloader holds the run until both splits exist."""
+    st.setdefault("accel_jobs", {})
+    for j in jobs:
+        if not done(j):
+            continue
+        for sp in accel_missing(j):
+            key = f"{j['name']}:{sp}"
+            job = st["accel_jobs"].get(key)
+            if job and sh(["squeue", "-h", "-j", job]):
+                continue
+            tier = j["tier"]
+            if not staged(tier, GROUP[j["task"]]):
+                continue  # the staging block requests the group
+            run = RUNS / j["name"]
+            pred = run / "predictions" / f"hfcache_{tier}_{sp}"
+            if not (pred / "predictions.h5").exists():
+                log(
+                    f"warm-start evaluation for {j['name']} {sp}: no local predictions (offloaded?) — skipped"
+                )
+                continue
+            cmd = (
+                f"source scripts/env.sh; python scripts/evaluate.py --predictions {pred} --root data/hfcache "
+                f"--tier {tier} --split {sp} --workers 8 --acceleration --out {run}/eval_accel_{sp}"
+            )
+            (LOGS / "accel").mkdir(exist_ok=True)
+            jid = sh(
+                [
+                    "sbatch",
+                    "--parsable",
+                    "-A",
+                    "coc",
+                    "-q",
+                    "coc-ice",
+                    "-p",
+                    "coc-cpu",
+                    "-N1",
+                    "-n1",
+                    "-c8",
+                    "--mem=" + ("96G" if tier == "L" else "64G"),
+                    "-t",
+                    "10:00:00",
+                    "-J",
+                    f"accel-{j['name']}-{sp}",
+                    "-o",
+                    f"{LOGS}/accel/accel_{j['name']}_{sp}_%j.out",
+                    "--wrap",
+                    cmd,
+                ]
+            )
+            if jid.isdigit():
+                st["accel_jobs"][key] = jid
+                log(f"warm-start evaluation for {j['name']} {sp}: job {jid}")
+
+
 def cycle(jobs: list[dict], st: dict) -> None:
     note_bad_nodes(jobs)
     note_oom(jobs, st)
     submit_t4_reference_backfill(jobs, st)
+    submit_accel_backfill(jobs, st)
     active = our_jobs()
-    running = {n for n, s in active.items() if not n.startswith(("stats-", "t4ref-"))}
+    running = {n for n, s in active.items() if not n.startswith(("stats-", "t4ref-", "accel-"))}
     pending = [j for j in jobs if not done(j) and j["name"] not in running]
     # staging: data of the next pending jobs, in priority order, only when the group fits under the quota guard
     # (2026-09-24: an unguarded staging chain hit the 300 GB quota); groups no pending job needs are evicted first
@@ -628,6 +697,12 @@ def cycle(jobs: list[dict], st: dict) -> None:
                 xfer_only.add(key)
         elif key in xfer_only and j.get("kind") != "transfer":
             xfer_only.discard(key)
+    # finished voltage-head runs whose warm-start evaluation is missing need their group staged for the CPU job
+    for j in jobs:
+        if done(j) and accel_missing(j):
+            key = (j["tier"], GROUP[j["task"]])
+            if key not in needed:
+                needed.append(key)
     # staging in strict priority order: the data of the highest-priority pending jobs comes first; when it does not fit,
     # evict staged groups that no RUNNING job uses, those whose next pending use is furthest down the list first
     # (re-staging a group takes ≈ 3 min at the measured 8–10 GB/min). 2026-09-24: the S groups were pinning 87 GB and
