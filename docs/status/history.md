@@ -2910,8 +2910,9 @@ Next: GNN L decision when `gnn_T1_L_s1_tune_ms8` finishes; owner: phase 15 go/no
   (generated at the end, with the regenerated tables).
 
 ## Running
-- Phase 14 GNN M re-runs (6, H100, node-local data): epochs 8–12 of 30 at 21:30Z → end ≈ 2026-10-14 00:30Z.
-- GNN L tuning candidate (ms8): ≈ 02:30Z → L decision for GNN, `scripts/tuning_select.py` re-run.
+- Phase 14 GNN M re-runs (6, H100, node-local data): five at epoch 19–21 of 30 at 21:30Z (≈ 750 s/epoch → ≈ 23:45Z),
+  one at epoch 12 (restarted after a node's ECC error at 18:42Z → ≈ 01:15Z).
+- GNN L tuning candidate (ms8): epoch 12 of 30 at 1 114 s/epoch → ≈ 03:00Z → L decision for GNN, `scripts/tuning_select.py` re-run.
 - Phase 15: T1 L legs ≈ 22:10Z; L/T4 staging + T4 L legs + 16 recomputes ≈ 23:30Z; XL/XXL transfer legs ≈ 01:30Z.
 
 ## Next (this session, no further gate)
