@@ -16,6 +16,7 @@ import pathlib
 import sys
 import time
 
+from ampscape.io.pagecache import drop_file_cache
 from ampscape.io.sync import remote_sha256, sha256
 
 
@@ -93,6 +94,7 @@ def main() -> int:
                 time.sleep(30 * (attempt + 1))
         bad = 0
         for p, rel, h in b:
+            drop_file_cache(p)  # uploaded (and hashed): drop its pages — login-node 4 GB memory cgroup
             remote = remote_sha256(api, a.repo, f"{a.dest}/{rel}")
             if (
                 remote is None

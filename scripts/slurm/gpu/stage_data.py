@@ -51,6 +51,20 @@ def cmd_stage(a):
         ],
         max_workers=8,
     )
+    # login-node 4 GB memory cgroup (2026-10-10): flush and drop the page cache of everything just written — the
+    # shards, index, split lists and the Xet/HF chunk caches — or the slice fills with clean file pages and OOM-kills
+    from ampscape.io.pagecache import drop_tree_cache
+
+    dropped = drop_tree_cache(
+        [
+            cache / "data" / a.tier / a.group,
+            cache / "index",
+            cache / "splits",
+            cache / ".cache",
+            ROOT / ".hf_cache",
+        ],
+        fsync=True,
+    )
     n = len(list((cache / "data" / a.tier / a.group).glob("shard-*.h5")))
     size = gb(cache / "data" / a.tier / a.group)
     rec = {
@@ -60,6 +74,7 @@ def cmd_stage(a):
         "gb": round(size, 1),
         "staged_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         "minutes": round((dt.datetime.now(dt.UTC) - t0).total_seconds() / 60, 1),
+        "cache_dropped_gb": round(dropped["bytes"] / 1e9, 1),
     }
     stats_f = cache / "stats" / "norm_stats.json"
     have = json.loads(stats_f.read_text()) if stats_f.exists() else {}

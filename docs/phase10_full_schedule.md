@@ -53,6 +53,20 @@ S runs; GNN last because it is two thirds of the budget and its receptive field,
   survives the session that launched it; a login-node reboot kills it (no cron/systemd for users on PACE login
   nodes) — run the line again. Health check: `tail logs/keepalive.log logs/gpu_driver.log; squeue -u $USER`.
 
+- **Login-node memory (2026-10-13).** Each user runs in a 4 GB memory cgroup (`/sys/fs/cgroup/user.slice/user-$(id -u).slice`,
+  `memory.max`); the kernel did not reclaim our clean page cache (≈ 3.85 GB of `file` in `memory.stat` after scratch
+  I/O), `memory.reclaim` is not writable by the user, and the cgroup OOM-killed instead: on 2026-10-10 the driver's Hub
+  staging subprocesses died within seconds in a loop (no job submitted) and the owner's tmux/screen attaches and SSH
+  session were SIGKILLed. `posix_fadvise(DONTNEED)` over the scratch roots cleared it. Permanent fix: every file a
+  login-node daemon writes (fsync first) or reads is advised DONTNEED after use (`ampscape/io/pagecache.py`, wired
+  into `stage_data.py`, `push_aux.py`, `ampscape/io/sync.py`); the keepalive runs `scripts/evict_cache.py` every
+  10 min and whenever `memory.current` > 2.5 GiB (lines in `logs/keepalive.log`). Manual: `python scripts/evict_cache.py`;
+  check: `cat /sys/fs/cgroup/user.slice/user-$(id -u).slice/memory.current`.
+- **No pattern kills (2026-10-13 audit).** Stop a daemon via its lease / pid file only (`logs/lease_<name>.json`,
+  `logs/keepalive.pid`); the repository contains no `pkill`, `killall`, `kill -9`, `pgrep -f` or `kill -f`, and
+  `tests/test_no_pattern_kills.py` fails the build on any process selector that could match tmux, screen, sshd, bash
+  or the Claude CLI.
+
 ## 4. Storage rule for runs (2026-09-24)
 
 A finished S run holds ≈ 2.6 GB of predictions (26 k test items), so 133 runs would exceed the 300 GB scratch quota.

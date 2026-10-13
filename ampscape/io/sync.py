@@ -22,6 +22,7 @@ import os
 import pathlib
 import time
 
+from ampscape.io.pagecache import drop_file_cache, drop_files_cache
 from ampscape.io.schema import validate_shard
 
 REPO_LAYOUT = "data/{tier}/{task_group}/{name}"
@@ -42,6 +43,11 @@ def sha256(path: pathlib.Path) -> str:
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 22), b""):
             h.update(chunk)
+        # login-node memory cgroup: drop the pages this read pulled in (ampscape/io/pagecache.py)
+        try:
+            os.posix_fadvise(f.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
+        except OSError:
+            pass
     return h.hexdigest()
 
 
@@ -196,6 +202,7 @@ def upload_and_verify(
             commit_message=f"add {path_in_repo}",
         )
         remote = remote_sha256(api, repo_id, path_in_repo)
+        drop_file_cache(shard)  # the upload re-read the shard; drop its pages (login-node cgroup)
         if remote == local:
             rec = {
                 "repo": repo_id,
@@ -248,6 +255,7 @@ def upload_parts_one_commit(
             time.sleep(30 * (attempt + 1))
             print(json.dumps({"retry": attempt + 1, "error": str(e)[:200]}), flush=True)
     out = {}
+    drop_files_cache(parts.values())  # uploaded: drop their pages (login-node cgroup)
     for grp, rel in rels.items():
         remote = remote_sha256(api, repo_id, rel)
         if remote != shas[grp]:

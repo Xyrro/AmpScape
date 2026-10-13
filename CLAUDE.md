@@ -24,6 +24,8 @@
 - Generation jobs must be resumable: Slurm job arrays, ≤ 4 hours per job, one shard per job, skip shards that already exist and validate.
 - Use `module load` for Julia, GDAL, Python/Anaconda if available; otherwise install to scratch.
 - Baseline training uses GPU partitions; keep mini-scale runs short. Full-scale baselines will be scheduled separately after discussion.
+- **Login-node memory cgroup (4 GB per user, no page-cache reclaim):** every login-node process that writes or reads large files must `posix_fadvise(DONTNEED)` them after use (`ampscape.io.pagecache`; fsync first on writes); `scripts/evict_cache.py` sweeps the scratch roots and the keepalive runs it every 10 min and whenever `memory.current` > 2.5 GiB. Otherwise the cgroup OOM-kills (staging subprocesses, tmux attaches, the SSH session — 2026-10-10).
+- **Never kill processes by name pattern** (`pkill`, `killall`, `pgrep -f | xargs kill`, `kill -9 <pattern>`): such patterns have matched the owner's shell and the Claude CLI. Stop daemons through their lease / pid files only; `tests/test_no_pattern_kills.py` enforces this for `scripts/`, `ampscape/` and `tests/`.
 
 ## Gates (must ask the owner before)
 - Downloading source data: any single download > 5 GB, or cumulative source downloads > 20 GB (running total in `data/sources/manifest.json`).
