@@ -1,61 +1,54 @@
-# Status — 2026-10-13 06:50Z: login-node OOM fixed at the source (sweeper during transfers, tested); phase 14 (tuned-config M re-runs) launched behind the phase 13c remainder
+# Status — 2026-10-13 08:20Z: GPU policy check and probes; input pipeline fixed (packed node-local items, 2–3.5× per epoch); driver routes to H200/H100 first; plan reordered GNN-last
 
-## Incident and fix (owner report 2026-10-13)
-- With the keepalive and driver running, tmux/screen attaches were SIGKILLed and the owner's SSH session closed; later
-  the Claude CLI session was killed while fixing it. Cause: the login node's 4 GB per-user memory cgroup does not
-  reclaim clean page cache from our scratch I/O and OOM-kills instead (`memory.events` oom_kill 11 by 06:35Z). Dropping
-  the cache *after* a staged group (the 02:00Z fix) was too late: `snapshot_download` with 8 workers filled the slice in
-  seconds and the L/T1 and M/T4 staging subprocesses died at 23 % / 20 % (log lines ending in a progress bar).
-- Kill-pattern audit (the other suspect): none in any tracked file, `work/`, git hooks or Claude settings/hooks — only
-  `kill -0 <pid>` liveness probes and `kill $(cat <pidfile>)`. `tests/test_no_pattern_kills.py` now scans that scope
-  (172 files). Stale `sync_L` pid/lease and the dead keepalive/driver leases removed.
-- Fix (`ampscape.io.pagecache.CacheSweeper`, `stage_data.py`, `push_aux.py`; `tests/test_pagecache.py`): downloads per
-  file with 2 workers, fsync + DONTNEED on each completed file, and a sweeper thread advising DONTNEED over the group /
-  download-temp / xet-cache directories every 5 s for the whole transfer; the uploader (offloader) runs the same
-  sweeper over the run directory and the xet cache. Keepalive sweep (every 10 min / above 2.5 GiB) unchanged.
-- Acceptance test (login node, `memory.current` logged every 5 s): 101 new M/T4 shards, 10.4 GB in 70 s with 2
-  workers — peak 1.08 GiB (0.82 before; requirement < 1.5 GiB). Live check after the restart: 1.0–1.3 GiB while the
-  driver staged M/T4 and the offloader pushed runs concurrently.
-- Runbook `docs/phase10_full_schedule.md` §3 and `CLAUDE.md` updated (rule: keep the cache low *during* transfers;
-  acceptance test; widened audit scope).
+## Policy check (owner's question)
+- QoS `coc-ice`: MaxSubmitPU 50, MaxTRESRunMinsPU gres/gpu = 1 920 min (32 GPU-h concurrent) — per user **per QoS**.
+  `coe-ice` (also in the account's QoS list) carries the same limits and is a separate budget by Slurm semantics; it is
+  the QoS for `coe-gpu`, where 25 of the 37 H100/H200 nodes live. `ice-gpu` (AllowQos=ALL) reaches 6 H100 + 6 H200 nodes
+  under coc-ice. The driver uses ice-gpu/coc-gpu only; whether to use coe-gpu/coe-ice as a second 32 GPU-h budget is the
+  owner's call (it would double concurrency, not per-job speed).
+- Queue waits: 2–5 s on every pool at 07:02Z (H200 via ice-gpu and coe-gpu, H100, L40S); later H200 waits of 27 s,
+  473 s, and one probe pending > 20 min on "Priority" (2 free H200 GPUs at the time) — H100 had ≥ 60 free GPUs all
+  morning. The cu126 torch 2.14 wheel runs on H200/H100 (sm 9.0) under driver 615.71 (CUDA 13.4).
 
-## Phase 14 launched (owner approval 2026-10-13; 20 GPU-h gate lifted for it)
-- Plan `docs/plans/phase13c_14_plan.json` = the 55 phase 13c jobs (40 done, 15 pending ≈ 38 GPU-h: six L tuning
-  candidates, two T1V voltage heads at L, two at S running, three MgNO runs, two T4 reference backfills) followed by the 30
-  phase 14 re-runs (`RERUN_M`, ≈ 117 GPU-h nominal): U-Net w64 (T1/T3/T4), FNO w48 (T1/T3/T4), ViT p16g16 (T1/T4),
-  GNN ms8 (T1/T4), seeds 1–3, names `<model>_<task>_M_s<seed>_t2`. Keepalive restarted 06:42Z (pid in
-  `logs/keepalive.pid`), driver 06:43Z (85 jobs, est 187 GPU-h), offloader 06:43Z. The driver was idle between
-  2026-10-10 18:45Z and 2026-10-13 06:15Z (OOM-killed staging; no jobs lost).
-- Storage: scratch 203 GB at launch; L/T1 (84 GB) waits for S/T1 to drain (three S jobs running), M/T4 is being staged.
-
-## Tuning pass — what changed (`docs/tables/tuning_full.md`, selection on val only, T1 seed 1)
-
-| tier | model | official → chosen | best val loss | params | decision |
+## Per-epoch probes (T4, M tier, official batch 8; `docs/tables/gpu_probe.md`)
+| loader | workers | U-Net L40S | U-Net H200 | FNO L40S | FNO H200 |
 |---|---|---|---|---|---|
-| M | U-Net | base → **w64** | 0.0364 → 0.0213 (−41 %) | 7.8 → 31.0 M | re-run (phase 14) |
-| M | FNO | m64 → **w48** | 0.0498 → 0.0463 (−7 %) | 33.6 → 75.5 M | re-run (phase 14) |
-| M | ViT | patch 4 / grid 32 → **p16g16** | 0.2222 → 0.0559 (−75 %) | 3.0 M | re-run (phase 14) |
-| M | GNN | ms → **ms8** | 0.2150 → 0.1633 (−24 %) | 0.2 M | re-run (phase 14) |
-| L | all four | official kept *provisionally* | — | — | six candidates still pending |
+| HDF5 (as run until today) | 6 | 170 s | 169 s | 208 s | 197 s |
+| HDF5 | 12 | 94 s | 100 s | — | 116 s |
+| (a) group copied to node NVMe, HDF5 | 12 | 93 s | — | — | — |
+| (b) batch 16 + prefetch 4, HDF5 | 12 | 108 s | — | — | — |
+| **(c) packed memmaps on node NVMe** | 6 / 12 | **87 s** | **56 s** | **183 s** | **59 s** |
 
-- Every M candidate beat the official config by more than the official seed spread, so all four configs change at M.
-- **L re-runs:** undecided — the L candidates (U-Net wide, FNO m96/w48, ViT p16g32/p8g64, GNN ms8; ≈ 28 GPU-h) are the
-  first pending jobs of the merged plan. If any beats its official L config by more than the seed spread, an L re-run
-  phase (3 seeds, all tasks, plus XL/XXL transfers and the scale-aware variant for that model) is costed and proposed
-  before launch; the M re-runs do not depend on it.
+- The epoch was bound by gzip-4/HDF5 decoding in the loader workers: the GPU type made no difference (H200 1.0–1.06×),
+  12 workers nearly halved it, a local copy of the files changed nothing (CPU-bound, not I/O-bound), a larger batch did
+  not help. Packing the loader's own tensors once per job (`ampscape/data/packed.py`, 41 GB in 57–95 s on the node's
+  NVMe RAID; byte-identical items; RNG state preserved → the packed run reproduces the HDF5 run's losses exactly) makes
+  the epoch GPU-bound: U-Net 3.0× and FNO 3.5× faster on H200 than before; FNO alone is 3.1× faster on H200 than on L40S.
+- L tier: probe running (U-Net + FNO on T1 L, group fetched to the node's NVMe directly since scratch cannot hold L/T1
+  until the M/T4 legs end) — numbers follow in this file.
+- Applied (driver restarted 07:53Z, commit dec252d): every non-GNN training leg runs `PACK=1`; legs go to `ice-gpu` H200
+  → H100 → `coc-gpu` L40S → A100 (spill after 3 pending on a type), all under coc-ice. GNN keeps the HDF5/graph path.
+  Probing cost ≈ 2.5 GPU-h (three probes re-run after I deleted their output directory while they ran — my error).
 
-## Other outstanding items
-- **Item 1, solver-acceleration metric:** T3 rows complete at S/M/L for U-Net and FNO (`docs/tables/acceleration.md`):
-  no acceleration anywhere — iterations 10 → 10 (S), 12 → 13 (M), 17 → 18/19 (L); time within −10 … +0.1 %; the
-  warm-start residual is 80–3,900× the zero start's. Reported as a negative result with the explanation. T1V (first
-  pair) heads: M runs trained (warm-start evaluations being backfilled by CPU jobs), S running, L pending.
-- **Item 3, derivation:** done (`paper/appendix_derivation.md`, zero-shot T4 error = 1 − r_train/r_eval).
-- **Item 4, WP6:** MgNO vendored (MIT, 0.57 M params); T1 M done (rel-L2 0.412 test_id, in `paper/baselines.md`);
-  T1 S running, T4 S and T4 M pending. HANO not runnable from its public repository (documented).
-- **Item 5, submission format:** done (`docs/submission.md`, `scripts/submit_results.py`, tests); leaderboard seeded
-  locally with 142 entries, **not pushed** (Hub push is a gate — needs owner approval).
-- **Item 6, `paper/draft.md`:** not assembled; waits for the M re-runs (tables, figures and sections regenerate from
-  the tuned runs), then the leaderboard push and the 9-page cut.
+## Plan order and storage
+- The merged plan had the six GNN M re-runs in tier order; three started at 07:00–07:20Z and would have pinned M/T4 for
+  ≈ 12 h while neither L/T1 nor M/T1 fits beside it under the 280 GB guard — all other work would have idled until ≈ 19:00Z.
+  Cancelled them (1 epoch each; they resume from last.pt), restored "GNN strictly last", driver restarted on the reordered
+  plan. Scratch 267 GB; incomplete M/T1 and L/T4 download fragments (10 GB, no staged marker) and probe outputs removed.
 
-Next: driver works through 13c remainder → phase 14; L re-run decision when the six L candidates finish (≈ 1 day);
-weekly report or on schedule changes.
+## Calendar (pending work: 42 jobs; measured L40S/HDF5 hours → projected with packing + H200)
+| block | jobs | before (GPU-h) | after (GPU-h) | notes |
+|---|---|---|---|---|
+| 13c remainder: L tuning candidates, T1V L, MgNO, T4 reference backfills | 12 | 34 | 20 | GNN L tune (10 h) unchanged |
+| phase 14 non-GNN M re-runs (U-Net w64, FNO w48, ViT p16g16) | 24 | 52 | 19 | ≈ 0.5–0.8 h per run on H200 |
+| phase 14 GNN M re-runs | 6 | 65 | 65 | loader-bound by graph construction, not probed |
+| total | 42 | 151 | 104 | GNN = 72 % of what remains |
+
+Wall-clock, storage-serialized (one 150 GB staging window): M/T4 legs end ≈ 10:00Z → L/T1 staged → L tuning + T1V L
+(≈ 2 h on H200) → M/T1, M/T3 re-runs (≈ 3 h) → GNN tail (7 jobs × 10–11 h in parallel; needs M/T4 + M/T1 + L/T1 staged in
+turn) → **≈ 2026-10-14 05:00–15:00Z** (the range is the GNN L candidate's placement). Before (L40S, HDF5, original order):
+the GNN-pinning deadlock plus 151 GPU-h at ≤ 16 concurrent legs ≈ 2026-10-15 00:00Z. The L re-run decision (six L
+candidates) now lands ≈ 12:30Z today instead of tomorrow.
+
+Next: L probe numbers → this file; owner decisions: (1) coe-gpu/coe-ice as a second budget, (2) a 12-worker/graph-caching
+probe for the GNN (the remaining 72 %).
