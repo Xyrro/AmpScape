@@ -1,4 +1,4 @@
-# Status — 2026-10-13 17:05Z: packed input + H100/H200 pools in production; two QoS budgets; GNN legs off scratch; phase 14 M re-runs 24/30 done; L decision: FNO w48 re-runs needed (phase 15 plan, gated)
+# Status — 2026-10-13 17:25Z: packed input + H100/H200 pools in production; two QoS budgets; GNN legs off scratch; phase 14 M re-runs 24/30 done; L decision: FNO w48 re-runs needed (phase 15 plan, gated)
 
 ## Owner follow-ups (both done)
 1. **GNN legs fetch their data group to the node's NVMe** (`train_full.sbatch LOCALDATA=1`): the probe's fetch had run on
@@ -42,10 +42,22 @@ Phase 15 plan file `docs/plans/phase15_plan.json`: 9 FNO w48 L runs (T1/T3/T4 ×
 packed) + 2 scale-aware variants + 16 XL/XXL transfer legs (L40S) = **≈ 32 GPU-h**, ≈ 3–4 h wall with the two pools.
 Above the 20 GPU-h gate → **waiting for the owner's approval**; the M-tier FNO rows already use w48.
 
+## Measured on the GNN legs (node-local data, H100)
+- Fetch from the Hub to the node's NVMe, 16 workers: M/T1 53 GB in 586 s, M/T4 51 GB in 503 s (286 s on a node that
+  already had part of it), L/T1 79 GB in 752 s — ≈ 100 MB/s per node, seven nodes in parallel.
+- GNN epoch: 715–766 s at M on H100 reading local NVMe vs 1 110 s on L40S from scratch this morning (1.5×); 1 105 s at L.
+  → 30 epochs ≈ 6.2 h at M, 9.2 h at L (2-h legs; a leg landing on a fresh node re-fetches ≈ 10 min).
+- Driver fix (17:20Z): a drain never takes a group whose next pending training use precedes the target's — L/T1 had been
+  drained for L/T4, wanted only by CPU backfill evaluations, which held the pending U-Net T1V L run for 50 min.
+- Surfaced: the 16 finished T4 L runs (official, scale-aware) still carry only the pre-2026-10-05 reference evaluation
+  (`eval_t4_reference_prodtarget_wrong`); their recompute (CPU, needs L/T4 staged) is queued by the driver's backfill
+  after the T1V L run — the Hub copies of those evaluations are the wrong ones until then.
+
 ## Revised completion estimate
-- Current plan (13c + 14): the six GNN M re-runs and the GNN L candidate are the tail — ≈ 10–11 GPU-h each at
-  ≈ 18–20 min/epoch (loader-bound by graph construction) in 2-h legs, local fetch ≈ 20 min per node → **≈ 2026-10-14 04:00Z**
-  (before today's changes: ≈ 2026-10-15 00:00Z; this morning's estimate: 2026-10-14 05:00–15:00Z).
+- Current plan (13c + 14): the six GNN M re-runs end ≈ 2026-10-14 00:00Z and the GNN L candidate ≈ 02:30Z (started
+  16:22Z; measured epoch times above) → **≈ 2026-10-14 02:30Z** for the GPU work, plus the 16 T4 L reference
+  recomputes on CPU (≈ 20–30 min each, parallel) — before today's changes ≈ 2026-10-15 00:00Z; this morning's estimate
+  2026-10-14 05:00–15:00Z.
 - Phase 15, if approved now: runs alongside the GNN tail in the free legs of both pools → done ≈ 2026-10-13 22:00Z.
 - Then: regenerate tables/figures/sections from the tuned runs, leaderboard push (gate), `paper/draft.md`.
 
