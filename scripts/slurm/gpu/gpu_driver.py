@@ -678,6 +678,13 @@ def submit_accel_backfill(jobs: list[dict], st: dict) -> None:
                 log(f"warm-start evaluation for {j['name']} {sp}: job {jid}")
 
 
+def gnn_phase(j: dict) -> bool:
+    """Jobs held until everything else is done ("GNN strictly last"): the phase-10 GNN tags and, since 2026-10-13, any
+    GNN job from a plan file — a GNN leg pins its data group for ≈ 12 h, which deadlocks the staging of every other
+    group under the scratch guard (M/T4 at 07:00Z, M/T1 at 09:27Z)."""
+    return j["tag"] in ("P4", "XF4", "SN4", "SNX4") or j.get("model") == "gnn"
+
+
 def cycle(jobs: list[dict], st: dict) -> None:
     note_bad_nodes(jobs)
     note_oom(jobs, st)
@@ -695,9 +702,9 @@ def cycle(jobs: list[dict], st: dict) -> None:
     # the GNN phase (P4/XF4/SN4/SNX4) cannot be submitted while an earlier-phase job is pending, so its groups are
     # not staged ahead either (2026-10-03 02:00Z: pre-staged S/M groups pushed scratch over the transfer threshold
     # and blocked the very transfer legs the GNN phase was waiting for)
-    earlier_pending = any(jj["tag"] not in ("P4", "XF4", "SN4", "SNX4") for jj in pending)
+    earlier_pending = any(not gnn_phase(jj) for jj in pending)
     stageable = [
-        jj for jj in pending if not (earlier_pending and jj["tag"] in ("P4", "XF4", "SN4", "SNX4"))
+        jj for jj in pending if not (earlier_pending and gnn_phase(jj))
     ]
     for j in stageable[:LOOKAHEAD]:
         key = (j["tier"], GROUP[j["task"]])
@@ -734,7 +741,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
     first_use_soon = {}  # ignoring the GNN phase (P4/XF4), which cannot start before everything else anyway
     for k, jj in enumerate(pending):
         first_use.setdefault((jj["tier"], GROUP[jj["task"]]), k)
-        if jj["tag"] not in ("P4", "XF4", "SN4", "SNX4"):
+        if not gnn_phase(jj):
             first_use_soon.setdefault((jj["tier"], GROUP[jj["task"]]), k)
     # draining: when the highest-priority unstaged group does not fit because RUNNING jobs pin the groups that would
     # be evicted, those groups stop receiving new jobs (their later seeds wait) so the pin dissolves as the running
@@ -872,10 +879,8 @@ def cycle(jobs: list[dict], st: dict) -> None:
         if slots <= 0 or n_queued_total() >= MAX_QUEUED_TOTAL:
             break
         key = (j["tier"], GROUP[j["task"]])
-        if j["tag"] in ("P4", "SN4", "SNX4") and any(
-            jj["tag"] not in ("P4", "XF4", "SN4", "SNX4")
-            for jj in pending
-            if jj["name"] not in running
+        if gnn_phase(j) and j.get("kind") != "transfer" and any(
+            not gnn_phase(jj) for jj in pending if jj["name"] not in running
         ):
             continue  # GNN strictly last: never ahead of a P1–P3/WP4/XF job that is only waiting for its data
         if j.get("kind") == "transfer":
