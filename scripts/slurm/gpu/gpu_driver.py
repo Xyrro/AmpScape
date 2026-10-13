@@ -295,16 +295,13 @@ RECENT_STAGE_S = 900.0
 
 def footprint_gb(active: dict[str, str], jobs: list[dict]) -> float:
     """GB that queued/running work will still write to scratch: the predictions of every training leg whose run is
-    not yet offloaded and the predictions.h5 of every in-flight T4 reference backfill (2026-10-13 22:50Z: with L/T3 and
-    L/T4 staged (146 GB) the 7 GNN legs, 8 L legs and 16 L backfills would have written ≈ 190 GB into 17 GB of
-    quota)."""
+    not yet offloaded (2026-10-13 22:50Z: with L/T3 and L/T4 staged (146 GB) the 7 GNN legs and 8 L legs would have
+    written ≈ 90 GB into 17 GB of quota)."""
     by = {j["name"]: j for j in jobs}
     tot = 0.0
     for n in active:
-        if n.startswith("t4ref-"):
-            tot += PRED_GB["L"]
-        elif n.startswith(("stats-", "accel-", "xfer_")):
-            continue  # transfer bursts have their own bound (XFER_QUOTA_GB, MAX_XFER)
+        if n.startswith(("stats-", "accel-", "t4ref-", "xfer_")):
+            continue  # transfer bursts have their own bound (XFER_QUOTA_GB, MAX_XFER); backfills fetch to the node
         elif n in by and not (RUNS / n / ".offloaded").exists():
             tot += PRED_GB.get(by[n]["tier"], 7.0)
     return tot
@@ -617,7 +614,7 @@ def alert(msg: str) -> None:
     log("ALERT: " + msg)
 
 
-def submit_t4_reference_backfill(jobs: list[dict], st: dict, headroom: list[float] | None = None) -> None:
+def submit_t4_reference_backfill(jobs: list[dict], st: dict) -> None:
     """T4 at M/L: the exact block-1 reference evaluation runs at the end of the training job; legs submitted before
     2026-09-24 12:30Z looked for predictions under the wrong path and skipped it. Any finished run without
     eval_t4_reference/ gets a CPU job that runs the same evaluate.py command (the offloader waits for it)."""
@@ -635,24 +632,24 @@ def submit_t4_reference_backfill(jobs: list[dict], st: dict, headroom: list[floa
         tier = j["tier"]
         if not staged(tier, "T4"):
             continue  # the harness reads the shards; the staging block above requests the group
-        if headroom is not None:
-            if headroom[0] < PRED_GB["L"]:
-                continue  # its fetched predictions.h5 would not fit under the quota beside the running work
-            headroom[0] -= PRED_GB["L"]
         fetch = ""
-        if not (
-            pred / "predictions.h5"
-        ).exists():  # offloaded to the Hub: fetched by the job, removed afterwards
+        cleanup = ""
+        if not (pred / "predictions.h5").exists():
+            # offloaded to the Hub: fetched by the job onto the CPU node's local disk (1.4 TB; 22:58Z: 16 L fetches
+            # of 6.5 GB onto scratch would not have fit, and the hub-cache copies of the morning's M fetches stayed
+            # behind on scratch), xet chunk cache alongside it, everything removed with the job
+            rel = f"aux/results/runs_full/{j['name']}/predictions/hfcache_{tier}_test_id/predictions.h5"
             fetch = (
-                f'mkdir -p {pred}; python -c "from huggingface_hub import hf_hub_download; import shutil; '
-                f"shutil.copyfile(hf_hub_download('Xirro/AmpScape', 'aux/results/runs_full/{j['name']}/predictions/"
-                f"hfcache_{tier}_test_id/predictions.h5', repo_type='dataset'), '{pred}/predictions.h5')\" && "
+                f'L="${{TMPDIR:-/tmp}}/ampscape_t4ref_{j["name"]}_$SLURM_JOB_ID"; mkdir -p "$L"; '
+                f'HF_XET_CACHE="$L/xet" python -c "from huggingface_hub import hf_hub_download as d; '
+                f"d('Xirro/AmpScape', '{rel}', repo_type='dataset', local_dir='$L')\" && "
             )
+            pred = pathlib.Path(f"$L/{rel}").parent
+            cleanup = '; rm -rf "$L"'
         cmd = (
             f"source scripts/env.sh; {fetch}python scripts/evaluate.py --predictions {pred} --root data/hfcache --tier {tier} "
             f"--split test_id --t4-reference aux/t4_bs1_reference/{tier}_bs1 "
-            f"--t4-blocks aux/t4_blocksize_baselines/{tier}_* --out {run}/eval_t4_reference"
-            + (f" && rm -f {pred}/predictions.h5" if fetch else "")
+            f"--t4-blocks aux/t4_blocksize_baselines/{tier}_* --out {run}/eval_t4_reference" + cleanup
         )
         jid = sh(
             [
@@ -771,6 +768,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
         return committed_gb(st, fp)
 
     headroom = [QUOTA_SOFT_GB - used_gb()]  # GB of predictions that may still be committed this cycle
+    submit_t4_reference_backfill(jobs, st)
     submit_accel_backfill(jobs, st)
     running = {n for n, s in active.items() if not n.startswith(("stats-", "t4ref-", "accel-"))}
     pending = [j for j in jobs if not done(j) and j["name"] not in running]
@@ -1012,8 +1010,6 @@ def cycle(jobs: list[dict], st: dict) -> None:
         slots -= 1
         if j.get("kind") == "transfer":
             n_xfer_running += 1
-    # CPU backfills after the GPU legs: each fetches ≈ 7 GB of predictions from the Hub and takes what headroom is left
-    submit_t4_reference_backfill(jobs, st, headroom)
     save_state(st)
 
 

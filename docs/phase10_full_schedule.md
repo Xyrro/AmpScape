@@ -96,6 +96,11 @@ A finished S run holds ≈ 2.6 GB of predictions (26 k test items), so 133 runs 
 T4-reference evaluation) to `aux/results/runs_full/<run>/` on the Hub with sha256 verification and then removes the
 local `predictions/*.h5` and `last.pt`; results, config, log and best.pt stay local. Tables are built from the local
 `results.json` files; predictions are re-downloadable per run for figures.
+Scratch accounting (2026-10-13 23:00Z): the driver's fit tests use `committed_gb` = `pace-quota` reading + the part of
+the last 15 min of stagings the (lagging) accounting has not shown yet + the predictions every running training leg
+will still write (`PRED_GB` per tier; a run's predictions stay until the offloader frees them); a leg is held when its
+predictions would not fit under 295 GB, and a staged group is evicted only when the evictable set makes the target fit.
+T4 reference backfills fetch their `predictions.h5` onto the CPU node's local disk, not scratch.
 A run that is already offloaded (`.offloaded`) is pushed again only for a recomputed `eval_t4_reference/` whose
 sha256 differs from `.hub_pushed.json` (`offload_runs.reference_stale`, 2026-10-13: the exact-reference evaluations of
 the 28 T4 M/L runs were recomputed after their offload — the superseded one stays local as
