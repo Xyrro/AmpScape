@@ -735,6 +735,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
             needed.append(key)
     # finished T4 M/L runs whose exact-reference evaluation is missing need their group staged for the CPU job
     for j in jobs:
+        key = (j["tier"], GROUP[j["task"]])  # (16:18Z: was the loop variable left over from the stageable loop above)
         if (
             j["task"] == "T4"
             and j["tier"] in ("M", "L")
