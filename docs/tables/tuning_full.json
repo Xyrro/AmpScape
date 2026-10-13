@@ -56,17 +56,20 @@
    "official_best_val": 0.08865,
    "official_seed_std": 0.005605268355157796,
    "candidates": {
-    "base": 0.08865
+    "base": 0.08865,
+    "wide": 0.0832
    }
   },
   "fno": {
-   "variant": "m64",
-   "changed": false,
+   "variant": "w48",
+   "changed": true,
    "official_variant": "m64",
    "official_best_val": 0.06283,
    "official_seed_std": 0.0002608320021265274,
    "candidates": {
-    "m64": 0.06283
+    "m64": 0.06283,
+    "m96": 0.06183,
+    "w48": 0.06049
    }
   },
   "vit": {
@@ -76,7 +79,9 @@
    "official_best_val": 0.26356,
    "official_seed_std": 0.0038274795884498214,
    "candidates": {
-    "base": 0.26356
+    "base": 0.26356,
+    "p16g32": 0.38949,
+    "p8g64": 0.43099
    }
   },
   "gnn": {
@@ -86,7 +91,8 @@
    "official_best_val": 0.31265,
    "official_seed_std": 0.00676668555005576,
    "candidates": {
-    "ms": 0.31265
+    "ms": 0.31265,
+    "ms8": 0.44769
    }
   }
  }

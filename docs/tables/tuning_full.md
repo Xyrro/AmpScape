@@ -22,10 +22,16 @@ config only if it beats the official seed-1 value by more than the official conf
 | M | gnn | ms8  | 0.1633 | 30 | 0.2 | 10.84 | -24.0 % | **chosen** |
 | M | gnn | (official seed spread) | ± 0.0008 | | | | | config changes |
 | L | unet | base official | 0.0887 | 30 | 7.8 | 1.49 |  | **chosen** |
+| L | unet | wide  | 0.0832 | 27 | 17.5 | 1.26 | -6.1 % |  |
 | L | unet | (official seed spread) | ± 0.0056 | | | | | official kept |
-| L | fno | m64 official | 0.0628 | 28 | 33.6 | 2.70 |  | **chosen** |
-| L | fno | (official seed spread) | ± 0.0003 | | | | | official kept |
+| L | fno | m64 official | 0.0628 | 28 | 33.6 | 2.70 |  |  |
+| L | fno | m96  | 0.0618 | 27 | 75.5 | 0.85 | -1.6 % |  |
+| L | fno | w48  | 0.0605 | 30 | 75.5 | 1.08 | -3.7 % | **chosen** |
+| L | fno | (official seed spread) | ± 0.0003 | | | | | config changes |
 | L | vit | base official | 0.2636 | 29 | 3.0 | 4.44 |  | **chosen** |
+| L | vit | p16g32  | 0.3895 | 22 | 3.1 | 0.43 | +47.8 % |  |
+| L | vit | p8g64  | 0.4310 | 28 | 3.6 | 0.59 | +63.5 % |  |
 | L | vit | (official seed spread) | ± 0.0038 | | | | | official kept |
 | L | gnn | ms official | 0.3126 | 22 | 0.2 | 14.68 |  | **chosen** |
+| L | gnn | ms8  | 0.4477 | 1 | 0.2 | 0.31 | +43.2 % |  |
 | L | gnn | (official seed spread) | ± 0.0068 | | | | | official kept |
