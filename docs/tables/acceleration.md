@@ -7,10 +7,14 @@ T1V = first pair of each T1 landscape, point source/ground, pre-solved) — seed
 
 | task | tier | model | split | systems | iters zero → warm | iter reduction | time zero → warm (ms) | time reduction | warm-start residual | converged |
 |---|---|---|---|---|---|---|---|---|---|---|
+| T3 | L | fno | test_id | 1928 | 17 → 18 | -5.6 % | 757.0 → 808.7 | -6.2 % | 1.62e+03 | 100.0 % |
+| T3 | L | fno | test_ood | 1275 | 23 → 24 | -4.2 % | 1159.8 → 1221.1 | -4.4 % | 1.89e+03 | 100.0 % |
 | T3 | M | fno | test_id | 4823 | 12 → 13 | +0.0 % | 119.9 → 120.9 | -0.5 % | 559 | 100.0 % |
 | T3 | M | fno | test_ood | 3222 | 16 → 16 | +0.0 % | 167.2 → 169.3 | -0.5 % | 653 | 100.0 % |
 | T3 | S | fno | test_id | 9850 | 10 → 10 | +0.0 % | 19.3 → 19.7 | -0.1 % | 181 | 100.0 % |
 | T3 | S | fno | test_ood | 6460 | 11 → 11 | +0.0 % | 25.4 → 25.6 | +0.0 % | 212 | 100.0 % |
+| T3 | L | unet | test_id | 1928 | 17 → 19 | -9.1 % | 763.2 → 858.6 | -9.5 % | 3.32e+03 | 100.0 % |
+| T3 | L | unet | test_ood | 1275 | 23 → 25 | -8.8 % | 1164.0 → 1281.7 | -8.8 % | 3.87e+03 | 100.0 % |
 | T3 | M | unet | test_id | 4823 | 12 → 13 | -2.9 % | 99.9 → 102.3 | -1.0 % | 580 | 100.0 % |
 | T3 | M | unet | test_ood | 3222 | 16 → 16 | -4.5 % | 140.7 → 144.5 | -4.5 % | 783 | 100.0 % |
 | T3 | S | unet | test_id | 9850 | 10 → 10 | +0.0 % | 19.3 → 19.1 | +0.1 % | 82.5 | 100.0 % |
