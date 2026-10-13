@@ -43,6 +43,15 @@ def main() -> int:
     ap.add_argument("--commit-gb", type=float, default=3.0)
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
+    # login-node 4 GB memory cgroup, anonymous side (2026-10-13 06:50Z): the xet upload pipeline peaked at ≈ 1 GB RSS
+    # per push (8 concurrent file ingestions / xorb buffers) — one file at a time, two upload streams, no HP mode
+    for k, v in {
+        "HF_XET_MAX_CONCURRENT_FILE_INGESTION": "1",
+        "HF_XET_FIXED_UPLOAD_CONCURRENCY": "2",
+        "HF_XET_CLIENT_AC_MAX_UPLOAD_CONCURRENCY": "2",
+        "HF_XET_HIGH_PERFORMANCE": "0",
+    }.items():
+        os.environ.setdefault(k, v)
     src = pathlib.Path(a.src)
     rec_f = src / ".hub_pushed.json"
     rec = json.loads(rec_f.read_text()) if rec_f.exists() else {}

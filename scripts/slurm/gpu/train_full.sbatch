@@ -20,6 +20,14 @@ ARGS=(--model "$MODEL" --task "$TASK" --tier "$TIER" --root "$ROOT" --out "$OUT"
       --eval-splits test_id,test_ood,ood_region --published-root data/builds/published --published-tiers "$TIER")
 [ -n "$MAXTRAIN" ] && ARGS+=(--max-train "$MAXTRAIN")
 [ -n "$EXTRA" ] && ARGS+=($EXTRA)
+# PACK=1 (2026-10-13): train/val items packed once per job to the node's local NVMe (${TMPDIR:-/tmp}) and read as
+# memmaps — the epoch was bound by gzip/HDF5 decoding in the loader workers (ampscape/data/packed.py; identical
+# tensors; the GNN keeps the HDF5 path). Packs older than 2 days under our local dir are removed first.
+if [ "${PACK:-0}" = "1" ]; then
+  PACKDIR=${TMPDIR:-/tmp}/ampscape_$USER/pack; mkdir -p "$PACKDIR"
+  find "$PACKDIR" -mindepth 1 -maxdepth 1 -type d -mtime +2 -exec rm -rf {} + 2>/dev/null
+  ARGS+=(--packed-dir "$PACKDIR" --prefetch "${PREFETCH:-2}")
+fi
 python scripts/train.py "${ARGS[@]}" 2>&1 | grep -v Warning | tee -a "$OUT/train.log" | tail -40
 # re-queue only when THIS job paused on its time budget (paused.json carries the job id): a job that crashed (bad GPU,
 # missing file) must not re-queue itself — the driver re-submits it elsewhere. Cap: 120 re-queues per run (2-h legs).
@@ -31,7 +39,7 @@ if [ -f "$OUT/paused.json" ] && [ ! -f "$OUT/results.json" ] && [ "$PJ" = "$SLUR
   echo "paused at $(cat "$OUT/paused.json"); re-queueing with --resume (re-queue $((NRQ + 1)), $EXCL)"
   sbatch --parsable $EXCL -A coc -q coc-ice -p "${SLURM_JOB_PARTITION}" -N1 -n1 -c "${SLURM_CPUS_PER_TASK:-6}" --mem="${MEM:-48G}" \
     --gres="${GRES:-gpu:1}" -t "${WALL:-16:00:00}" -J "$SLURM_JOB_NAME" -o "$OUT/slurm_%j.out" \
-    --export=ALL,MODEL="$MODEL",TASK="$TASK",TIER="$TIER",SEED="$SEED",OUT="$OUT",ROOT="$ROOT",EPOCHS="$EPOCHS",BATCH="$BATCH",PATIENCE="$PATIENCE",WORKERS="$WORKERS",MAXTRAIN="$MAXTRAIN",EXTRA="$EXTRA",MEM="${MEM:-48G}",GRES="${GRES:-gpu:1}",WALL="${WALL:-16:00:00}" \
+    --export=ALL,MODEL="$MODEL",TASK="$TASK",TIER="$TIER",SEED="$SEED",OUT="$OUT",ROOT="$ROOT",EPOCHS="$EPOCHS",BATCH="$BATCH",PATIENCE="$PATIENCE",WORKERS="$WORKERS",MAXTRAIN="$MAXTRAIN",EXTRA="$EXTRA",MEM="${MEM:-48G}",GRES="${GRES:-gpu:1}",WALL="${WALL:-16:00:00}",PACK="${PACK:-0}",PREFETCH="${PREFETCH:-2}" \
     scripts/slurm/gpu/train_full.sbatch
   exit 0
 fi

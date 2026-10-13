@@ -80,6 +80,13 @@ S runs; GNN last because it is two thirds of the budget and its receptive field,
   `kill`s are `kill -0 <pid>` liveness probes and `kill $(cat <pidfile>)`. `tests/test_no_pattern_kills.py` scans the
   same scope and fails on any selector that could match tmux, screen, sshd, bash or the Claude CLI.
 
+- **GPU pools and packed input (2026-10-13).** Training legs are routed by `choose_pool`: `ice-gpu` H200 → H100 →
+  `coc-gpu` L40S → A100 (spill when ≥ 3 of ours are pending on a type), all under coc-ice; transfer/evaluation legs stay
+  on L40S. Non-GNN legs run with `PACK=1`: `train.py --packed-dir` packs the train/val tensors once per job to the
+  node's local NVMe (`/tmp/ampscape_$USER/pack/<key>`, reused by later legs on the same node, 2-day cleanup) — the
+  epoch is then GPU-bound (U-Net M 56 s on H200 vs 170 s before; FNO 59 vs 208 s; `docs/tables/gpu_probe.md`).
+  Probe one configuration: `sbatch ... --export=ALL,MODEL=unet,TASK=T4,TIER=M,BATCH=8,WORKERS=6,PACK=1 scripts/slurm/gpu/gpu_probe.sbatch`.
+
 ## 4. Storage rule for runs (2026-09-24)
 
 A finished S run holds ≈ 2.6 GB of predictions (26 k test items), so 133 runs would exceed the 300 GB scratch quota.

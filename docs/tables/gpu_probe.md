@@ -1,0 +1,27 @@
+# GPU-type and input-pipeline probes — 2026-10-13 (`scripts/slurm/gpu/gpu_probe.sbatch`, logs in `logs/probe/`)
+
+One cold epoch of the official config (T4, M tier, batch 8, seed 1) on the staged Hub cache; `epoch_s` from log.csv.
+Queue wait = submit → start. All jobs under QoS coc-ice except the two coe-gpu rows (coe-ice).
+
+| model | GPU (partition) | loader | workers | wait | epoch 1 | epoch 2 | note |
+|---|---|---|---|---|---|---|---|
+| U-Net | L40S (coc-gpu) | HDF5 | 6 | 2 s | 170 s | | baseline (official runs: 122 s warm) |
+| U-Net | H100 (coe-gpu) | HDF5 | 6 | 3 s | 154 s | | |
+| U-Net | H200 (ice-gpu) | HDF5 | 6 | 5 s | 169 s | | |
+| FNO | L40S (coc-gpu) | HDF5 | 6 | 2 s | 208 s | | baseline |
+| FNO | H100 (ice-gpu) | HDF5 | 6 | 4 s | 203 s | | |
+| FNO | H200 (coe-gpu) | HDF5 | 6 | 3 s | 197 s | | |
+| U-Net | L40S | HDF5 | 12 | 1 s | 94 s | | loader CPU-bound |
+| U-Net | H200 | HDF5 | 12 | 27 s | 100 s | | |
+| FNO | H200 | HDF5 | 12 | 27 s | 116 s | | |
+| U-Net | L40S | (a) local NVMe copy of the group, HDF5 | 12 | 211 s | 93 s | | copy 51 GB in 26 s; no gain |
+| U-Net | L40S | (c) packed memmaps | 12 | 159 s | 88 s | 87 s | pack 41 GB in 95 s |
+| U-Net | L40S | (c) packed memmaps | 6 | 1 s | 88 s | 87 s | workers no longer matter |
+| U-Net | H200 | (c) packed memmaps | 12 | 473 s | 57 s | 56 s | pack in 57 s |
+| FNO | L40S | (c) packed memmaps | 12 | 234 s | 185 s | 183 s | FNO is compute-bound on L40S |
+| FNO | H200 | (c) packed memmaps | 12 | 193 s | 61 s | 59 s | |
+| U-Net | L40S | (b) batch 16, prefetch 4, HDF5 | 12 | | | | see below (information only; batch is part of the official config) |
+
+Node facts (`logs/probe/nodeinfo_*.out`): every GPU node has a local NVMe RAID at `/tmp` (= `/scratch`, 11–28 TB, ≥ 96 %
+free), 755 GB–2 TB RAM, 64 cores (8 per GPU). The cu126 torch 2.14 wheel runs on H100/H200 (sm 9.0) under driver
+615.71 (CUDA 13.4).

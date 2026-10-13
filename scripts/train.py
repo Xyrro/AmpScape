@@ -296,6 +296,13 @@ def main():
     )
     ap.add_argument("--no-amp", action="store_true")
     ap.add_argument(
+        "--packed-dir",
+        default=None,
+        help="pack the train/val items once to this (node-local) directory and train from the memmaps "
+        "(ampscape.data.packed; same tensors as the HDF5 loader; ignored for the GNN)",
+    )
+    ap.add_argument("--prefetch", type=int, default=2, help="DataLoader prefetch_factor")
+    ap.add_argument(
         "--resume", action="store_true", help="continue from <out>/last.pt if present (2026-09-24)"
     )
     ap.add_argument(
@@ -392,20 +399,32 @@ def main():
         if a.max_train:
             tr.index = tr.index.iloc[: a.max_train].reset_index(drop=True)
         va = AmpScapeDataset(a.task, "val", a.tier, a.root, aux_root=a.aux_root)
+        items_tr = Items(tr, a.task, stats, graph, extra, multiscale, a.tier, a.target_norm, a.target, voltage_scale, coarse_factor)
+        items_va = Items(va, a.task, stats, graph, extra, multiscale, a.tier, a.target_norm, a.target, voltage_scale, coarse_factor)
+        if a.packed_dir and not graph:
+            from ampscape.data.packed import PackedItems, pack_items, pack_key
+
+            base = {
+                "task": a.task, "tier": a.tier, "root": str(pathlib.Path(a.root).resolve()), "extra": list(extra),
+                "target_norm": a.target_norm, "target": a.target, "voltage_scale": voltage_scale,
+                "stats": stats, "max_train": a.max_train or 0,
+            }
+            packs = {}
+            # the packing loaders draw from the global RNGs (DataLoader base seeds): save/restore so the training
+            # shuffle is the same permutation as the HDF5 path's (identical sample stream, verified 2026-10-13)
+            import random as _random
+
+            rng_state = (torch.get_rng_state(), np.random.get_state(), _random.getstate())
+            for split, it in (("train", items_tr), ("val", items_va)):
+                spec = dict(base, split=split)
+                packs[split] = pack_items(
+                    it, pathlib.Path(a.packed_dir) / f"{a.task}_{a.tier}_{split}_{pack_key(spec)}", spec,
+                    workers=a.workers, batch=max(a.batch, 8), collate=collate, log=print,
+                )
+            torch.set_rng_state(rng_state[0]); np.random.set_state(rng_state[1]); _random.setstate(rng_state[2])
+            items_tr, items_va = PackedItems(packs["train"]), PackedItems(packs["val"])
         dl_tr = torch.utils.data.DataLoader(
-            Items(
-                tr,
-                a.task,
-                stats,
-                graph,
-                extra,
-                multiscale,
-                a.tier,
-                a.target_norm,
-                a.target,
-                voltage_scale,
-                coarse_factor,
-            ),
+            items_tr,
             batch_size=a.batch,
             shuffle=True,
             num_workers=a.workers,
@@ -413,25 +432,16 @@ def main():
             pin_memory=True,
             drop_last=True,
             persistent_workers=a.workers > 0,
+            prefetch_factor=a.prefetch if a.workers > 0 else None,
         )
         dl_va = torch.utils.data.DataLoader(
-            Items(
-                va,
-                a.task,
-                stats,
-                graph,
-                extra,
-                multiscale,
-                a.tier,
-                a.target_norm,
-                a.target,
-                voltage_scale,
-                coarse_factor,
-            ),
+            items_va,
             batch_size=a.batch,
             shuffle=False,
             num_workers=a.workers,
             collate_fn=collate,
+            pin_memory=True,
+            prefetch_factor=a.prefetch if a.workers > 0 else None,
         )
         opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=a.weight_decay)
         steps = a.epochs * max(len(dl_tr), 1)

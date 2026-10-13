@@ -44,6 +44,12 @@ def cmd_stage(a):
     from concurrent.futures import ThreadPoolExecutor
 
     os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    for k, v in {  # xet download pipeline: bounded anonymous memory (login-node cgroup; see push_aux.py)
+        "HF_XET_FIXED_DOWNLOAD_CONCURRENCY": "4",
+        "HF_XET_CLIENT_AC_MAX_DOWNLOAD_CONCURRENCY": "4",
+        "HF_XET_HIGH_PERFORMANCE": "0",
+    }.items():
+        os.environ.setdefault(k, v)
     from huggingface_hub import HfApi, RepoFile, hf_hub_download
 
     from ampscape.io.pagecache import CacheSweeper, cgroup_memory, drop_file_cache

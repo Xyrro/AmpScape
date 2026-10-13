@@ -56,6 +56,18 @@ GROUP_GB = {
 GRES = "gpu:l40s:1"
 GRES_ALT = "gpu:a100:1"  # used when ≥ ALT_AFTER of our jobs are already pending on L40S
 ALT_AFTER = 4
+# GPU pools (2026-10-13, owner): training legs go to the first pool with fewer than SPILL_AFTER of our jobs pending on
+# its GPU type and spill down the list; all pools run under the coc-ice QoS (one 1 920 GPU-minute budget). `ice-gpu`
+# reaches 6 H100 and 6 H200 nodes (AllowQos=ALL); coe-gpu (the other 25 H100/H200 nodes) needs the coe-ice QoS and is
+# not used without the owner's decision on its separate budget. PACK=1: node-local packed training items (train_full.sbatch).
+POOLS = [
+    ("ice-gpu", "gpu:h200:1"),
+    ("ice-gpu", "gpu:h100:1"),
+    ("coc-gpu", "gpu:l40s:1"),
+    ("coc-gpu", "gpu:a100:1"),
+]
+SPILL_AFTER = 3
+PACK = "1"
 PARTITION = "coc-gpu"
 WALL = "02:00:00"  # 2026-09-24: QoS MaxTRESRunMinsPU gres/gpu=1920 → short jobs + self re-queue give ≈ 16 concurrent GPUs
 TIERS = ["S", "M", "L", "XL"]
@@ -385,6 +397,17 @@ def submit_transfer(j: dict, st: dict, gres: str, exclude: list[str]) -> None:
         log(f"submit failed for {j['name']}: {jid[-200:]}")
 
 
+def choose_pool(pend: list[str]) -> tuple[str, str]:
+    """(partition, gres) for the next training leg: the first pool with fewer than SPILL_AFTER of our jobs pending on
+    its GPU type; the last pool otherwise. `pend` = squeue lines "name|gres" of our pending jobs."""
+    for partition, gres in POOLS:
+        gtype = gres.split(":")[1]
+        n = sum(1 for x in pend if x.startswith("phase10-") and gtype in x.split("|", 1)[-1])
+        if n < SPILL_AFTER:
+            return partition, gres
+    return POOLS[-1]
+
+
 def submit(j: dict, st: dict) -> None:
     out = RUNS / j["name"]
     if j.get("kind") != "transfer":
@@ -401,13 +424,11 @@ def submit(j: dict, st: dict) -> None:
     pend = sh(
         ["squeue", "-u", os.environ.get("USER", "yxiao413"), "-h", "-t", "PD", "-o", "%j|%b"]
     ).splitlines()
-    pd_l40s = sum(1 for x in pend if x.startswith("phase10-") and "l40s" in x)
-    pd_a100 = sum(1 for x in pend if x.startswith("phase10-") and "a100" in x)
-    gres = GRES_ALT if (pd_l40s >= ALT_AFTER and pd_a100 < 4) else GRES
+    partition, gres = choose_pool(pend)
     export = (
         f"ALL,MODEL={j['model']},TASK={j['task']},TIER={j['tier']},SEED={j['seed']},OUT={out},ROOT={CACHE},"
         f"EPOCHS={j.get('epochs', 30)},BATCH={batch},PATIENCE=8,WORKERS={res['cpus']},MAXTRAIN={j.get('maxtrain', '')},"
-        f"EXTRA={j.get('extra', '')},MEM={res['mem']},GRES={gres},WALL={WALL}"
+        f"EXTRA={j.get('extra', '')},MEM={res['mem']},GRES={gres},WALL={WALL},PACK={PACK if j['model'] != 'gnn' else '0'}"
     )
     bad = (
         LOGS / "gpu_bad_nodes.txt"
@@ -418,7 +439,7 @@ def submit(j: dict, st: dict) -> None:
         else []
     )
     if j.get("kind") == "transfer":
-        submit_transfer(j, st, gres, exclude)
+        submit_transfer(j, st, GRES, exclude)
         return
     jid = sh(
         [
@@ -430,7 +451,7 @@ def submit(j: dict, st: dict) -> None:
             "-q",
             "coc-ice",
             "-p",
-            PARTITION,
+            partition,
             "-N1",
             "-n1",
             f"-c{res['cpus']}",
