@@ -144,7 +144,7 @@ def short_label(method: str) -> str:
     import re as _re
 
     mm = _re.match(
-        r"^(unet|fno|vit|gnn|mgno)_T4_\w+?(?: \(tuned\))?(_s\d+)?(_scalenorm)? \(learned", method
+        r"^(unet|fno|vit|gnn|mgno)_T4_\w+?(?: \(tuned\))?(_s\d+)?(?:_t2)?(_scalenorm)? \(learned", method
     )
     if not mm:
         return method
