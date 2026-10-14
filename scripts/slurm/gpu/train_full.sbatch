@@ -9,6 +9,7 @@ cd /storage/ice1/1/8/yxiao413/EcoFlowBench
 source scripts/env.sh
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-6}
 ROOT=${ROOT:-data/hfcache}; EPOCHS=${EPOCHS:-30}; BATCH=${BATCH:-16}; PATIENCE=${PATIENCE:-8}; WORKERS=${WORKERS:-6}
+ROOT0=$ROOT  # the scratch root as submitted: re-queued legs must receive this, not a node-local path (00:10Z 2026-10-14)
 MAXTRAIN=${MAXTRAIN:-}; EXTRA=${EXTRA:-}
 mkdir -p "$OUT"
 echo "host=$(hostname) gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1) model=$MODEL task=$TASK tier=$TIER seed=$SEED start=$(date -u +%FT%TZ) job=$SLURM_JOB_ID"
@@ -21,7 +22,9 @@ if [ -n "${SLURM_JOB_END_TIME:-}" ]; then BUDGET=$(( ( SLURM_JOB_END_TIME - $(da
 if [ "${LOCALDATA:-0}" = "1" ]; then
   LBASE=${TMPDIR:-/tmp}/ampscape_$USER/hfcache; mkdir -p "$LBASE"
   find "$LBASE" -mindepth 1 -maxdepth 1 -type d -mtime +2 -exec rm -rf {} + 2>/dev/null
-  LROOT=$LBASE/${TIER}_${GROUP}; mkdir -p "$LROOT/stats"
+  # the root's basename is the evaluation-group prefix ('<root>_<tier>_<split>'): keep it 'hfcache' like the scratch
+  # copy (00:00Z 2026-10-14: four GNN runs came out keyed 'M_T4_M_test_id'; scripts/fix_local_root_tags.py renamed them)
+  LROOT=$LBASE/${TIER}_${GROUP}/hfcache; mkdir -p "$LROOT/stats"
   cp "$ROOT/stats/norm_stats.json" "$LROOT/stats/"
   (
     flock 9
@@ -59,7 +62,7 @@ if [ -f "$OUT/paused.json" ] && [ ! -f "$OUT/results.json" ] && [ "$PJ" = "$SLUR
   echo "paused at $(cat "$OUT/paused.json"); re-queueing with --resume (re-queue $((NRQ + 1)), $EXCL)"
   sbatch --parsable $EXCL -A coc -q "${QOS:-coc-ice}" -p "${SLURM_JOB_PARTITION}" -N1 -n1 -c "${SLURM_CPUS_PER_TASK:-6}" --mem="${MEM:-48G}" \
     --gres="${GRES:-gpu:1}" -t "${WALL:-16:00:00}" -J "$SLURM_JOB_NAME" -o "$OUT/slurm_%j.out" \
-    --export=ALL,MODEL="$MODEL",TASK="$TASK",TIER="$TIER",SEED="$SEED",OUT="$OUT",ROOT="$ROOT",EPOCHS="$EPOCHS",BATCH="$BATCH",PATIENCE="$PATIENCE",WORKERS="$WORKERS",MAXTRAIN="$MAXTRAIN",EXTRA="$EXTRA",MEM="${MEM:-48G}",GRES="${GRES:-gpu:1}",WALL="${WALL:-16:00:00}",PACK="${PACK:-0}",PREFETCH="${PREFETCH:-2}",QOS="${QOS:-coc-ice}",LOCALDATA="${LOCALDATA:-0}",GROUP="${GROUP:-}" \
+    --export=ALL,MODEL="$MODEL",TASK="$TASK",TIER="$TIER",SEED="$SEED",OUT="$OUT",ROOT="$ROOT0",EPOCHS="$EPOCHS",BATCH="$BATCH",PATIENCE="$PATIENCE",WORKERS="$WORKERS",MAXTRAIN="$MAXTRAIN",EXTRA="$EXTRA",MEM="${MEM:-48G}",GRES="${GRES:-gpu:1}",WALL="${WALL:-16:00:00}",PACK="${PACK:-0}",PREFETCH="${PREFETCH:-2}",QOS="${QOS:-coc-ice}",LOCALDATA="${LOCALDATA:-0}",GROUP="${GROUP:-}" \
     scripts/slurm/gpu/train_full.sbatch
   exit 0
 fi

@@ -630,24 +630,35 @@ def submit_t4_reference_backfill(jobs: list[dict], st: dict) -> None:
             continue
         pred = run / "predictions" / f"hfcache_{j['tier']}_test_id"
         tier = j["tier"]
-        if not staged(tier, "T4"):
-            continue  # the harness reads the shards; the staging block above requests the group
         fetch = ""
         cleanup = ""
+        root = "data/hfcache"
+        if not staged(tier, "T4"):
+            if tier != "M" or not (pred / "predictions.h5").exists():
+                continue  # the harness reads the shards; the staging block above requests the group
+            # M/T4 is not on scratch (the GNN legs read node-local copies): fetch the group onto the CPU node's local
+            # disk (54 GB, ≈ 10 min) instead of staging it beside the L work (00:05Z 2026-10-14)
+            fetch = (
+                f'G="${{TMPDIR:-/tmp}}/ampscape_t4ref_{j["name"]}_$SLURM_JOB_ID"; mkdir -p "$G/hfcache/stats"; '
+                f'cp data/hfcache/stats/norm_stats.json "$G/hfcache/stats/"; '
+                f'python scripts/slurm/gpu/stage_data.py stage --cache "$G/hfcache" --tier M --group T4 --workers 16 2>&1 | tail -1 && '
+            )
+            root = '"$G/hfcache"'
+            cleanup = '; rm -rf "$G"'
         if not (pred / "predictions.h5").exists():
             # offloaded to the Hub: fetched by the job onto the CPU node's local disk (1.4 TB; 22:58Z: 16 L fetches
             # of 6.5 GB onto scratch would not have fit, and the hub-cache copies of the morning's M fetches stayed
             # behind on scratch), xet chunk cache alongside it, everything removed with the job
             rel = f"aux/results/runs_full/{j['name']}/predictions/hfcache_{tier}_test_id/predictions.h5"
-            fetch = (
+            fetch += (
                 f'L="${{TMPDIR:-/tmp}}/ampscape_t4ref_{j["name"]}_$SLURM_JOB_ID"; mkdir -p "$L"; '
                 f'HF_XET_CACHE="$L/xet" python -c "from huggingface_hub import hf_hub_download as d; '
                 f"d('Xirro/AmpScape', '{rel}', repo_type='dataset', local_dir='$L')\" && "
             )
             pred = pathlib.Path(f"$L/{rel}").parent
-            cleanup = '; rm -rf "$L"'
+            cleanup += '; rm -rf "$L"'
         cmd = (
-            f"source scripts/env.sh; {fetch}python scripts/evaluate.py --predictions {pred} --root data/hfcache --tier {tier} "
+            f"source scripts/env.sh; {fetch}python scripts/evaluate.py --predictions {pred} --root {root} --tier {tier} "
             f"--split test_id --t4-reference aux/t4_bs1_reference/{tier}_bs1 "
             f"--t4-blocks aux/t4_blocksize_baselines/{tier}_* --out {run}/eval_t4_reference" + cleanup
         )
