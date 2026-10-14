@@ -811,6 +811,10 @@ def cycle(jobs: list[dict], st: dict) -> None:
             and done(j)
             and not (RUNS / j["name"] / "eval_t4_reference").exists()
         ):
+            if j["tier"] == "M" and (
+                RUNS / j["name"] / "predictions" / "hfcache_M_test_id" / "predictions.h5"
+            ).exists():
+                continue  # the backfill fetches M/T4 onto the CPU node itself (00:08Z 2026-10-14)
             key = (j["tier"], "T4")
             if key not in needed:
                 needed.append(key)
