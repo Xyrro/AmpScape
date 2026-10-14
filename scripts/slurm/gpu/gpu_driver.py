@@ -772,7 +772,10 @@ def gnn_phase(j: dict) -> bool:
 def cycle(jobs: list[dict], st: dict) -> None:
     note_bad_nodes(jobs)
     note_oom(jobs, st)
-    active = our_jobs()
+    submit_t4_reference_backfill(jobs, st)
+    submit_accel_backfill(jobs, st)
+    active = our_jobs()  # after the backfill submissions, so their groups are pinned in this cycle (06:32Z 2026-10-14:
+    # S/T1 was evicted by the transfer hold seconds after four warm-start evaluations were submitted on it)
     fp = footprint_gb(active, jobs)
     st["recent_stagings"] = [
         x for x in st.get("recent_stagings", []) if time.time() - x[0] < RECENT_STAGE_S
@@ -782,8 +785,6 @@ def cycle(jobs: list[dict], st: dict) -> None:
         return committed_gb(st, fp)
 
     headroom = [QUOTA_SOFT_GB - used_gb()]  # GB of predictions that may still be committed this cycle
-    submit_t4_reference_backfill(jobs, st)
-    submit_accel_backfill(jobs, st)
     running = {n for n, s in active.items() if not n.startswith(("stats-", "t4ref-", "accel-"))}
     pending = [j for j in jobs if not done(j) and j["name"] not in running]
     # staging: data of the next pending jobs, in priority order, only when the group fits under the quota guard
