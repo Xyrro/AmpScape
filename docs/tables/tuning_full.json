@@ -85,14 +85,14 @@
    }
   },
   "gnn": {
-   "variant": "ms",
-   "changed": false,
+   "variant": "ms8",
+   "changed": true,
    "official_variant": "ms",
    "official_best_val": 0.31265,
    "official_seed_std": 0.00676668555005576,
    "candidates": {
     "ms": 0.31265,
-    "ms8": 0.44769
+    "ms8": 0.26446
    }
   }
  }

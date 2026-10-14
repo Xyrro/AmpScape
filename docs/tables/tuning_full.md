@@ -32,6 +32,6 @@ config only if it beats the official seed-1 value by more than the official conf
 | L | vit | p16g32  | 0.3895 | 22 | 3.1 | 0.43 | +47.8 % |  |
 | L | vit | p8g64  | 0.4310 | 28 | 3.6 | 0.59 | +63.5 % |  |
 | L | vit | (official seed spread) | ± 0.0038 | | | | | official kept |
-| L | gnn | ms official | 0.3126 | 22 | 0.2 | 14.68 |  | **chosen** |
-| L | gnn | ms8  | 0.4477 | 1 | 0.2 | 0.31 | +43.2 % |  |
-| L | gnn | (official seed spread) | ± 0.0068 | | | | | official kept |
+| L | gnn | ms official | 0.3126 | 22 | 0.2 | 14.68 |  |  |
+| L | gnn | ms8  | 0.2645 | 17 | 0.2 | 7.71 | -15.4 % | **chosen** |
+| L | gnn | (official seed spread) | ± 0.0068 | | | | | config changes |
