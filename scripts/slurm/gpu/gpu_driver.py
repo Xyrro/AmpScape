@@ -845,6 +845,13 @@ def cycle(jobs: list[dict], st: dict) -> None:
     # blocking the headline M/L runs.
     running_jobs = [j for j in jobs if j["name"] in running]
     running_groups = {(jj["tier"], GROUP[jj["task"]]) for jj in running_jobs if not local_fetch(jj)}
+    # CPU backfills read their group from scratch too (06:09Z 2026-10-14: S/T1 was evicted under four running
+    # warm-start evaluations, which failed after 10 min and would have re-staged it in a loop)
+    by_name = {j["name"]: j for j in jobs}
+    for n in active:
+        run = n[len("accel-") :].rsplit("-", 1)[0] if n.startswith("accel-") else n[len("t4ref-") :] if n.startswith("t4ref-") else None
+        if run in by_name:
+            running_groups.add((by_name[run]["tier"], GROUP[by_name[run]["task"]]))
     first_use = {}
     first_use_soon = {}  # ignoring the GNN phase (P4/XF4), which cannot start before everything else anyway
     for k, jj in enumerate(pending):
