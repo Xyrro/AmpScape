@@ -63,3 +63,6 @@ def test_footprint_and_committed_scratch(tmp_path, monkeypatch):
     # accounting caught up → no compensation
     monkeypatch.setattr(g, "quota_gb", lambda: 240.0)
     assert g.committed_gb(st, 0.0) == 240.0
+    # a stale q0 (eviction not yet in the reading) never adds more than the staged size
+    monkeypatch.setattr(g, "quota_gb", lambda: 100.0)
+    assert g.committed_gb({"recent_stagings": [[now - 60, 61.0, 260.0]]}, 0.0) == 161.0

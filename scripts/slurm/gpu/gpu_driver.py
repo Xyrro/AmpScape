@@ -316,8 +316,9 @@ def committed_gb(st: dict, footprint: float) -> float:
     # each entry [ts, gb, q0]: the reading at the stage start plus the staged GB is what the reading must reach; the
     # compensation decays to 0 as the accounting catches up (an eviction in between over-compensates for ≤ 15 min)
     recent = max(
-        [q0 + gb - q for ts, gb, q0 in st.get("recent_stagings", []) if now - ts < RECENT_STAGE_S] + [0.0]
-    )
+        [min(gb, q0 + gb - q) for ts, gb, q0 in st.get("recent_stagings", []) if now - ts < RECENT_STAGE_S]
+        + [0.0]
+    )  # never more than the staged size (03:54Z: a stale q0 produced 328 GB "committed" against 242 GB used)
     return q + recent + footprint
 
 
@@ -953,7 +954,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
                     # behind one long GNN run while S-tier jobs could have run)
                     continue
                 break  # quota truly full: do not stage a later group before this one
-        q0 = quota_gb()
+        q0 = quota_gb() - freed[0]  # evictions of this cycle are not in the reading yet (03:54Z: L/T4's 82 GB were)
         stage(tier, group)
         if staged(tier, group):
             freed[0] -= size
