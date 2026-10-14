@@ -11,7 +11,7 @@
 - Every time you stop to report, write the same summary to `docs/status/latest.md` and append it to `docs/status/history.md` (owner reads these on GitHub).
 - Log every design decision that refines or deviates from the brief in `DECISIONS.md` with a one-line rationale.
 - Keep `CHANGELOG.md` up to date.
-- Prefer small, reviewable commits. Never force-push.
+- Prefer small, reviewable commits. Never force-push. **Push `main` to GitHub after every status update and every phase boundary** (`git push origin main`); a failed push is a failure to report with its exact error (credentials, network, hook), never something to retry silently (owner, 2026-10-14: 38 commits had sat unpushed).
 - Never add `Co-Authored-By`, "Generated with Claude Code", or `Claude-Session` trailers to commits or PRs (a `commit-msg` hook strips them; `~/.claude/settings.json` sets `attribution` to empty).
 - Do not fabricate data sources, URLs, licenses, or citations. If something cannot be verified, say so in the report.
 
