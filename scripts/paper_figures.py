@@ -83,6 +83,14 @@ def t4_pareto(out: pathlib.Path) -> None:
             for p in glob.glob(str(ROOT / "runs" / "full" / f"*_T4_{tier}_s*"))
             if (pathlib.Path(p) / "eval_t4_reference" / "results.json").exists()
         )
+        # a tier-tuned re-run ('_t2' after the seed) supersedes the pre-tuning run of the same seed (2026-10-14)
+        names = {pathlib.Path(p).name for p in runs}
+        runs = [
+            p
+            for p in runs
+            if "_t2" in pathlib.Path(p).name
+            or re.sub(r"(_s\d+)", r"\1_t2", pathlib.Path(p).name, count=1) not in names
+        ]
         if not ref.exists():
             log(f"F2 T4 Pareto {tier}: reference {ref} missing — skipped")
             continue
@@ -144,6 +152,8 @@ def split_run_name(model: str) -> tuple[str, str, str, int | None, str]:
     suffix = m.group(5) or ""
     if suffix == "t2":
         suffix = ""
+    elif suffix.startswith("t2_"):
+        suffix = suffix[3:]  # '_t2_scalenorm': the tier-tuned scale-aware variant (2026-10-14)
     return m.group(1), m.group(2), m.group(3), int(m.group(4)), suffix
 
 
@@ -234,10 +244,10 @@ def scale_transfer(out: pathlib.Path) -> None:
         base, task, tier, seed, suffix = split_run_name(run.name)
         if seed is None:
             continue
-        if suffix == "" and "_t2" not in run.name:
-            t2 = run.parent / f"{base}_{task}_{tier}_s{seed}_t2"
+        if "_t2" not in run.name:
+            t2 = run.parent / f"{base}_{task}_{tier}_s{seed}_t2{'_' + suffix if suffix else ''}"
             if (t2 / "results_transfer.json").exists():
-                continue  # a tier-tuned counterpart exists: it is the official L model
+                continue  # a tier-tuned counterpart exists: it is the official L model (also for scale-aware)
         ev = json.loads(pathlib.Path(p).read_text())["eval"]
         for tag, v in ev.items():
             m = re.match(r"^[^_]+_(XL|XXL)_(test_id|test_ood|ood_region)$", tag)
