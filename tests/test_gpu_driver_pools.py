@@ -36,6 +36,7 @@ def test_local_fetch_only_for_gnn_training_legs():
     assert g.local_fetch({"model": "gnn"})
     assert not g.local_fetch({"model": "gnn", "kind": "transfer"})
     assert not g.local_fetch({"model": "unet"})
+    assert g.local_fetch({"model": "fno", "local": True}) and not g.local_fetch({"model": "fno", "local": True, "kind": "transfer"})
     assert g.gnn_phase({"model": "gnn", "tag": "RERUN_M"}) and g.gnn_phase({"model": "unet", "tag": "P4"})
 
 

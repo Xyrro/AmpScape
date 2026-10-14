@@ -465,8 +465,10 @@ def choose_pool(queued: list[str]) -> tuple[str, str, str] | None:
 def local_fetch(j: dict) -> bool:
     """GNN training legs fetch their (tier, group) from the Hub straight to the compute node's NVMe (train_full.sbatch
     LOCALDATA=1; compute nodes have outbound HTTPS, docs/compute_env.md) instead of reading the scratch cache: a GNN
-    leg pins its group for ≈ 12 h, which deadlocked the staging of every other group under the scratch guard."""
-    return j.get("model") == "gnn" and j.get("kind") != "transfer"
+    leg pins its group for ≈ 12 h, which deadlocked the staging of every other group under the scratch guard.
+    A plan entry with "local": true does the same (01:30Z 2026-10-14: the FNO T3 L legs would have waited ≈ 2.5 h for
+    L/T4 to be released by the slow scale-aware T4 leg; a 64 GB fetch takes ≈ 10 min)."""
+    return (j.get("model") == "gnn" or bool(j.get("local"))) and j.get("kind") != "transfer"
 
 
 def submit(j: dict, st: dict) -> None:

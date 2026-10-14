@@ -987,7 +987,8 @@
   "seed": 1,
   "tag": "RERUN_L",
   "extra": "--variant w48 --extra dist",
-  "est_h": 1.1
+  "est_h": 1.1,
+  "local": true
  },
  {
   "name": "fno_T3_L_s2_t2",
@@ -997,7 +998,8 @@
   "seed": 2,
   "tag": "RERUN_L",
   "extra": "--variant w48 --extra dist",
-  "est_h": 1.1
+  "est_h": 1.1,
+  "local": true
  },
  {
   "name": "fno_T3_L_s3_t2",
@@ -1007,7 +1009,8 @@
   "seed": 3,
   "tag": "RERUN_L",
   "extra": "--variant w48 --extra dist",
-  "est_h": 1.1
+  "est_h": 1.1,
+  "local": true
  },
  {
   "name": "xfer_fno_T1_L_s1_t2_XL",
