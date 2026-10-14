@@ -452,6 +452,28 @@
   "done_marker": true
  },
  {
+  "name": "gnn_T4_L_s1_scalenorm",
+  "model": "gnn",
+  "task": "T4",
+  "tier": "L",
+  "seed": 1,
+  "tag": "T4REF",
+  "extra": "",
+  "est_h": 0.0,
+  "done_marker": true
+ },
+ {
+  "name": "vit_T4_L_s1_scalenorm",
+  "model": "vit",
+  "task": "T4",
+  "tier": "L",
+  "seed": 1,
+  "tag": "T4REF",
+  "extra": "",
+  "est_h": 0.0,
+  "done_marker": true
+ },
+ {
   "name": "mgno_T1_S_s1",
   "model": "mgno",
   "task": "T1",
