@@ -975,9 +975,19 @@ def cycle(jobs: list[dict], st: dict) -> None:
     if first_xfer is not None and used_gb() > XFER_QUOTA_GB:
         # 12 h idle on 2026-09-25: all four XL/XXL groups (166 GB) kept the scratch above the transfer threshold and
         # nothing triggered an eviction — free the groups whose next use is later than the first runnable transfer
+        # whose group is already staged (03:01Z 2026-10-14: XXL/T1, staged and wanted by the first runnable XXL legs,
+        # was evicted because the XL leg ahead of them — its group unstageable behind L/T4 — set the target)
         before = used_gb()
+        protect = max(
+            [
+                first_use.get((jj["tier"], GROUP[jj["task"]]), 10**6)
+                for jj in pending
+                if jj.get("kind") == "transfer" and done({"name": jj["src"]}) and staged(jj["tier"], GROUP[jj["task"]])
+            ]
+            + [first_xfer]
+        )
         evict_until(
-            0.0, first_xfer, XFER_QUOTA_GB
+            0.0, protect, XFER_QUOTA_GB
         )  # until quota - freed <= XFER_QUOTA_GB; only groups outside the lookahead (23:22Z: a 1 GB overshoot evicted XXL/T1 four jobs ahead of its use)
         if freed[0] > 0:
             log(
