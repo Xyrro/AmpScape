@@ -799,12 +799,20 @@ def cycle(jobs: list[dict], st: dict) -> None:
     stageable = [
         jj for jj in pending if not (earlier_pending and gnn_phase(jj))
     ]
+    train_needs: set[tuple[str, str]] = set()
     for j in stageable[:LOOKAHEAD]:
         if local_fetch(j):
             continue  # fetched on the node, nothing to stage
         key = (j["tier"], GROUP[j["task"]])
         if key not in needed:
             needed.append(key)
+        if j.get("kind") == "transfer":
+            if key not in train_needs:
+                xfer_only.add(key)  # staged under the lower transfer limit (03:57Z 2026-10-14: XL/T4 was staged
+                # beside XL/T1 + XXL/T1 up to the 280 GB guard and every transfer leg was then held under 255)
+        else:
+            train_needs.add(key)
+            xfer_only.discard(key)
     # finished T4 M/L runs whose exact-reference evaluation is missing need their group staged for the CPU job
     for j in jobs:
         key = (j["tier"], GROUP[j["task"]])  # (16:18Z: was the loop variable left over from the stageable loop above)
@@ -979,13 +987,14 @@ def cycle(jobs: list[dict], st: dict) -> None:
         # whose group is already staged (03:01Z 2026-10-14: XXL/T1, staged and wanted by the first runnable XXL legs,
         # was evicted because the XL leg ahead of them — its group unstageable behind L/T4 — set the target)
         before = used_gb()
+        runnable = [
+            jj
+            for jj in pending
+            if jj.get("kind") == "transfer" and done({"name": jj["src"]}) and staged(jj["tier"], GROUP[jj["task"]])
+        ][:MAX_XFER]  # only the legs that can run now: a staged group wanted further down (XL/T4 behind eight
+        # T1 legs) is evicted rather than holding everything (03:57Z 2026-10-14)
         protect = max(
-            [
-                first_use.get((jj["tier"], GROUP[jj["task"]]), 10**6)
-                for jj in pending
-                if jj.get("kind") == "transfer" and done({"name": jj["src"]}) and staged(jj["tier"], GROUP[jj["task"]])
-            ]
-            + [first_xfer]
+            [first_use.get((jj["tier"], GROUP[jj["task"]]), 10**6) for jj in runnable] + [first_xfer]
         )
         evict_until(
             0.0, protect, XFER_QUOTA_GB
