@@ -204,15 +204,16 @@ def error_vs_tier(out: pathlib.Path) -> None:
     metrics = ["rel_l2", "mae_log10eps", "top5_iou", "pinch_recall", "spearman"]
     agg = (
         learned.groupby(["task", "tier", "base"])[metrics + ["speed-up (median)", "train GPU-h"]]
-        .agg(["mean", "std", "count"])
+        .agg(["mean", "std", "count", "median"])
         .reset_index()
     )
-    # table: mean ± std over seeds
+    # table: mean ± std over seeds, plus the median over seeds of rel-L2 (owner, 2026-10-15: at L the seed
+    # disagreement on rel-L2 makes the mean outlier-driven)
     lines = [
-        "# Learned baselines on test_id, mean ± std over seeds (from docs/tables/baselines_full.md)",
+        "# Learned baselines on test_id, mean ± std over seeds (from docs/tables/baselines_full.md); rel-L2 median = median over seeds",
         "",
-        "| task | tier | model | seeds | rel-L2 | MAE log10 | top-5 % IoU | pinch recall | Spearman | speed-up (median) | train GPU-h |",
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "| task | tier | model | seeds | rel-L2 | rel-L2 median | MAE log10 | top-5 % IoU | pinch recall | Spearman | speed-up (median) | train GPU-h |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for _, r in agg.sort_values(["task", "tier", "base"]).iterrows():
         n = int(r[("rel_l2", "count")])
@@ -223,7 +224,7 @@ def error_vs_tier(out: pathlib.Path) -> None:
 
         lines.append(
             f"| {r['task'].iloc[0] if hasattr(r['task'], 'iloc') else r['task']} | {r['tier'].iloc[0] if hasattr(r['tier'], 'iloc') else r['tier']} | "
-            f"{MODEL_LABEL.get(r['base'].iloc[0] if hasattr(r['base'], 'iloc') else r['base'], r['base'])} | {n} | {ms('rel_l2')} | {ms('mae_log10eps')} | "
+            f"{MODEL_LABEL.get(r['base'].iloc[0] if hasattr(r['base'], 'iloc') else r['base'], r['base'])} | {n} | {ms('rel_l2')} | {r[('rel_l2', 'median')]:.3f} | {ms('mae_log10eps')} | "
             f"{ms('top5_iou')} | {ms('pinch_recall')} | {ms('spearman')} | {r[('speed-up (median)', 'mean')]:.0f} | "
             f"{r[('train GPU-h', 'mean')]:.2f} |"
         )
@@ -323,15 +324,15 @@ def scale_transfer(out: pathlib.Path) -> None:
         df.groupby(["task", "model", "variant", "eval_tier", "split"])[
             ["rel_l2", "spearman", "top5_iou", "throughput_err"]
         ]
-        .agg(["mean", "std", "count"])
+        .agg(["mean", "std", "count", "median"])
         .reset_index()
     )
     lines = [
         "# Scale transfer: models trained at L evaluated at L, XL and XXL (from runs/full/*/results_transfer.json; "
-        "L rows from results.json). Mean ± std over seeds; zero-shot = official config; scale-aware = --target-norm scale.",
+        "L rows from results.json). Mean ± std over seeds, rel-L2 also as the median over seeds; zero-shot = official config; scale-aware = --target-norm scale.",
         "",
-        "| task | model | variant | eval tier | split | seeds | rel-L2 | Spearman | top-5 % IoU | throughput err |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| task | model | variant | eval tier | split | seeds | rel-L2 | rel-L2 median | Spearman | top-5 % IoU | throughput err |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     order = {"L": 0, "XL": 1, "XXL": 2}
     agg["o"] = agg["eval_tier"].map(order)
@@ -346,7 +347,7 @@ def scale_transfer(out: pathlib.Path) -> None:
 
         lines.append(
             f"| {r['task'].iloc[0]} | {MODEL_LABEL.get(r['model'].iloc[0], r['model'].iloc[0])} | {r['variant'].iloc[0]} | "
-            f"{r['eval_tier'].iloc[0]} | {r['split'].iloc[0]} | {n} | {ms('rel_l2')} | {ms('spearman')} | {ms('top5_iou')} | {ms('throughput_err')} |"
+            f"{r['eval_tier'].iloc[0]} | {r['split'].iloc[0]} | {n} | {ms('rel_l2')} | {r[('rel_l2', 'median')]:.3f} | {ms('spearman')} | {ms('top5_iou')} | {ms('throughput_err')} |"
         )
     (out / "tables" / "scale_transfer.md").write_text("\n".join(lines) + "\n")
     # figure: test_id rel-L2 at L / XL / XXL per model, panels per task, zero-shot solid vs scale-aware hatched
@@ -569,21 +570,23 @@ def ood_degradation(out: pathlib.Path) -> None:
     g = df.groupby(["task", "tier", "base", "split"])[
         ["rel_l2", "spearman", "top5_iou", "pinch_recall"]
     ].mean()
+    med = df.groupby(["task", "tier", "base", "split"])["rel_l2"].median().unstack("split")
     wide = g["rel_l2"].unstack("split")
     for sp_ in splits:
         if sp_ not in wide:
             wide[sp_] = np.nan
+        wide[f"{sp_} median"] = med[sp_] if sp_ in med else np.nan
     wide["test_ood/test_id"] = wide["test_ood"] / wide["test_id"]
     wide["ood_region/test_id"] = wide["ood_region"] / wide["test_id"]
     wide["published/test_id"] = wide["published"] / wide["test_id"]
     wide = wide.reset_index()
     lines = [
-        "# OOD degradation at the training tier (rel-L2, official configs, mean over seeds; from docs/tables/baselines_full.md)",
+        "# OOD degradation at the training tier (rel-L2, official configs, mean over seeds with the median over seeds in brackets; from docs/tables/baselines_full.md)",
         "",
         "test_ood = held-out resistance table (forest_bird) + held-out contrast (10⁶); ood_region = held-out biomes/realm; "
         "published = real tiles with published resistance surfaces (S only). Ratios > 1 mean degradation relative to test_id.",
         "",
-        "| task | tier | model | test_id | test_ood | ood_region | published | test_ood / id | ood_region / id | published / id |",
+        "| task | tier | model | test_id [median] | test_ood [median] | ood_region [median] | published [median] | test_ood / id | ood_region / id | published / id |",
         "|---|---|---|---|---|---|---|---|---|---|",
     ]
 
@@ -593,9 +596,12 @@ def ood_degradation(out: pathlib.Path) -> None:
     order = {t: i for i, t in enumerate(TIER_ORDER)}
     wide["o"] = wide.tier.map(order)
     for _, r in wide.sort_values(["task", "o", "base"]).iterrows():
+        def fm(sp_, r=r):
+            return "–" if not np.isfinite(r[sp_]) else f"{r[sp_]:.3f} [{r[f'{sp_} median']:.3f}]"
+
         lines.append(
-            f"| {r.task} | {r.tier} | {MODEL_LABEL.get(r.base, r.base)} | {f(r.test_id)} | {f(r.test_ood)} | {f(r.ood_region)} | "
-            f"{f(r.published)} | {f(r['test_ood/test_id'])} | {f(r['ood_region/test_id'])} | {f(r['published/test_id'])} |"
+            f"| {r.task} | {r.tier} | {MODEL_LABEL.get(r.base, r.base)} | {fm('test_id')} | {fm('test_ood')} | {fm('ood_region')} | "
+            f"{fm('published')} | {f(r['test_ood/test_id'])} | {f(r['ood_region/test_id'])} | {f(r['published/test_id'])} |"
         )
     (out / "tables" / "ood_degradation.md").write_text("\n".join(lines) + "\n")
     tasks = [t for t in ("T1", "T3", "T4") if t in set(wide.task)]
@@ -649,7 +655,7 @@ def baselines_all_splits(out: pathlib.Path) -> None:
     ]
     agg = (
         learned.groupby(["task", "tier", "split", "base"])[metrics + ["speed-up (median)"]]
-        .agg(["mean", "std", "count"])
+        .agg(["mean", "std", "count", "median"])
         .reset_index()
     )
     order = {t: i for i, t in enumerate(TIER_ORDER)}
@@ -657,12 +663,12 @@ def baselines_all_splits(out: pathlib.Path) -> None:
     agg["o"] = agg["tier"].map(order)
     agg["so"] = agg["split"].map(sp_order).fillna(9)
     lines = [
-        "# Learned baselines — all evaluation splits, mean ± std over seeds (official configs; from docs/tables/baselines_full.md)",
+        "# Learned baselines — all evaluation splits, mean ± std over seeds, rel-L2 also as the median over seeds (official configs; from docs/tables/baselines_full.md)",
         "",
         "Non-learned baselines (coarsen ×4, Omniscape block sizes) are in docs/tables/baselines_full.md and paper/tables/t4_pareto_{M,L}.md.",
         "",
-        "| task | tier | split | model | seeds | rel-L2 | MAE log10 | top-5 % IoU | pinch recall | Spearman | corridor dice | SSIM | speed-up (median) |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| task | tier | split | model | seeds | rel-L2 | rel-L2 median | MAE log10 | top-5 % IoU | pinch recall | Spearman | corridor dice | SSIM | speed-up (median) |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for _, r in agg.sort_values(["task", "o", "so", "base"]).iterrows():
         n = int(r[("rel_l2", "count")])
@@ -675,7 +681,7 @@ def baselines_all_splits(out: pathlib.Path) -> None:
 
         lines.append(
             f"| {r['task'].iloc[0]} | {r['tier'].iloc[0]} | {r['split'].iloc[0]} | {MODEL_LABEL.get(r['base'].iloc[0], r['base'].iloc[0])} | {n} | "
-            f"{ms('rel_l2')} | {ms('mae_log10eps')} | {ms('top5_iou')} | {ms('pinch_recall')} | {ms('spearman')} | "
+            f"{ms('rel_l2')} | {r[('rel_l2', 'median')]:.3f} | {ms('mae_log10eps')} | {ms('top5_iou')} | {ms('pinch_recall')} | {ms('spearman')} | "
             f"{ms('corridor_dice')} | {ms('ssim')} | {r[('speed-up (median)', 'mean')]:.0f} |"
         )
     (out / "baselines.md").write_text("\n".join(lines) + "\n")

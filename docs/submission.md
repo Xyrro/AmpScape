@@ -1,9 +1,9 @@
 # Submitting results to the AmpScape leaderboard
 
-Status (2026-10-05): the submission path is implemented (`scripts/submit_results.py`) and the leaderboard has been
-seeded locally with the official Phase 10-full baselines. **The seeded `aux/leaderboard/` files have not been pushed to
-the Hub yet; the maintainer pushes them after the tuning pass** (`scripts/submit_results.py append --push`, login node
-only). Until then the leaderboard location below is reserved, not live.
+Status (2026-10-15): the leaderboard is live on the Hub at `Xirro/AmpScape` under `aux/leaderboard/` (owner approval
+2026-10-15), seeded with the official Phase 10-full baselines (official configurations per model × task × tier,
+`docs/tables/tuning_decisions.md`): in-tier rows at S/M/L, zero-shot XL/XXL rows of the L-trained models and the T4
+block-1 reference rows at M and L. The dataset card carries a condensed version of this document.
 
 Evaluation harness and metric definitions: `docs/evaluation.md`; predictions layout: the module docstring of
 `ampscape/eval/harness.py`; data splits and tiers: `docs/dataset_card.md`.
@@ -193,7 +193,7 @@ the same task/tier/split; their seed numbers are taken from the `meta` block the
   `scripts/push_aux.py` (sha256-verified, nothing deleted; login node only — compute nodes have no Hub access for
   pushes by project convention). Entries are never edited or removed; a correction is a new entry whose `notes`
   names the superseded id.
-- Submitters open an issue in the code repository (`https://github.com/xyrro/EcoFlowBench`) titled
+- Submitters open an issue in the code repository (`https://github.com/Xyrro/AmpScape`) titled
   `Leaderboard: <model> <task> <tier> <split>` with (i) the `entry.json` produced by `make-entry`, (ii) a link to the
   predictions — a Hub dataset/model repo or any download the maintainer can fetch; the `predictions.h5` + `meta.json`
   per split, not the checkpoints — and (iii) the validator output. The maintainer re-validates, appends and pushes;
@@ -206,7 +206,5 @@ the same task/tier/split; their seed numbers are taken from the `meta` block the
   are deterministic (`baseline-<model>_<task>_<tier>-<split>`, `…-xfer-<tier>-<split>`, `…-block1`) so re-running the
   command is idempotent.
 
-Known gap (2026-10-05): the official `eval_t4_reference/results.json` files carry no per-sample `t4_target`, i.e. the
-block-1 reference was not applied when they were produced (`ampscape/eval/harness.py` only reaches the reference
-branch for pairwise kinds); `seed-baselines` therefore warns and seeds no `block1_reference` rows until those
-evaluations are redone with a fixed harness.
+Resolved (2026-10-14): the official `eval_t4_reference/results.json` files were recomputed with the fixed harness
+(per-sample `t4_target = "block1_reference"`), so `seed-baselines` seeds the block-1 rows at M and L.

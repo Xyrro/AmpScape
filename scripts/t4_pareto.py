@@ -129,6 +129,7 @@ def model_rows(runs: list[pathlib.Path], tier: str) -> pd.DataFrame:
             seeds=("seed", "nunique"),
             cost_s=("cost_s", "mean"),
             **{k: (k, "mean") for k in KEYS},
+            rel_l2_median=("rel_l2", "median"),
         )
         .reset_index()
     )
@@ -171,8 +172,8 @@ def main():
     lines = [
         f"# T4 error vs cost at tier {a.tier} (errors against the exact block-1 map on the reference subset)",
         "",
-        "| split | method | n | cost s / landscape | rel_l2 | ns_rel_l2 | mae_log10eps | top5_iou | pinch_recall | spearman |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| split | method | n | cost s / landscape | rel_l2 | rel_l2 median (seeds) | ns_rel_l2 | mae_log10eps | top5_iou | pinch_recall | spearman |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for split, g in df.groupby("split"):
         for r in g.sort_values("cost_s", ascending=False).itertuples():
@@ -180,9 +181,10 @@ def main():
             def f(v):
                 return "–" if v is None or pd.isna(v) else f"{v:.4f}"
 
+            med = getattr(r, "rel_l2_median", None)
             lines.append(
-                f"| {split} | {r.method} | {r.n} | {'–' if pd.isna(r.cost_s) else f'{r.cost_s:.3g}'} | "
-                + " | ".join(f(getattr(r, k)) for k in KEYS)
+                f"| {split} | {r.method} | {r.n} | {'–' if pd.isna(r.cost_s) else f'{r.cost_s:.3g}'} | {f(r.rel_l2)} | {f(med)} | "
+                + " | ".join(f(getattr(r, k)) for k in KEYS if k != "rel_l2")
                 + " |"
             )
     pathlib.Path(a.out).parent.mkdir(parents=True, exist_ok=True)

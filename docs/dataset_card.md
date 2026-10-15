@@ -148,6 +148,31 @@ The domain-level metrics (top-q % high-flow IoU, pinch-point recall, corridor Di
 that are **not validated against ecological outcomes**; we report them as comparative scores between
 models and make no claim that any level is sufficient for conservation practice.
 
+## Leaderboard and submissions
+
+The leaderboard is part of this repository: `aux/leaderboard/results.jsonl` (append-only, one JSON entry per line)
+and `aux/leaderboard/README.md` (rendered tables per task × tier × split, sorted by rel-L2). The official baselines
+(U-Net, FNO, ViT, GNN, MgNO; three seeds unless stated; one official configuration per model × task × tier selected on
+validation loss) are the first entries; XL/XXL rows of L-trained models are zero-shot; T4 at M and L is reported against
+the production target and, on the reference subset, against the exact block-1 map (`aux/t4_bs1_reference`).
+
+A submission uses the evaluation harness's own format, nothing more: one directory per (task, tier, split) with
+`predictions.h5` — one group per sample id, one subgroup per configuration (`points`, `wall_to_wall_NS`/`_EW`,
+`regions`, `advanced`, `omniscape`) holding the task's dataset (`cum_current`, `current`, `reff`; float32, index shape),
+every configuration group carrying an `inference_time_s` attribute — and `meta.json` (model, task, tier, split, seed,
+`params_M`, `train_data`, `train_tiers`, hardware, `inference_batch`, `code_url`, `code_commit`, contact). Every
+`qc_pass` sample of the declared split must be present and nothing else; predictions must be finite everywhere.
+Rules: an XL/XXL entry is zero-shot unless `train_tiers` includes the tier; inference batch 1 at XL/XXL; seeds of one
+model are aggregated into one entry (mean ± std over seeds); every number comes from the harness `results.json` —
+nothing is recomputed.
+
+Procedure: `python scripts/submit_results.py validate --predictions <dir> --root <data root> --tier <tier> --split
+<split>` (schema → coverage → harness), `make-entry` to build the entry JSON, then an issue titled
+`Leaderboard: <model> <task> <tier> <split>` in the code repository (https://github.com/Xyrro/AmpScape) with the
+entry, a link to the predictions and the validator output; a maintainer re-validates, appends and pushes. Entries are
+never edited or removed; a correction is a new entry naming the superseded id. Full specification:
+`docs/submission.md` in the code repository.
+
 ## Redistribution terms and attributions
 
 AmpScape data are released under **CC BY 4.0**. The covariate channels and the published-resistance

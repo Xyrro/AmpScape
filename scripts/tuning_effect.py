@@ -81,8 +81,8 @@ def main() -> None:
     lines += ["## Per split, mean over seeds", "",
               "Columns 'pre-tuning → tuned'; **official** names the configuration the tables report for that (model, task, tier) "
               "(`docs/tables/tuning_decisions.md`: per-task selection on validation loss).", "",
-              "| task | tier | model | official | split | seeds (pre-tuning / tuned) | rel-L2 pre-tuning → tuned (Δ) | MAE log10 pre-tuning → tuned (Δ) | top-5 % IoU | pinch recall | Spearman | params (M) | train GPU-h |",
-              "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+              "| task | tier | model | official | split | seeds (pre-tuning / tuned) | rel-L2 pre-tuning → tuned (Δ) | rel-L2 median pre-tuning → tuned | MAE log10 pre-tuning → tuned (Δ) | top-5 % IoU | pinch recall | Spearman | params (M) | train GPU-h |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for task, tier, base in tuned_keys:
         for split in SPLITS:
             sub = df[(df.task == task) & (df.tier == tier) & (df.base == base) & (df.split == split)]
@@ -101,7 +101,7 @@ def main() -> None:
             d = decisions.get(f"{base}_{task}_{tier}", {}).get("official", "base")
             lines.append(
                 f"| {task} | {tier} | {pf.MODEL_LABEL.get(base, base)} | {'tuned' if d == 't2' else 'pre-tuning'} | {split} | {len(off)} / {len(tun)} | "
-                f"{cell('rel_l2', True)} | {cell('mae_log10eps', True)} | {cell('top5_iou')} | {cell('pinch_recall')} | "
+                f"{cell('rel_l2', True)} | {off['rel_l2'].median():.3f} → {tun['rel_l2'].median():.3f} | {cell('mae_log10eps', True)} | {cell('top5_iou')} | {cell('pinch_recall')} | "
                 f"{cell('spearman')} | {off['params (M)'].mean():.1f} → {tun['params (M)'].mean():.1f} | "
                 f"{off['train GPU-h'].mean():.2f} → {tun['train GPU-h'].mean():.2f} |"
             )
