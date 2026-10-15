@@ -92,3 +92,25 @@ def test_hf_layout_export_and_subsets(tmp_path):
     ds = AmpScapeDataset("T4", split="train", tier="S", root=tmp_path / "hf", subset="mini")
     d = ds[0]
     assert len(ds) > 0 and d["cum_current"].shape == (1, 128, 128) and out.task_group.notna().all()
+
+
+def test_subset_shard_patterns_select_only_subset_shards(tmp_path):
+    """load_from_hub(subset=...) must download only the shards of that subset (2026-10-15 verification fix)."""
+    import pandas as pd
+
+    from ampscape.data.dataset import subset_shard_patterns
+
+    idx = pd.DataFrame(
+        {
+            "hf_path": ["data/S/T1/shard-00000.h5", "data/S/T1/shard-00001.h5", "data/S/T1/shard-00500.h5", "data/S/T4/shard-00000.h5"],
+            "task_group": ["T1", "T1", "T1", "T4"],
+            "subset_mini": [True, True, False, True],
+            "subset_full": [True, True, True, True],
+        }
+    )
+    f = tmp_path / "S.parquet"
+    idx.to_parquet(f)
+    assert subset_shard_patterns(f, "S", "T1", "mini") == ["data/S/T1/shard-00000.h5", "data/S/T1/shard-00001.h5"]
+    assert subset_shard_patterns(f, "S", "T4", "mini") == ["data/S/T4/shard-00000.h5"]
+    assert len(subset_shard_patterns(f, "S", "T1", "full")) == 3
+

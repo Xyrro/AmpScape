@@ -327,11 +327,33 @@ def load_from_hub(
 
     group = {"T2": "T1"}.get(task, task)
     assert group in TASK_GROUPS, task
+    meta_patterns = [f"index/{tier}.parquet", "splits/**", "stats/*"]
+    subset = kw.get("subset")
+    if subset is None or subset == "full":
+        patterns = [f"data/{tier}/{group}/*", *meta_patterns]
+    else:
+        # 2026-10-15 (verification pass): the subset argument used to filter the index only, after the whole
+        # tier × group had been downloaded ("subset='mini' ≈ 0.6 GB" in the README was not true of the download).
+        # The subsets are shard prefixes, so the index names exactly the shards to fetch.
+        local = snapshot_download(
+            repo_id, repo_type="dataset", cache_dir=cache_dir, revision=revision, allow_patterns=meta_patterns
+        )
+        patterns = subset_shard_patterns(pathlib.Path(local) / "index" / f"{tier}.parquet", tier, group, subset)
+        patterns += meta_patterns
     local = snapshot_download(
-        repo_id,
-        repo_type="dataset",
-        cache_dir=cache_dir,
-        revision=revision,
-        allow_patterns=[f"data/{tier}/{group}/*", f"index/{tier}.parquet", "splits/*", "stats/*"],
+        repo_id, repo_type="dataset", cache_dir=cache_dir, revision=revision, allow_patterns=patterns
     )
     return AmpScapeDataset(task, split=split, tier=tier, root=local, **kw)
+
+
+def subset_shard_patterns(index_path: pathlib.Path, tier: str, group: str, subset: str) -> list[str]:
+    """The Hub paths (`hf_path`) of the shards of one tier × task group that hold the subset's samples — the
+    `subset_<name>` index column marks the samples, `hf_path` their shard. Raises KeyError for an unknown subset."""
+    import pandas as pd
+
+    idx = pd.read_parquet(index_path, columns=["hf_path", "task_group", f"subset_{subset}"])
+    sel = idx[idx["task_group"].eq(group) & idx[f"subset_{subset}"].astype(bool)]
+    paths = sorted(set(sel["hf_path"]))
+    if not paths:
+        raise ValueError(f"subset {subset!r} has no shards in {tier}/{group}")
+    return paths
