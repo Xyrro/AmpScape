@@ -201,27 +201,27 @@
   "variant": "ms8",
   "official": "t2",
   "n_official": 3,
-  "n_tuned": 1,
-  "val_official_mean": 0.31265,
+  "n_tuned": 3,
+  "val_official_mean": 0.32037333333333334,
   "val_official_std": 0.00676668555005576,
-  "val_tuned_mean": 0.26446,
-  "margin": 0.00676668555005576,
-  "delta_pct": -15.413401567247725,
-  "basis": "tuning candidate seed 1 vs official seed 1, margin std (no re-runs yet)"
+  "val_tuned_mean": 0.26929333333333333,
+  "margin": 0.003906747723846245,
+  "delta_pct": -15.943898784751129,
+  "basis": "3 tuned seeds vs 3 official, margin std/sqrt(3)"
  },
  "gnn_T4_L": {
   "model": "gnn",
   "task": "T4",
   "tier": "L",
   "variant": "ms8",
-  "official": "base",
+  "official": "t2",
   "n_official": 3,
-  "n_tuned": 0,
+  "n_tuned": 3,
   "val_official_mean": 0.02203,
   "val_official_std": 9.848857801796232e-05,
-  "val_tuned_mean": null,
-  "margin": null,
-  "delta_pct": null,
-  "basis": "no tuned run for this task yet: pre-tuning configuration stays official"
+  "val_tuned_mean": 0.02021,
+  "margin": 5.686240703077401e-05,
+  "delta_pct": -8.26146164321381,
+  "basis": "3 tuned seeds vs 3 official, margin std/sqrt(3)"
  }
 }

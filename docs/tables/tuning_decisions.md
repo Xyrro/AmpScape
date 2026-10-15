@@ -15,7 +15,7 @@ Rule (owner, 2026-10-15): the tier-tuned configuration is official for a (model,
 | M | T4 | U-Net | w64 | **tuned (w64)** | 0.0035 ± 0.0001 | 0.0031 | -12.5 % | 3 tuned seeds vs 3 official, margin std/sqrt(3) |
 | M | T4 | ViT | p16g16 | pre-tuning | 0.0134 ± 0.0024 | 0.0157 | +16.8 % | 3 tuned seeds vs 3 official, margin std/sqrt(3) |
 | L | T1 | FNO | w48 | **tuned (w48)** | 0.0626 ± 0.0003 | 0.0600 | -4.1 % | 3 tuned seeds vs 3 official, margin std/sqrt(3) |
-| L | T1 | GNN | ms8 | **tuned (ms8)** | 0.3126 ± 0.0068 | 0.2645 | -15.4 % | tuning candidate seed 1 vs official seed 1, margin std (no re-runs yet) |
+| L | T1 | GNN | ms8 | **tuned (ms8)** | 0.3204 ± 0.0068 | 0.2693 | -15.9 % | 3 tuned seeds vs 3 official, margin std/sqrt(3) |
 | L | T3 | FNO | w48 | **tuned (w48)** | 0.0863 ± 0.0028 | 0.0789 | -8.6 % | 3 tuned seeds vs 3 official, margin std/sqrt(3) |
 | L | T4 | FNO | w48 | **tuned (w48)** | 0.0212 ± 0.0004 | 0.0206 | -2.7 % | 3 tuned seeds vs 3 official, margin std/sqrt(3) |
-| L | T4 | GNN | ms8 | pre-tuning | 0.0220 ± 0.0001 | – | – | no tuned run for this task yet: pre-tuning configuration stays official |
+| L | T4 | GNN | ms8 | **tuned (ms8)** | 0.0220 ± 0.0001 | 0.0202 | -8.3 % | 3 tuned seeds vs 3 official, margin std/sqrt(3) |

@@ -10,7 +10,7 @@
 | queue wait now | L40S and V100: ≈ 10 min (`sbatch --test-only`); A100: ≈ 1 h; H100 (`ice-gpu`): ≈ 26 h. Dev runs on 09-14 started within 1–17 min |
 | chosen pool | L40S (bf16, 48 GB; 16 healthy GPUs on 2 nodes, 2 nodes excluded for ECC errors) with A100 spill-over; **2-hour legs** that checkpoint and re-queue themselves (`train.py --resume --pause-exit`), ≤ 18 concurrent jobs of ours |
 | data | the trainer reads the Hub layout directly; groups are staged to `data/hfcache` on the login node per (tier, task group) and evicted when no pending job needs them (sizes: S 32/25/30 GB for T1/T3/T4, M 57/43/54, L 84/64/82, XL 61/47/61; scratch guard 230 GB) |
-| bad nodes | `atl1-1-03-004-21-0` and `atl1-1-03-004-23-0` (uncorrectable ECC errors on one GPU each, probed 04:40Z) excluded; the driver adds any node that throws a CUDA/ECC error |
+| bad nodes | `atl1-1-03-004-21-0` and `atl1-1-03-004-23-0` (uncorrectable ECC errors on one GPU each, probed 04:40Z) excluded; the driver adds any node that throws a CUDA/ECC error; `atl1-1-03-013-3-0`, `atl1-1-03-014-9-0` added later; `atl1-1-03-014-16-0` added by hand 2026-10-15 08:18Z (H200 index 2, `GPU-29b46eb7`, reports "GPU requires reset" with N/A clocks/utilisation and slurmstepd NVML "Not Supported" errors; a training job on it spins on the CPU without ever allocating GPU memory and raises no CUDA error, so the driver's log-based detection does not catch it — check `nvidia-smi -q | grep -A1 Pending` and `memory.used` when a run has an empty `log.csv` after 30 min) |
 
 ## 2. Plan (132 jobs, ≈ 949 GPU-hours; `scripts/slurm/gpu/gpu_driver.py --plan`)
 

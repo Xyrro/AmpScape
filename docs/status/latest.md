@@ -1,53 +1,65 @@
-# Status — 2026-10-15 07:20Z: official configs chosen per model × task × tier on validation loss (tables regenerated); phase 16 (GNN L re-runs) launched; remaining items
+# Status — 2026-10-15 20:45Z: phase 16 complete (GNN L re-runs, 79 GPU-h); GNN ms8 official at T1 L and T4 L; tables, figures and leaderboard regenerated; remaining items
 
-## 1. Per-task configuration selection (owner rule, applied)
-`scripts/tuning_decisions.py` → `docs/tables/tuning_decisions.md` / `.json`: the tuned configuration is official for a
-(model, task, tier) only if its best validation loss, mean over seeds, beats the pre-tuning mean by more than the
-pre-tuning standard error (seed std / √n); never on test metrics, never carried across tasks. Where only the T1 tuning
-candidate exists, the seed-1 rule decides T1 alone.
+## 1. Phase 16 (approved ≈ 114 GPU-h; used 79.4)
+- Seven GNN L runs (T1 seeds 2–3, T4 seeds 1–3, two scale-aware variants) trained on H200 with node-local data,
+  1 033–1 332 s per epoch (same as H100), 26–30 epochs each; seed 1 of T1 L is the reused tuning candidate
+  (`REUSED_FROM.txt`, official protocol verified). All 16 XL/XXL transfer legs and the exact T4 reference
+  evaluations of the four T4 L runs are done; every result file is on the Hub with its current hash
+  (501 files checked over all T4 M/L and L runs — one pre-existing stale `results_transfer.json` of the pre-tuning
+  `gnn_T4_L_s1`, updated 15 min after its 2026-10-04 push, is being re-pushed by the offloader).
+- One incident: the H200 of `gnn_T4_L_s1_t2` (node `atl1-1-03-014-16-0`, GPU index 2) was silently faulted
+  ("GPU requires reset", no memory ever allocated, no CUDA error raised, slurmstepd NVML errors). Detected after
+  53 min with an empty `log.csv`, the job was cancelled by id, the node added to `logs/gpu_bad_nodes.txt` by hand and
+  the driver resubmitted the run on another node (1.1 GPU-h lost; symptom and check recorded in
+  `docs/phase10_full_schedule.md`, bad-nodes row).
+- GPU usage: 71.7 GPU-h training/evaluation legs + 7.8 GPU-h transfers (`docs/tables/gpu_usage_tuning.md`);
+  cumulative since 2026-10-13: 230.3 GPU-h.
 
-| tier | model | tuned variant | T1 | T3 | T4 |
-|---|---|---|---|---|---|
-| M | U-Net | w64 | tuned (−19 %) | **pre-tuning** (−1.4 %, inside the spread) | tuned (−12 %) |
-| M | FNO | w48 | tuned (−7 %) | tuned (−12 %) | tuned (−7 %) |
-| M | ViT | p16g16 | tuned (−62 %) | – | **pre-tuning** (+17 %) |
-| M | GNN | ms8 | tuned (−26 %) | – | **pre-tuning** (+8 %) |
-| L | FNO | w48 | tuned (−4 %) | tuned (−9 %) | tuned (−3 %) |
-| L | GNN | ms8 | tuned (−15 %, candidate rule; 3 seeds after phase 16) | – | decided after phase 16 |
-| L | U-Net, ViT | – | pre-tuning (candidates inside the spread / worse) | | |
+## 2. Configuration decisions at L (validation loss only, `docs/tables/tuning_decisions.md`)
 
-Every consumer reads the decisions file: `paper_figures.prefer_tuned` (baselines panels, OOD table, all-splits
-table), the scale-transfer panel (also the scale-aware variant), the T4 Pareto tables, `tuning_effect.py` (now with an
-"official" column) and the leaderboard seeder (`submit_results.py seed-baselines`). Tables/figures regenerated
-(commit a151c88): the T4 M rows for ViT and GNN and the T3 M row for U-Net are back on the pre-tuning runs. The rule
-is stated in `paper/sections/baselines_protocol.md` ("Configuration selection").
+| tier | task | model | pre-tuning val loss (mean ± std, 3 seeds) | ms8 (mean, 3 seeds) | Δ | official |
+|---|---|---|---|---|---|---|
+| L | T1 | GNN | 0.3204 ± 0.0068 | 0.2693 | −15.9 % | **tuned (ms8)** |
+| L | T4 | GNN | 0.0220 ± 0.0001 | 0.0202 | −8.3 % | **tuned (ms8)** |
 
-## 2. Phase 16 (owner approval, ≈ 114 GPU-h)
-- The L candidate `gnn_T1_L_s1_tune_ms8` was trained under the official protocol (same code path as every `_t2`
-  re-run, same data and normalisation statistics, batch 1, patience 8, seed 1; only the intended variant, the GPU type
-  and the node-local data path differ — for FNO the candidate and the re-run gave identical metrics), so it is reused
-  as seed 1: `runs/full/gnn_T1_L_s1_t2` is a copy (`REUSED_FROM.txt`). Saves ≈ 9 GPU-h.
-- Launched 07:10Z (`docs/plans/phase13c_16_plan.json`): GNN T1 L seeds 2–3, GNN T4 L seeds 1–3, two scale-aware
-  variants — seven runs on H200 with node-local data (five on one node sharing the copy) — plus 16 XL/XXL transfer
-  legs (two already running for the reused seed). ≈ 105 GPU-h; GNN L epochs took 1 105–1 137 s on H100, H200 to be
-  measured → training ≈ 9–10 h → **≈ 2026-10-15 17:30Z**, transfers and the T4 reference evaluations after.
-- Then: `tuning_decisions.py` at L (GNN T1 with three seeds, GNN T4), regeneration, updated `tuning_effect.md`.
+Unlike at M (where ms8 was worse on T4, +8 %), the variant improves both tasks at L. The full matrix is unchanged
+otherwise: tuned official for FNO w48 at T1/T3/T4 (M, L), U-Net w64 at T1/T4 M, ViT p16g16 at T1 M, GNN ms8 at T1 M;
+pre-tuning for U-Net T3 M, ViT T4 M, GNN T4 M; U-Net and ViT at L stay pre-tuning. 15 decisions, 12 tuned.
 
-## 3. Remaining items (state as of now)
-- **Derivation:** done — `paper/appendix_derivation.md` (zero-shot T4 error = 1 − r_train/r_eval; the scale-aware
-  target removes it); referenced from the results section.
-- **WP6 (MgNO / HANO):** MgNO vendored (MIT, 0.57 M params) and run at T1 S/M and T4 S/M (seed 1; rows in
-  `paper/baselines.md`, MgNO in the error-vs-tier figure); HANO not runnable from its public repository
-  (`docs/wp6_implementations.md`). Open: MgNO at L and seeds 2–3 if the owner wants it as a full baseline (≈ 10 GPU-h
-  at L per task with packing — not planned).
-- **Submission format:** done — `docs/submission.md`, `scripts/submit_results.py` (validate / make-entry / append /
-  seed-baselines, now following the per-task decisions), tests; leaderboard seeded locally, **Hub push is a gate**
-  (re-seed after phase 16, then push on approval).
-- **`paper/draft.md`:** not assembled. All inputs exist (sections under `paper/sections/`, tables, figures,
-  appendix); it waits for phase 16 so the L rows are final, then one pass to assemble and cut to length.
-- **Acceleration metric (item 1):** `docs/tables/acceleration.md` complete for T3 and T1V heads at S/M/L — no
-  acceleration anywhere (iterations 9–25 unchanged, time −8 … +0 %); the write-up for the paper is pending with the draft.
+## 3. Effect on the test metrics (`docs/tables/tuning_effect.md`, test_id, mean ± std over 3 seeds, official → tuned)
+
+| task | tier | rel-L2 | MAE (log10) | Spearman |
+|---|---|---|---|---|
+| T1 | L | 1.067 ± 0.026 → 0.941 ± 0.160 (−11.8 %) | 0.416 → 0.382 (−8.2 %) | 0.834 → 0.861 |
+| T4 | L | 0.142 ± 0.001 → 0.142 ± 0.001 (0.0 %) | 0.074 → 0.071 (−4.5 %) | 0.960 → 0.962 |
+
+OOD splits move the same way (T1 test_ood −15.3 %, ood_region −13.2 %; T4 −0.2 % / −1.3 %). The ms8 T1 L seeds
+disagree on rel-L2 (0.79 / 0.93 / 1.11) while their MAE and Spearman agree within 0.02 — rel-L2 at L is dominated by
+a few high-current landscapes. Scale transfer (`paper/tables/scale_transfer.md`, now 3 seeds for GNN): T1 zero-shot
+rel-L2 0.94 (L) → 1.42 ± 0.82 (XL) → 1.62 ± 0.58 (XXL); T4 0.142 → 0.498 → 0.739; the scale-aware T1 variant is worse
+than zero-shot at XL (7.5) and similar at XXL (1.4).
+
+## 4. Regenerated
+`scripts/tuning_select.py`, `tuning_decisions.py`, `paper_figures.py --skip-stats`, `tuning_effect.py`,
+`acceleration_table.py`: `docs/tables/{tuning_full,tuning_decisions,tuning_effect,baselines_full}.md`,
+`paper/baselines.md`, `paper/tables/{baselines_sml,ood_degradation,scale_transfer,t4_pareto_L}.md`, figures
+`error_vs_tier`, `ood_degradation`, `scale_transfer`, `t4_pareto_L`. Leaderboard rebuilt from scratch
+(`submit_results.py seed-baselines`, 165 entries: 123 in-tier + 42 zero-shot; the previous file was kept aside in
+`work/` because its id-based de-duplication would have retained the pre-tuning GNN L entries). Hub push of
+`aux/leaderboard/` remains a gate.
+
+## 5. Remaining items
+- **Derivation:** done — `paper/appendix_derivation.md`.
+- **WP6 (MgNO / HANO):** MgNO vendored and run at T1 S/M and T4 S/M (seed 1); HANO not runnable
+  (`docs/wp6_implementations.md`). MgNO at L / seeds 2–3 not planned (≈ 10 GPU-h per task at L).
+- **Submission format:** done — `docs/submission.md`, `scripts/submit_results.py`, 22 tests pass; leaderboard
+  re-seeded with the final official baselines; Hub push on approval.
+- **`paper/draft.md`:** not assembled; all inputs are now final (the L rows no longer change). Next step on
+  go-ahead: assemble from `paper/sections/*`, the regenerated tables/figures and the appendices, refresh
+  `paper/sections/results.md` (written 2026-10-05, before the tuned configurations), and cut to length.
+- **Acceleration metric:** `docs/tables/acceleration.md` complete (no acceleration anywhere); paper write-up with
+  the draft.
 
 ## Operations
-- Driver idle-restarts between plans are harmless (keepalive, "all jobs done"); scratch 249 GB; login-node memory
-  0.8 GiB. GitHub: pushed after every status update (main = origin).
+No jobs queued; the plan is exhausted (driver idle-restarts by the keepalive are harmless). Offloader loop running.
+Scratch 150 GB, login-node memory ≈ 1.1 GiB. GitHub: pushed after this update (main = origin).
