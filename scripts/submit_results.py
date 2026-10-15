@@ -795,6 +795,14 @@ def _baseline_entry(
     }
 
 
+def _official_config(model: str, task: str, tier: str) -> str:
+    f = ROOT / "docs" / "tables" / "tuning_decisions.json"
+    try:
+        return json.loads(f.read_text()).get(f"{model}_{task}_{tier}", {}).get("official", "base")
+    except (OSError, json.JSONDecodeError):
+        return "base"
+
+
 def seed_baselines(
     runs_dir: pathlib.Path, timestamp: str | None = None
 ) -> tuple[list[dict], list[str]]:
@@ -825,9 +833,12 @@ def seed_baselines(
         groups.setdefault((p["model"], p["task"], p["tier"]), []).append((p["seed"], d, tuned))
     entries: list[dict] = []
     for (model, task, tier), seed_runs3 in sorted(groups.items()):
-        # one run per seed: the tier-tuned run replaces the pre-tuning one when both exist
+        # one run per seed: the run of the official configuration for this (model, task, tier) — the tier-tuned
+        # one where docs/tables/tuning_decisions.json says so (selection per task on validation loss, 2026-10-15),
+        # else the pre-tuning one
+        t2_official = _official_config(model, task, tier) == "t2"
         by_seed: dict[int, tuple[int, pathlib.Path]] = {}
-        for sd, d, _tuned in sorted(seed_runs3, key=lambda x: (x[0], x[2])):
+        for sd, d, _tuned in sorted(seed_runs3, key=lambda x: (x[0], x[2] == t2_official)):
             by_seed[sd] = (sd, d)
         seed_runs = sorted(by_seed.values())
         name = MODEL_NAMES.get(model, model)

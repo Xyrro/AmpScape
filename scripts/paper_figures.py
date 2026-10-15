@@ -83,14 +83,19 @@ def t4_pareto(out: pathlib.Path) -> None:
             for p in glob.glob(str(ROOT / "runs" / "full" / f"*_T4_{tier}_s*"))
             if (pathlib.Path(p) / "eval_t4_reference" / "results.json").exists()
         )
-        # a tier-tuned re-run ('_t2' after the seed) supersedes the pre-tuning run of the same seed (2026-10-14)
+        # per (model, task, tier) the official configuration's runs (tuning_decisions.json): the tier-tuned re-run
+        # ('_t2' after the seed) or the pre-tuning run of the same seed (2026-10-14/15)
         names = {pathlib.Path(p).name for p in runs}
-        runs = [
-            p
-            for p in runs
-            if "_t2" in pathlib.Path(p).name
-            or re.sub(r"(_s\d+)", r"\1_t2", pathlib.Path(p).name, count=1) not in names
-        ]
+
+        def keep(p: str) -> bool:
+            n = pathlib.Path(p).name
+            base = n.split("_")[0]
+            t2_official = official_config(base, "T4", tier) == "t2"
+            if "_t2" in n:
+                return t2_official
+            return not (t2_official and re.sub(r"(_s\d+)", r"\1_t2", n, count=1) in names)
+
+        runs = [p for p in runs if keep(p)]
         if not ref.exists():
             log(f"F2 T4 Pareto {tier}: reference {ref} missing — skipped")
             continue
@@ -157,14 +162,30 @@ def split_run_name(model: str) -> tuple[str, str, str, int | None, str]:
     return m.group(1), m.group(2), m.group(3), int(m.group(4)), suffix
 
 
+def official_config(base: str, task: str, tier: str) -> str:
+    """'t2' when the tier-tuned configuration is the official one for (model, task, tier), else 'base' — from
+    docs/tables/tuning_decisions.json (scripts/tuning_decisions.py: selection per model × task × tier on validation
+    loss, owner rule 2026-10-15). Without a decision the pre-tuning run is official."""
+    global _DECISIONS
+    if _DECISIONS is None:
+        f = ROOT / "docs" / "tables" / "tuning_decisions.json"
+        _DECISIONS = json.loads(f.read_text()) if f.exists() else {}
+    return _DECISIONS.get(f"{base}_{task}_{tier}", {}).get("official", "base")
+
+
+_DECISIONS = None
+
+
 def prefer_tuned(df: pd.DataFrame) -> pd.DataFrame:
-    """Among rows of one (task, tier, split, base, seed) keep the tier-tuned run ('_t2' in the model name) when it
-    exists, otherwise the pre-tuning run; adds a boolean column `tuned`."""
+    """Among rows of one (task, tier, split, base, seed) keep the run of the official configuration for that
+    (model, task, tier): the tier-tuned run ('_t2') where `official_config` says so, else the pre-tuning run;
+    adds a boolean column `tuned`."""
     df = df.copy()
     df["tuned"] = df.model.str.contains(r"_t2(?:$|_)", regex=True)
+    off_t2 = df.apply(lambda r: official_config(r["base"], r["task"], r["tier"]) == "t2", axis=1)
     key = ["task", "tier", "split", "base", "seed"]
     has_t2 = df[df.tuned].groupby(key).size().index
-    drop = df.index[(~df.tuned) & df.set_index(key).index.isin(has_t2)]
+    drop = df.index[((~df.tuned) & off_t2 & df.set_index(key).index.isin(has_t2)) | (df.tuned & ~off_t2)]
     return df.drop(drop)
 
 
@@ -246,8 +267,10 @@ def scale_transfer(out: pathlib.Path) -> None:
             continue
         if "_t2" not in run.name:
             t2 = run.parent / f"{base}_{task}_{tier}_s{seed}_t2{'_' + suffix if suffix else ''}"
-            if (t2 / "results_transfer.json").exists():
-                continue  # a tier-tuned counterpart exists: it is the official L model (also for scale-aware)
+            if (t2 / "results_transfer.json").exists() and official_config(base, task, tier) == "t2":
+                continue  # the tier-tuned counterpart is the official L model (also for scale-aware)
+        elif official_config(base, task, tier) != "t2":
+            continue  # tuned run of a (model, task, tier) whose official configuration is the pre-tuning one
         ev = json.loads(pathlib.Path(p).read_text())["eval"]
         for tag, v in ev.items():
             m = re.match(r"^[^_]+_(XL|XXL)_(test_id|test_ood|ood_region)$", tag)

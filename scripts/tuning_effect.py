@@ -76,9 +76,13 @@ def main() -> None:
                     f"{'config changes' if r.get('changed') else 'official kept'} |"
                 )
         lines.append("")
+    dec_f = ROOT / "docs" / "tables" / "tuning_decisions.json"
+    decisions = json.loads(dec_f.read_text()) if dec_f.exists() else {}
     lines += ["## Per split, mean over seeds", "",
-              "| task | tier | model | split | seeds (official / tuned) | rel-L2 official → tuned (Δ) | MAE log10 official → tuned (Δ) | top-5 % IoU | pinch recall | Spearman | params (M) | train GPU-h |",
-              "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+              "Columns 'pre-tuning → tuned'; **official** names the configuration the tables report for that (model, task, tier) "
+              "(`docs/tables/tuning_decisions.md`: per-task selection on validation loss).", "",
+              "| task | tier | model | official | split | seeds (pre-tuning / tuned) | rel-L2 pre-tuning → tuned (Δ) | MAE log10 pre-tuning → tuned (Δ) | top-5 % IoU | pinch recall | Spearman | params (M) | train GPU-h |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for task, tier, base in tuned_keys:
         for split in SPLITS:
             sub = df[(df.task == task) & (df.tier == tier) & (df.base == base) & (df.split == split)]
@@ -94,8 +98,9 @@ def main() -> None:
                     s += f" ({(mt - mo) / abs(mo) * 100:+.1f} %)"
                 return s
 
+            d = decisions.get(f"{base}_{task}_{tier}", {}).get("official", "base")
             lines.append(
-                f"| {task} | {tier} | {pf.MODEL_LABEL.get(base, base)} | {split} | {len(off)} / {len(tun)} | "
+                f"| {task} | {tier} | {pf.MODEL_LABEL.get(base, base)} | {'tuned' if d == 't2' else 'pre-tuning'} | {split} | {len(off)} / {len(tun)} | "
                 f"{cell('rel_l2', True)} | {cell('mae_log10eps', True)} | {cell('top5_iou')} | {cell('pinch_recall')} | "
                 f"{cell('spearman')} | {off['params (M)'].mean():.1f} → {tun['params (M)'].mean():.1f} | "
                 f"{off['train GPU-h'].mean():.2f} → {tun['train GPU-h'].mean():.2f} |"
