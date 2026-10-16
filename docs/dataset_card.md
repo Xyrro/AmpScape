@@ -4,7 +4,7 @@ pretty_name: AmpScape
 task_categories: [image-to-image, other]
 tags: [landscape-connectivity, circuitscape, omniscape, surrogate-modeling, neural-operators, scientific-ml, ecology]
 size_categories: [100K<n<1M]
-configs: []   # filled by scripts/push_to_hub.py from the layout (one config per tier × task group)
+configs: []   # no dataset-viewer configs: the shards are HDF5 (not viewer-loadable); use ampscape.data.load_from_hub
 ---
 
 # AmpScape
@@ -33,7 +33,7 @@ per-pixel (block 1) Omniscape whose fidelity was measured (≈ 2–5 % relative 
 
 ## Versions
 
-- **v1.0** (2026-09-23) data revision. **v1.0.1** (2026-09-24) metadata: nested `lite` subset. **v1.0.2** (2026-09-26) metadata: XL amendment C3 corrected (synthetic XL train/val restored) and split lists rebuilt as cross-tier unions. Data files are identical across the three tags.
+- **v1.0** (2026-09-23) data revision. **v1.0.1** (2026-09-24) metadata: nested `lite` subset. **v1.0.2** (2026-09-26 UTC) metadata: XL amendment C3 corrected (synthetic XL train/val restored) and split lists rebuilt as cross-tier unions. Data files are identical across the three tags. Hub revisions (`revision=` in `load_from_hub` / `snapshot_download`): `v1.0` and `v1.0.2`; `v1.0.1` is a GitHub tag only (its metadata is contained in `v1.0.2`). `croissant.json` carries `version 1.0.2`, `datePublished 2026-09-26`.
 
 ## Final counts (v1.0)
 
@@ -47,7 +47,7 @@ per-pixel (block 1) Omniscape whose fidelity was measured (≈ 2–5 % relative 
 | **total** | **174,400** | **920,372** | | **1157.4** | 25 |
 
 Subsets (nested shard prefixes per tier; each also a Croissant FileSet, an index column `subset_<name>` and a split-list folder `splits/<name>/`): `mini` (0.6 GB, the first 3 S shards, 600 landscapes), `lite` (≈ 26 GB: 8 000 S + 2 400 M + 800 L landscapes, all tasks — added in 1.0.1 as metadata only), `core` (115.5 GB, 3 705 files: 20 000 S + 10 000 M + 5 000 L landscapes),
-`full` (1 157.4 GB). The prefix subsets are drawn from the synthetic stream, so real tiles and the `ood_region` split appear only in `full`. Auxiliary evaluation sets and results under `aux/` (20.5 GB, `aux/README.md`).
+`full` (1 157.4 GB). The prefix subsets are drawn from the synthetic stream, so real tiles and the `ood_region` split appear only in `full`. Auxiliary evaluation sets and results under `aux/` (`aux/README.md`): 20.5 GB of evaluation sets at v1.0, 605 GB on 2026-10-15 including the official baselines' predictions, checkpoints and metrics under `aux/results/` (552 GB) and the first-pair voltages `aux/t1_pair1/` (32 GB).
 Every tier and every task group is a self-contained set of HDF5 shards (`data/<tier>/<group>/shard-XXXXX.h5`, inputs
 included), so any tier or task group can be downloaded alone (`snapshot_download(allow_patterns="data/L/T4/*")`).
 The 25 rows failing QC after the precision pass (24 landscapes, all synthetic at contrast ≥ 10⁴) stay in the index

@@ -11,3 +11,14 @@
 
 Query: `sacct -u $USER -S 2026-09-24 -X -o JobName,ElapsedRaw,AllocTRES -P`, jobs named `phase10-*` with a GPU
 allocation, summing `ElapsedRaw × gres/gpu`.
+
+## Final total at the paper draft (queried 2026-10-15 22:00Z)
+
+| item | value |
+|---|---|
+| GPU jobs 2026-09-24 → 2026-10-15 (Phase 10-full baselines, WP4, transfers, scale-aware variants, GNN, WP7, MgNO, voltage heads for the acceleration metric, tuning candidates and the tuned re-runs of phases 13–16, probes, duplicates and abandoned legs) | 773 |
+| GPU-hours consumed (sum of elapsed × allocated GPUs) | 701.5 |
+
+Query: `sacct -u $USER -S 2026-09-24 -E now -X -P -o JobID,JobName,ElapsedRaw,AllocTRES`, every job with a `gres/gpu`
+allocation, summing `ElapsedRaw × gres/gpu` (CPU-only backfills excluded). Breakdown of the tuning phases:
+`docs/tables/gpu_usage_tuning.md`.

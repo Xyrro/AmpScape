@@ -25,6 +25,8 @@ INCLUDE = [
     "best.pt",
     "predictions",
     "eval_t4_reference",
+    "eval_accel_test_id",  # 2026-10-15 verification: the acceleration evaluations of the voltage heads were never
+    "eval_accel_test_ood",  # published (docs/tables/acceleration.md could not be regenerated from the Hub)
     "train.log",
 ]
 

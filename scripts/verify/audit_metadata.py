@@ -98,8 +98,9 @@ def main() -> None:
             except Exception as e:  # noqa: BLE001
                 check(f"{t} split list {sp}", False, f"unreadable: {e}")
                 continue
-            mine = set(d[(d.split == sp) & d.qc_pass.astype(bool)].sample_id)
-            check(f"{t} split {sp} ⊂ splits/full/{sp}", mine <= ids, f"{len(mine)} index ids, {len(mine - ids)} not in the list")
+            failing = set(d[~d.qc_pass.astype(bool)].sample_id)  # a landscape with any failing row is excluded whole
+            mine = set(d[d.split == sp].sample_id) - failing
+            check(f"{t} split {sp} == splits/full/{sp} ∩ tier", mine == (ids & set(d.sample_id)), f"{len(mine)} index ids (QC-failing landscapes removed), {len(mine - ids)} not in the list, {len((ids & set(d.sample_id)) - mine)} listed but not in the index split")
     c = cc.get("total", {})
     for k in ("landscapes", "rows", "qc_fail"):
         check(f"total {k}", c.get(k) == tot[k], f"index {tot[k]} vs card {c.get(k)}")
