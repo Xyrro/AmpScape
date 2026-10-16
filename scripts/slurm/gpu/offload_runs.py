@@ -54,10 +54,28 @@ def finished(run: pathlib.Path) -> bool:
     return True
 
 
+def run_includes(run: pathlib.Path, tier: str) -> list[str]:
+    """The whole-run push ships `predictions/<tag>` only for the run's own tier. Transfer tags (XL/XXL legs write
+    `predictions/hfcache_XL_*` into the same run directory while they run) are shipped per tag by offload_transfer
+    once their metrics exist — 2026-10-16 verification: two runs had a partial predictions.h5 on the Hub whose size
+    metadata disagreed with its content because the whole-run push caught a transfer leg's file while it was growing."""
+    inc = [x for x in INCLUDE if x != "predictions"]
+    pred = run / "predictions"
+    if pred.exists():
+        for d in sorted(pred.iterdir()):
+            if d.is_dir() and d.name.split("_")[1:2] == [tier]:
+                inc.append(f"predictions/{d.name}")
+    return inc
+
+
 def offload(run: pathlib.Path) -> None:
     mark = run / ".offloaded"
     if mark.exists():
         return
+    try:
+        tier = json.loads((run / "config.json").read_text())["tier"]
+    except (OSError, json.JSONDecodeError, KeyError):
+        tier = run.name.split("_")[2] if len(run.name.split("_")) > 2 else ""
     r = subprocess.run(
         [
             sys.executable,
@@ -67,7 +85,7 @@ def offload(run: pathlib.Path) -> None:
             "--dest",
             f"aux/results/runs_full/{run.name}",
             "--include",
-            *INCLUDE,
+            *run_includes(run, tier),
         ],
         capture_output=True,
         text=True,
