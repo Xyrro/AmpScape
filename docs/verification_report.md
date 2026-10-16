@@ -7,11 +7,11 @@ Logs: `work/verify/` (untracked, scratch); JSON results named per item.
 
 | item | result | fixes applied |
 |---|---|---|
-| 1. Fresh clone at the tagged release on a compute node, lockfile env, `lite` loader, tests, `evaluate.py` on a published baseline | **PASS** at `v1.0.2` (8/8 metrics match `docs/tables/baselines_full.md` at the printed precision; 198 tests pass, 13 skipped) and at `main` (440 pass, 14 skipped); three steps need undocumented knowledge (below) | loader downloaded the whole tier × task group regardless of `subset` (30 GB for "lite S/T1" at the tag) → fixed on `main` (1.9 GB) with a test; README quickstart sizes corrected |
+| 1. Fresh clone at the tagged release on a compute node, lockfile env, `lite` loader, tests, `evaluate.py` on a published baseline | **PASS** at `v1.0.2` (8/8 metrics match `docs/tables/baselines_full.md` at the printed precision; 198 tests pass, 13 skipped) and at `main` (440 pass, 14 skipped; whole `lite` subset = 517 shards, 25 GB, as the card says); three steps need undocumented knowledge (below) | loader downloaded the whole tier × task group regardless of `subset` (30 GB for "lite S/T1" at the tag) → fixed on `main` (1.9 GB) with a test; README quickstart sizes corrected |
 | 2. Regenerate every paper table and figure from Hub-published results only, diff against the committed versions | **PASS** — every table and figure byte-identical after one fix | the acceleration evaluations (`eval_accel_*`) of the 12 voltage-head runs had never been published → pushed, added to the offloader's include list |
 | 3. Cross-check every number in `paper/draft.md` against its tagged source file | **PASS** — 1,508 numeric tokens, 0 untraceable, 0 untagged (`scripts/verify/check_draft_numbers.py`) | 29 initial mismatches fixed in the draft (rounded or derived values replaced by the source values or tagged `[derived]`) |
 | 4. Dataset card, Croissant and CITATION.cff against the index | **PASS** — 97/97 checks after fixes (`scripts/verify/audit_metadata.py`) | `croissant.json` `datePublished` 2026-09-25 (local date) → 2026-09-26 (UTC date of the tag; re-validated, 0 errors / 0 warnings, uploaded); card: `aux/` size 20.5 GB was the v1.0 figure (605 GB today) → dated statement; viewer-config comment corrected; Hub revisions stated (`v1.0`, `v1.0.2`; `v1.0.1` is a GitHub tag only) |
-| 5. Full Hub audit, five tiers and `aux/` | tiers S, XXL **PASS** (0 discrepancies); M, L, XL: running (12-h jobs, results appended below when done); `aux/`: 9,443 files / 605 GB listed, 8,243 covered by sha256 push records (5 stale records refreshed), 1,066 unrecorded files hashed from their local sources (0 mismatches), 128 files without local source downloaded and verified (second pass running); **one integrity defect found** (below) | stale push records of `aux/test_ood_published/index*` refreshed; stale Hub copy of `generation_postmortem.md` re-pushed; the defective file is being regenerated |
+| 5. Full Hub audit, five tiers and `aux/` | tiers S, XXL **PASS** (0 discrepancies); M, L, XL: running (12-h jobs, results appended below when done); `aux/`: 9,443 files / 605 GB listed, 8,243 covered by sha256 push records (5 stale records refreshed), 1,066 unrecorded files hashed from their local sources (0 mismatches), 134 files without local source or non-LFS downloaded and verified — 132 ok, **2 prediction files defective** (below) | stale push records refreshed; stale Hub copy of `generation_postmortem.md` re-pushed; one defective file repaired (complete content, wrong size metadata), the other (corrupt content) regenerated on a GPU and re-pushed; the offloader no longer ships a transfer leg's predictions with the whole-run push (root cause) |
 
 ## 1. Reviewer path on a compute node (`scripts/verify/fresh_clone_verify.sbatch`)
 
@@ -31,8 +31,9 @@ Job 6286607 (tag `v1.0.2`, 18 min on a `coc-cpu` node, 48 GB RAM, node-local dis
    index after the download, so the README's "mini ≈ 0.6 GB" was not true of the download. Fixed on `main`
    (`ampscape/data/dataset.py`: the index names the subset's shards and only those are fetched; `tests/test_data_loader.py`):
    the same call now downloads 1.9 GB (40 shards) in 39 s. The whole-`lite` loop (S, M, L × five task groups) in job
-   6286685 was cut short by a Hub CDN error (`504 Gateway Time-out` from the xet backend after 79 shards / 4.4 GB); it is
-   re-run with the xet backend disabled in job 6286935.
+   6286685 was cut short by a Hub CDN error (`504 Gateway Time-out` from the xet backend after 79 shards / 4.4 GB); job
+   6286935 re-ran it with the xet backend disabled: 15 loader calls, 517 shards, 25 GB on disk in 148 s — the card's
+   "≈ 26 GB" — and the evaluation step passed again (8/8 metrics).
 6. `scripts/evaluate.py` at `v1.0.2` on the published predictions of `unet_T1_S_s1` (`aux/results/runs_full/unet_T1_S_s1/predictions/hfcache_S_test_id`, 274 MB) against the S/T1 group downloaded from the Hub: 9,850 rows in 434 s; every printed metric equals the `docs/tables/baselines_full.md` row of `origin/main` at three decimals (MAE 0.042, rel-L2 0.111, top-5 % IoU 0.857, pinch recall 0.914, Spearman 0.993, corridor Dice 0.938, SSIM 0.989, median speed-up 738.585). The evaluation code of `v1.0.2` therefore reproduces the paper's S rows; the later harness changes (T4 reference branch, packed loader) do not alter them.
 
 Evaluation-code drift since `v1.0.2` (for the record): `ampscape/eval/harness.py` (+37 lines, T4 block-1 reference
@@ -92,13 +93,24 @@ mismatches (17 GB, `aux/t1_pair1`, `aux/dev/S`, block-size tables, docs copies);
 (the `aux/dev` builds were deleted after upload; two prediction files) and were downloaded and hashed in a second pass
 (job 6286934, results below); 6 small non-LFS Markdown copies were compared byte-wise — `aux/generation_postmortem.md`
 was stale (9,584 vs 9,697 bytes) and was re-pushed.
-(c) **Integrity defect:** `aux/results/runs_full/gnn_T1_L_s3_t2/predictions/hfcache_XXL_test_id/predictions.h5` — the
-Hub lists 854,407,780 bytes while the download yields 931,457,226 bytes ("file size mismatch"), and no push record
-exists: the local file (931,457,226 bytes) was deleted for scratch quota at 16:47Z before the offloader's 16:54Z push
-of that split's metrics, so the Hub copy is a partial earlier upload. The metrics of that split (`results_transfer.json`,
-`eval_transfer/`) were computed from the complete local file and are unaffected. Fix in progress: the XXL test_id
-predictions of `gnn_T1_L_s3_t2` are regenerated with `scripts/transfer_eval.py` (≈ 0.5 GPU-h) and re-pushed with a
-record; the regenerated metrics must equal the published ones. `aux/results/runs_full/gnn_T4_L_s2/predictions/hfcache_XL_test_id/predictions.h5` is the second unrecorded prediction file and is verified in the same pass.
+(c) **Two defective prediction files** (job 6286934, plain downloads rejected by `huggingface_hub`'s consistency check;
+`scripts/verify/fetch_inconsistent.py` fetched the raw content):
+`aux/results/runs_full/gnn_T1_L_s3_t2/predictions/hfcache_XXL_test_id/predictions.h5` — pointer 854,407,780 bytes,
+content 931,457,226 bytes, HDF5 complete (275 groups, every group with `cum_current`), sha256 `52d2ca85…`; and
+`aux/results/runs_full/gnn_T4_L_s2/predictions/hfcache_XL_test_id/predictions.h5` — pointer 2,891,200,341 bytes,
+content 2,994,788,705 bytes, HDF5 does not open (bad object header). Neither had a push record, and both runs are
+seeds ≠ 1 whose transfer legs delete their predictions after the metrics (`KEEP=none`, `predictions_deleted.json`).
+**Root cause:** the offloader's whole-run push included the `predictions/` directory as a whole, so a transfer leg's
+`predictions/hfcache_XL*/predictions.h5` that was still being written was uploaded — the pointer took the size at the
+start of the upload, the stream read whatever had been written by its end. The metrics of both splits were computed by
+the legs from the complete files and are unaffected. **Fixes:** (i) `offload_runs.py` now ships only in-tier
+`predictions/<tag>` directories with the whole-run push (transfer tags are pushed per tag once their metrics exist;
+`tests/test_offload_includes.py`); (ii) the `gnn_T1_L_s3_t2` file was re-added with correct metadata (a single
+delete+add commit left the path empty for a few minutes because the identical content was de-duplicated away; the
+following `upload_file` restored it: pointer 931,457,226 bytes, sha256 `52d2ca85…`, record written); (iii) the
+`gnn_T4_L_s2` XL test_id predictions are regenerated on a GPU (`scripts/transfer_eval.py`, job 6287240) and replace the
+corrupt file; the XXL test_id predictions of `gnn_T1_L_s3_t2` were regenerated as well (job 6287040) as an independent
+check of the repaired file. Results of both appended below.
 
 ## Findings that need an owner decision
 
@@ -106,6 +118,8 @@ record; the regenerated metrics must equal the published ones. `aux/results/runs
    branch and the leaderboard tooling; the paper should cite a tag at the paper commit (proposal: `v1.1.0-paper`).
 2. **Private dataset, ssh clone, `uv` bootstrap** are the three steps a reviewer cannot take from the README alone; the
    README gains a "Reviewer access" paragraph once the owner decides when the Hub repository becomes public.
+4. **Transient Hub CDN errors** (`504` from the xet backend, twice in one evening) interrupt long downloads; the
+   documented loader should mention `HF_HUB_DISABLE_XET=1` or retries for multi-GB fetches.
 3. **Hub layout of the aux evaluation sets** differs from the local names the scripts expect
    (`aux/t4_bs1_reference/M` vs `M_bs1`, `aux/t4_blocksize_baselines/M/M_b7_ca1` vs `M_b7_ca1`); either the scripts
    accept both or `docs/aux_layout.md` documents the mapping (done in this report; code unchanged).
