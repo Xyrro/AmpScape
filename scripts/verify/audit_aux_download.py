@@ -63,7 +63,11 @@ def main() -> None:
         if not h:
             res["bad"].append({"path": hp, "why": "not on the Hub any more"})
             continue
-        lp = pathlib.Path(hf_hub_download(a.repo, hp, repo_type="dataset", local_dir=str(tmp)))
+        try:
+            lp = pathlib.Path(hf_hub_download(a.repo, hp, repo_type="dataset", local_dir=str(tmp)))
+        except Exception as e:  # noqa: BLE001 — a failed transfer is a finding, not a crash
+            res["bad"].append({"path": hp, "why": f"download failed: {repr(e)[:300]}"})
+            continue
         gb += lp.stat().st_size / 1e9
         entry = {"path": hp, "bytes": lp.stat().st_size}
         if h["sha256"]:

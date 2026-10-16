@@ -129,13 +129,13 @@ def main() -> None:
         check(f"subset {sub} landscapes", {k: v for k, v in got["per_tier"].items() if v} == per, f"index {got['per_tier']} vs card {per}")
         check(f"subset {sub} GB", abs(got["gb"] - gb) <= max(0.15, 0.05 * gb), f"Hub {got['gb']} GB ({got['files']} files) vs card ≈ {gb}")
     aux_gb = sum(v for k, v in sizes.items() if k.startswith("aux")) / 1e9
-    m = re.search(r"under `aux/` \(([\d.]+) GB", card)
-    check("aux GB", m is not None and abs(float(m.group(1)) - aux_gb) < 1.0, f"Hub {aux_gb:.1f} vs card {m.group(1) if m else None}")
+    m = re.search(r"([\d.]+) GB on (\d{4}-\d\d-\d\d) including the official baselines", card) or re.search(r"under `aux/` \(([\d.]+) GB", card)
+    check("aux GB", m is not None and abs(float(m.group(1)) - aux_gb) < 5.0, f"Hub {aux_gb:.1f} vs card {m.group(1) if m else None} (dated statement; ±5 GB tolerance as aux/results/ grows with every published run)")
     # --- croissant
     cj = json.loads(pathlib.Path(hf_hub_download(a.repo, "croissant.json", repo_type="dataset", local_dir=str(work))).read_text())
     cff = yaml.safe_load(pathlib.Path(a.cff).read_text())
     fm = yaml.safe_load(card.split("---")[1])
-    ver_card = re.findall(r"\*\*v(\d+\.\d+(?:\.\d+)?)\*\* \((\d{4}-\d\d-\d\d)\)", card)
+    ver_card = re.findall(r"\*\*v(\d+\.\d+(?:\.\d+)?)\*\* \((\d{4}-\d\d-\d\d)(?: UTC)?\)", card)
     latest_card = ver_card[-1] if ver_card else (None, None)
     check("croissant version == latest card version", cj.get("version") == latest_card[0], f"croissant {cj.get('version')} vs card {latest_card}")
     check("croissant datePublished == card date of that version", cj.get("datePublished") == latest_card[1], f"croissant {cj.get('datePublished')} vs card {latest_card[1]}")
@@ -158,7 +158,8 @@ def main() -> None:
     cols = set(idx["S"].columns)
     check("croissant index recordSet fields ⊂ index columns", idx_fields <= cols, f"{len(idx_fields)} fields; not in index: {sorted(idx_fields - cols)}")
     check("croissant subset FileSets", {"subset-mini", "subset-lite", "subset-core"} <= set(dist) or any("lite" in k for k in dist), f"subset entries: {sorted(k for k in dist if 'subset' in k or 'lite' in k or 'mini' in k)}")
-    check("card front matter configs", fm.get("configs") not in ([], None), f"configs = {fm.get('configs')!r} (viewer configs; HDF5 shards are not viewer-loadable, so an empty list is expected but the comment claims push_to_hub.py fills it)")
+    fm_text = card.split("---")[1]
+    check("card front matter configs", fm.get("configs") == [] and "filled by scripts/push_to_hub.py" not in fm_text, f"configs = {fm.get('configs')!r}; comment: {[l for l in fm_text.splitlines() if l.startswith('configs')]}")
     out = {"findings": findings, "subsets": sub_counts, "sizes_gb": {k: round(v / 1e9, 2) for k, v in sizes.items()}, "files": dict(files), "n_fail": sum(1 for f in findings if not f["ok"])}
     pathlib.Path(a.out).write_text(json.dumps(out, indent=1))
     print(f"{out['n_fail']} failing of {len(findings)} checks -> {a.out}")

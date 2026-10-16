@@ -5,8 +5,8 @@ Referenced from the results section (scale transfer). Facts used: Omniscape wind
 docs/t4_fidelity.md]; source strength s(x) ∈ [0, 1] = inverse-resistance suitability above its 0.5 quantile, rescaled
 to a maximum of 1 per landscape, `source_threshold = 0` [docs/t4_fidelity.md]; target maps are cumulative current
 `cum_current` summed over windows [docs/t4_fidelity.md]; measured zero-shot errors of the L-trained models at XL and
-XXL: rel-L2 0.515 / 0.532 / 0.538 (U-Net / FNO / ViT) at XL and 0.749 / 0.765 (U-Net / FNO) at XXL on test_id, three
-seeds each with std ≤ 0.002 [paper/tables/scale_transfer.md].
+XXL: rel-L2 0.515 / 0.531 / 0.538 / 0.498 (U-Net / FNO / ViT / GNN) at XL and 0.749 / 0.764 / 0.739 (U-Net / FNO / GNN) at XXL on
+test_id, three seeds each with std ≤ 0.003 [paper/tables/scale_transfer.md] (official configurations after the per-tier tuning, 2026-10-15).
 
 ## A.1 Magnitude of the Omniscape cumulative current scales with the window radius
 
@@ -37,13 +37,13 @@ magnitude). With κ = r_L / r_eval,
 
   rel-L2 = ‖P − C_eval‖₂ / ‖C_eval‖₂ = ‖(κ − 1) C_eval + ε‖₂ / ‖C_eval‖₂ ≈ 1 − κ = 1 − r_L / r_eval,
 
-where ε is the model's intrinsic error (its in-tier rel-L2 is 0.08–0.16 [paper/tables/baselines_sml.md]) and the
+where ε is the model's intrinsic error (its in-tier rel-L2 is 0.081–0.159 [paper/tables/baselines_sml.md]) and the
 approximation holds when (1 − κ)‖C‖ dominates ‖ε‖, which it does at XL and XXL. Predicted values: XL
-1 − 64/128 = 0.50, XXL 1 − 64/256 = 0.75; measured: 0.515–0.538 and 0.749–0.765 [paper/tables/scale_transfer.md],
+1 − 64/128 = 0.50, XXL 1 − 64/256 = 0.75; measured: 0.498–0.538 and 0.739–0.764 [paper/tables/scale_transfer.md],
 with the small excess over the prediction accounted for by ε added in quadrature. The near-identical values across
-U-Net, FNO and ViT, and the std ≤ 0.002 across seeds, are consistent with an error that is set by the operator (the
+U-Net, FNO, ViT and GNN, and the std ≤ 0.003 across seeds, are consistent with an error that is set by the operator (the
 radius), not by the model. Rank-based metrics are unaffected by a common factor, which is why Spearman stays at
-0.93–0.96 while rel-L2 collapses [paper/tables/scale_transfer.md].
+0.894–0.958 while rel-L2 collapses [paper/tables/scale_transfer.md].
 
 ## A.3 The scale-aware target
 
@@ -52,7 +52,7 @@ The variant trains on k · C with k = r_ref / r_tier (r_ref = 64, tier L) [ampsc
 independent of the tier. At evaluation the prediction is divided by k_eval = r_ref / r_eval, restoring
 C_eval ∝ r_eval · s̄ · g. No quantity of the evaluation tier other than its radius (a protocol constant) enters,
 and no XL/XXL data is used in training or in the inverse. What remains after the correction is the error that is not a
-common factor: the measured scale-aware rel-L2 is 0.16–0.22 at XL and 0.20–0.34 at XXL against an in-tier 0.08–0.16
+common factor: the measured scale-aware rel-L2 is 0.157–0.308 at XL and 0.197–0.438 at XXL against an in-tier 0.081–0.159
 [paper/tables/scale_transfer.md]; this residual is the operator-learning transfer error proper (window geometry
 changes by more than a factor — b and r both scale, the resistance field has different pixel size and extent — see
 the resolution-versus-size caveat in the discussion).
@@ -64,8 +64,8 @@ Under a uniform rescaling of the landscape by s per axis with the same resistanc
 crosses any front spreads over ∝ s pixels, so the per-pixel current ∝ 1/s, while the valid pixel count N ∝ s².
 The factor k = √(N_valid / N_ref) with N_ref = 512² [ampscape/models/common.py `target_scale`] makes k · C
 invariant; it is computed from the input mask alone. The measured throughput error of the zero-shot T1 transfers
-(0.5–0.9 at XL) [paper/tables/scale_transfer.md] is the signature of the same magnitude mismatch; the correction
-helps the FNO (0.707 → 0.572 at XL, 1.502 → 0.671 at XXL) and the ViT but not the U-Net or GNN, whose errors at XL/XXL
+(0.434–0.985 at XL) [paper/tables/scale_transfer.md] is the signature of the same magnitude mismatch; the correction
+helps the FNO at XXL (1.352 → 0.762) but not at XL (0.617 → 0.700), and not the U-Net (0.957 / 0.987), whose errors at XL/XXL
 remain near rel-L2 1 because their receptive fields do not cover the longer-range flow paths of the larger landscapes —
 a structural, not a magnitude, limit.
 
