@@ -110,7 +110,7 @@ delete+add commit left the path empty for a few minutes because the identical co
 following `upload_file` restored it: pointer 931,457,226 bytes, sha256 `52d2ca85…`, record written); (iii) the
 `gnn_T4_L_s2` XL test_id predictions are regenerated on a GPU (`scripts/transfer_eval.py`, job 6287240) and replace the
 corrupt file; the XXL test_id predictions of `gnn_T1_L_s3_t2` were regenerated as well (job 6287040) as an independent
-check of the repaired file. Results of both appended below.
+check of the repaired file. Regeneration result for `gnn_T1_L_s3_t2` XXL test_id (job 6287040, 32 min on an L40S): the regenerated file is not bitwise identical (930,701,350 bytes, bf16 inference on a different GPU and a different HDF5 chunk layout), but its metrics equal the published ones at three decimals — MAE 0.5437 / 0.5437, top-5 % IoU 0.3543 / 0.3543, pinch recall 0.4089 / 0.4088, Spearman 0.7282 / 0.7283 — and rel-L2 differs by 0.1 % (2.2824 vs 2.2847), the metric the paper reports with its median for exactly this reason. The repaired Hub file is the original content (sha256 `52d2ca85…`), so the published metrics stay consistent with it. Result for `gnn_T4_L_s2` XL test_id (job 6287240, 28 min on an L40S): 2,335 groups, metrics equal to the published ones (rel-L2 0.5191 / 0.5191, MAE 0.3840 / 0.3841, top-5 % IoU 0.5371 / 0.5371, pinch recall 0.6177 / 0.6177, Spearman 0.9276 / 0.9276); pushed over the corrupt file with a record — pointer 3,014,459,436 bytes, sha256 `9e230b8d…`, verified after upload. Both defects are closed; the regenerated local copies were deleted after the push.
 
 ## Findings that need an owner decision
 
