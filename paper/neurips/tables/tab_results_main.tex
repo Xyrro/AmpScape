@@ -1,0 +1,26 @@
+% src: paper/tables/baselines_sml.md
+\begin{table}[tb]
+\centering
+\small
+\setlength{\tabcolsep}{3.5pt}
+\caption{Relative L2 on \texttt{test\_id} at the training tier, mean $\pm$ std over three seeds with the median over seeds in brackets (official configuration per model $\times$ task $\times$ tier; MgNO: one seed, not ranked). Best three-seed model per task and tier in bold; lower is better. The complete metric set (MAE, top-5\,\% IoU, pinch recall, Spearman, speed-up, training cost) is Table~\ref{tab:baselines_full}.}
+\label{tab:results}
+\begin{tabular}{llccc}
+\toprule
+task & model & S & M & L \\
+\midrule
+T1 & U-Net & \textbf{0.114 $\pm$ 0.007 [0.111]} & \textbf{0.187 $\pm$ 0.022 [0.187]} & 0.397 $\pm$ 0.012 [0.392] \\
+T1 & FNO & 0.199 $\pm$ 0.002 [0.199] & 0.208 $\pm$ 0.003 [0.209] & \textbf{0.299 $\pm$ 0.012 [0.297]} \\
+T1 & ViT & 0.218 $\pm$ 0.028 [0.229] & 0.306 $\pm$ 0.012 [0.299] & 0.648 $\pm$ 0.033 [0.644] \\
+T1 & GNN & 0.561 $\pm$ 0.006 [0.563] & 0.607 $\pm$ 0.027 [0.600] & 0.941 $\pm$ 0.160 [0.925] \\
+T1 & MgNO & 0.220 [0.220] & 0.412 [0.412] & -- \\
+T3 & U-Net & \textbf{0.111 $\pm$ 0.005 [0.110]} & \textbf{0.202 $\pm$ 0.006 [0.202]} & 0.379 $\pm$ 0.011 [0.374] \\
+T3 & FNO & 0.253 $\pm$ 0.001 [0.252] & 0.255 $\pm$ 0.003 [0.254] & \textbf{0.323 $\pm$ 0.002 [0.323]} \\
+T4 & U-Net & \textbf{0.041 $\pm$ 0.002 [0.041]} & \textbf{0.042 $\pm$ 0.001 [0.041]} & \textbf{0.081 $\pm$ 0.001 [0.081]} \\
+T4 & FNO & 0.051 $\pm$ 0.001 [0.051] & 0.073 $\pm$ 0.001 [0.073] & 0.116 $\pm$ 0.000 [0.116] \\
+T4 & ViT & 0.052 $\pm$ 0.001 [0.052] & 0.094 $\pm$ 0.004 [0.093] & 0.159 $\pm$ 0.004 [0.161] \\
+T4 & GNN & 0.066 $\pm$ 0.000 [0.066] & 0.099 $\pm$ 0.001 [0.099] & 0.142 $\pm$ 0.001 [0.142] \\
+T4 & MgNO & 0.044 [0.044] & 0.189 [0.189] & -- \\
+\bottomrule
+\end{tabular}
+\end{table}

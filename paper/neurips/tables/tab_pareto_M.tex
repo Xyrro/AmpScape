@@ -1,0 +1,27 @@
+% src: paper/tables/t4_pareto_M.md
+\begin{table*}[tb]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{T4 at tier M against the exact block-1 Omniscape map on the \texttt{test\_id} reference subset: solver rows (single-core wall time per landscape) and learned models (median batch-amortised GPU inference per landscape; seeds averaged).}
+\label{tab:pareto_M}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrrrrr}
+\toprule
+method & n & cost s / landscape & rel-L2 & median (seeds) & non-source rel-L2 & MAE log$\_{10}$ & top-5\textbackslash{},\textbackslash{}\% IoU & pinch recall & Spearman \\
+\midrule
+block 1 (exact) & 400 & 776 & 0.0000 & -- & 0.0000 & 0.0000 & 1.0000 & 1.0000 & 1.0000 \\
+block 3, corr. off & 400 & 112 & 0.1105 & -- & 0.1069 & 0.0260 & 0.6105 & 0.7658 & 0.9856 \\
+prod. block 3, corr. on & 400 & 111 & 0.0291 & -- & 0.0371 & 0.0119 & 0.9357 & 0.9312 & 0.9983 \\
+block 7, corr. on & 400 & 25.5 & 0.0983 & -- & 0.1064 & 0.0526 & 0.8081 & 0.8081 & 0.9845 \\
+block 7, corr. off & 400 & 25.4 & 0.2918 & -- & 0.3771 & 0.0679 & 0.5468 & 0.9662 & 0.9664 \\
+gnn\_T4\_M (3 seeds) & 400 & 0.0164 & 0.0928 & 0.0929 & -- & 0.0511 & 0.7034 & 0.7770 & 0.9783 \\
+unet\_T4\_M (tuned) (3 seeds) & 400 & 0.00328 & 0.0510 & 0.0515 & -- & 0.0235 & 0.8532 & 0.9035 & 0.9957 \\
+fno\_T4\_M (tuned) (3 seeds) & 400 & 0.003 & 0.0761 & 0.0762 & -- & 0.0479 & 0.7872 & 0.7530 & 0.9866 \\
+vit\_T4\_M (3 seeds) & 400 & 0.00205 & 0.0931 & 0.0919 & -- & 0.0536 & 0.7202 & 0.8145 & 0.9822 \\
+fno\_T4\_M\_s1\_scalenorm (1 seed) & 400 & 0.00144 & 0.0813 & 0.0813 & -- & 0.0511 & 0.7747 & 0.7399 & 0.9854 \\
+unet\_T4\_M\_s1\_scalenorm (1 seed) & 400 & 0.000987 & 0.0575 & 0.0575 & -- & 0.0266 & 0.8413 & 0.8908 & 0.9948 \\
+mgno\_T4\_M (1 seed) & 400 & 0.000925 & 0.1864 & 0.1864 & -- & 0.1435 & 0.5794 & 0.7271 & 0.9526 \\
+\bottomrule
+\end{tabular}}
+\end{table*}

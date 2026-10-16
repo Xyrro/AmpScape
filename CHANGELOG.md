@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased] — Phase 10-full (GPU baselines)
+- Paper rewritten as a NeurIPS 2026 LaTeX submission (`paper/neurips/`, 9 content pages, PDF built with Tectonic); style memo `docs/paper_style_memo.md`; seven main-text figures + appendix figures from `scripts/paper_figures.py --tex` (raster arrays via `scripts/paper_figdata.py`), tables from `scripts/paper_tables_tex.py`; number checker gained a LaTeX mode; Markdown draft archived (2026-10-16).
 - Leaderboard live on the Hub (`aux/leaderboard/`), submission format on the dataset card; median rel-L2 in every main results table; `paper/draft.md` assembled end to end; verification pass (`docs/verification_report.md`, `scripts/verify/`): `load_from_hub` downloads only the subset's shards, acceleration evaluations published, Croissant date and card statements corrected (2026-10-15).
 - Phase 16 complete: GNN ms8 re-runs at L (T1 seeds 2–3, T4 seeds 1–3, scale-aware variants, XL/XXL transfer legs, exact T4 references); GNN ms8 official at T1 L and T4 L by the per-task validation rule; tables, figures, tuning-effect table and the local leaderboard regenerated (2026-10-15).
 - Phase 14/15 complete: tuned-config re-runs at M (U-Net w64, FNO w48, ViT p16g16, GNN ms8) and FNO w48 at L with scale-aware variants and XL/XXL transfer legs; all T4 M/L exact-reference evaluations recomputed and replaced on the Hub; tables/figures regenerated (`paper/`, `docs/tables/baselines_full.md`), `docs/tables/tuning_effect.md`, `docs/tables/gpu_usage_tuning.md` (151 GPU-h since 2026-10-13) (2026-10-14).

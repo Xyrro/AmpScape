@@ -1,0 +1,30 @@
+% src: docs/tables/tuning_decisions.md
+\begin{table*}[tb]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{Configuration selection per model $\times$ task $\times$ tier on validation loss alone (masked MSE in the log-target space; mean over three pre-tuning seeds $\pm$ std against the mean of three tuned seeds; the tuned configuration is official when it beats the pre-tuning mean by more than std$/\sqrt{3}$).}
+\label{tab:decisions}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllllllr}
+\toprule
+tier & task & model & variant & val loss pre-tuning & tuned & $\textbackslash{}Delta$ & official \\
+\midrule
+M & T1 & FNO & w48 & 0.0495 $\pm$ 0.0003 & 0.0461 & -6.9 \% & tuned (w48) \\
+M & T1 & GNN & ms8 & 0.2156 $\pm$ 0.0008 & 0.1603 & -25.6 \% & tuned (ms8) \\
+M & T1 & U-Net & w64 & 0.0295 $\pm$ 0.0060 & 0.0239 & -19.0 \% & tuned (w64) \\
+M & T1 & ViT & p16g16 & 0.1336 $\pm$ 0.0820 & 0.0504 & -62.3 \% & tuned (p16g16) \\
+M & T3 & FNO & w48 & 0.0630 $\pm$ 0.0020 & 0.0555 & -11.9 \% & tuned (w48) \\
+M & T3 & U-Net & w64 & 0.0276 $\pm$ 0.0010 & 0.0272 & -1.4 \% & pre-tuning \\
+M & T4 & FNO & w48 & 0.0118 $\pm$ 0.0001 & 0.0110 & -6.5 \% & tuned (w48) \\
+M & T4 & GNN & ms8 & 0.0120 $\pm$ 0.0002 & 0.0129 & +8.0 \% & pre-tuning \\
+M & T4 & U-Net & w64 & 0.0035 $\pm$ 0.0001 & 0.0031 & -12.5 \% & tuned (w64) \\
+M & T4 & ViT & p16g16 & 0.0134 $\pm$ 0.0024 & 0.0157 & +16.8 \% & pre-tuning \\
+L & T1 & FNO & w48 & 0.0626 $\pm$ 0.0003 & 0.0600 & -4.1 \% & tuned (w48) \\
+L & T1 & GNN & ms8 & 0.3204 $\pm$ 0.0068 & 0.2693 & -15.9 \% & tuned (ms8) \\
+L & T3 & FNO & w48 & 0.0863 $\pm$ 0.0028 & 0.0789 & -8.6 \% & tuned (w48) \\
+L & T4 & FNO & w48 & 0.0212 $\pm$ 0.0004 & 0.0206 & -2.7 \% & tuned (w48) \\
+L & T4 & GNN & ms8 & 0.0220 $\pm$ 0.0001 & 0.0202 & -8.3 \% & tuned (ms8) \\
+\bottomrule
+\end{tabular}}
+\end{table*}

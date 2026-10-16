@@ -57,13 +57,99 @@ def present(tok: str, texts: list[str]) -> bool:
     return False
 
 
+TEX_STRIP = re.compile(r"\\(cite[pt]?|ref|label|eqref|includegraphics|input|vspace|hspace|setlength|caption|label|url|href|footnotemark|bibliography|bibliographystyle|usepackage|documentclass|newcommand|renewcommand|begin|end)\*?(\[[^\]]*\])?(\{[^{}]*\})+")
+LEN = re.compile(r"-?\d+(\.\d+)?\s*(\\(line|text|column)width|pt|cm|mm|em|ex|in)\b")
+
+
+def tex_to_units(text: str) -> list[tuple[int, str, list[str]]]:
+    """(line, cleaned text, sources) per paragraph of a .tex file. Source tags are `% src: a; b` comment lines inside
+    the paragraph (or at its end); table .tex files are checked separately through their own `% src:` header."""
+    units = []
+    buf, srcs, start = [], [], 1
+    for ln, raw in enumerate(text.splitlines(), 1):
+        line = raw
+        m = re.match(r"\s*%\s*src:\s*(.+)$", line)
+        if m:
+            srcs += [x.strip() for x in re.split(r"[;,]", m.group(1)) if x.strip()]
+            continue
+        if "%" in line:
+            line = re.sub(r"(?<!\\)%.*$", "", line)
+        if not line.strip():
+            if buf:
+                units.append((start, "\n".join(buf), srcs))
+            buf, srcs = [], []
+            start = ln + 1
+            continue
+        if not buf:
+            start = ln
+        buf.append(line)
+    if buf:
+        units.append((start, "\n".join(buf), srcs))
+    out = []
+    for start, body, srcs in units:
+        body = LEN.sub(" ", body)
+        body = TEX_STRIP.sub(" ", body)
+        body = re.sub(r"\\[a-zA-Z@]+\*?", " ", body)  # remaining commands
+        body = body.replace("$", " ").replace("~", " ")
+        out.append((start, body, srcs))
+    return out
+
+
+def check_tex(path: pathlib.Path, root: pathlib.Path) -> dict:
+    checked, mismatches, untagged = 0, [], []
+    cache: dict[str, str | None] = {}
+
+    def load(p: str) -> str | None:
+        if p not in cache:
+            f = root / p
+            cache[p] = norm(f.read_text()) if f.exists() else None
+        return cache[p]
+
+    text = path.read_text()
+    if "\\begin{document}" in text:
+        text = text.split("\\begin{document}", 1)[1]  # the preamble holds lengths and colour mixes, not results
+    for start, body, srcs in tex_to_units(text):
+        if re.match(r"\s*\\(section|subsection|paragraph|maketitle|tableofcontents|appendix|newpage|clearpage)", body.strip()) and not srcs:
+            toks = numbers(re.sub(r"\\(section|subsection|paragraph)\*?\{[^}]*\}", " ", body))
+        else:
+            toks = numbers(body)
+        if not toks:
+            continue
+        if any(s.startswith("derived") for s in srcs):
+            continue
+        if not srcs:
+            untagged.append({"file": str(path), "line": start, "tokens": toks, "text": body.strip()[:100]})
+            continue
+        texts = [t for t in (load(s) for s in srcs) if t]
+        for tok in toks:
+            checked += 1
+            if not present(tok, texts):
+                mismatches.append({"file": str(path), "line": start, "token": tok, "sources": srcs, "text": body.strip()[:100]})
+    return {"checked": checked, "mismatches": mismatches, "untagged": untagged}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--draft", default="paper/draft.md")
     ap.add_argument("--root", default=".")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--tex", nargs="*", default=None, help="LaTeX files (paragraphs tagged with '%% src:' comments) instead of the Markdown draft")
     a = ap.parse_args()
     root = pathlib.Path(a.root)
+    if a.tex is not None:
+        tot = {"checked": 0, "mismatches": [], "untagged": []}
+        for f in a.tex:
+            r = check_tex(pathlib.Path(f), root)
+            for k in tot:
+                tot[k] = tot[k] + r[k] if isinstance(tot[k], list) else tot[k] + r[k]
+        if a.out:
+            pathlib.Path(a.out).write_text(json.dumps(tot, indent=1))
+        print(f"{tot['checked']} numeric tokens checked in {len(a.tex)} LaTeX files; {len(tot['mismatches'])} not found in their source files; {len(tot['untagged'])} untagged paragraphs with numbers")
+        for m in tot["mismatches"]:
+            print(f"  {m['file']}:L{m['line']}: {m['token']!r} not in {m['sources']} :: {m['text']}")
+        for u in tot["untagged"]:
+            print(f"  {u['file']}:L{u['line']}: untagged {u['tokens']} :: {u['text']}")
+        return
     lines = pathlib.Path(a.draft).read_text().splitlines()
     cache: dict[str, str | None] = {}
 

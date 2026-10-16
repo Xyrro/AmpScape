@@ -1,0 +1,20 @@
+% src: docs/tables/final_counts.json; docs/dataset_card.md
+\begin{table}[tb]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\caption{AmpScape v1.0 per tier. A landscape is one resistance raster; each of its source configurations is a configuration row. The 25 rows failing quality control (24 landscapes, all synthetic at contrast $\geq 10^4$) stay in the index with their flags and are excluded from the split lists.}
+\label{tab:counts}
+\begin{tabular}{llrrrrr}
+\toprule
+tier & raster · pixel & landscapes & configuration rows & synthetic / real & GB on the Hub & rows failing QC \\
+\midrule
+S & 128² · 100 m & 100,000 & 527,281 & 60,000 / 40,000 & 142.4 & 1 \\
+M & 256² · 100 m & 50,000 & 264,128 & 30,000 / 20,000 & 251.7 & 4 \\
+L & 512² · 200 m & 20,000 & 105,949 & 12,000 / 8,000 & 380.9 & 11 \\
+XL & 1024² · 500 m & 4,000 & 21,006 & 2,400 / 1,600 & 281.7 & 7 \\
+XXL & 2048² · 1 km & 400 & 2,008 & 210 / 190 & 100.7 & 2 \\
+total &  & 174,400 & 920,372 &  & 1157.4 & 25 \\
+\bottomrule
+\end{tabular}
+\end{table}

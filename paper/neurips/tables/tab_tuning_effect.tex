@@ -1,0 +1,15 @@
+% src: docs/tables/tuning_effect.md
+\begin{table*}[tb]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{Effect of the per-tier tuning on \texttt{test\_id} (mean $\pm$ std over three seeds), with the official choice of Table~\ref{tab:decisions}. The validation rule keeps the pre-tuning configuration for U-Net T3 M despite a better test rel-L2 and for ViT and GNN T4 M where the tuned one is worse on test: test metrics are never read.}
+\label{tab:tuning_effect}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llllllr}
+\toprule
+task & tier & model & official & rel-L2 pre-tuning $\textbackslash{}rightarrow$ tuned & median & MAE log$\_{10}$ pre-tuning $\textbackslash{}rightarrow$ tuned \\
+\midrule
+\bottomrule
+\end{tabular}}
+\end{table*}

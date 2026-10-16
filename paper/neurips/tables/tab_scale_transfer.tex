@@ -1,0 +1,59 @@
+% src: paper/tables/scale_transfer.md
+\begin{table*}[tb]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{Scale transfer on \texttt{test\_id}: models trained at L evaluated at L, XL and XXL at batch 1 with the training tier's normalisation statistics; zero-shot = official configuration (three seeds), scale-aware = \texttt{--target-norm scale} (seed 1). The ViT's interpolated positional embedding stops at XL.}
+\label{tab:scale_transfer}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllllllll}
+\toprule
+task & model & variant & eval tier & seeds & rel-L2 [median] & Spearman & top-5\textbackslash{},\textbackslash{}\% IoU & throughput err. \\
+\midrule
+T1 & FNO & scale-aware & L & 1 & 0.302 [0.302] & 0.949 & 0.664 & 0.085 \\
+T1 & FNO & scale-aware & XL & 1 & 0.700 [0.700] & 0.928 & 0.496 & 0.453 \\
+T1 & FNO & scale-aware & XXL & 1 & 0.762 [0.762] & 0.918 & 0.449 & 0.490 \\
+T1 & FNO & zero-shot & L & 3 & 0.299 $\pm$ 0.011 [0.297] & 0.949 $\pm$ 0.001 & 0.665 $\pm$ 0.003 & 0.083 $\pm$ 0.003 \\
+T1 & FNO & zero-shot & XL & 3 & 0.617 $\pm$ 0.010 [0.611] & 0.932 $\pm$ 0.000 & 0.554 $\pm$ 0.001 & 0.434 $\pm$ 0.083 \\
+T1 & FNO & zero-shot & XXL & 3 & 1.352 $\pm$ 0.092 [1.393] & 0.921 $\pm$ 0.001 & 0.507 $\pm$ 0.003 & 1.689 $\pm$ 0.182 \\
+T1 & GNN & scale-aware & L & 1 & 1.287 [1.287] & 0.860 & 0.495 & 0.854 \\
+T1 & GNN & scale-aware & XL & 1 & 7.509 [7.509] & 0.736 & 0.381 & 0.725 \\
+T1 & GNN & scale-aware & XXL & 1 & 1.405 [1.405] & 0.723 & 0.355 & 0.735 \\
+T1 & GNN & zero-shot & L & 3 & 0.941 $\pm$ 0.160 [0.925] & 0.861 $\pm$ 0.003 & 0.501 $\pm$ 0.008 & 0.873 $\pm$ 0.075 \\
+T1 & GNN & zero-shot & XL & 3 & 1.415 $\pm$ 0.821 [0.978] & 0.741 $\pm$ 0.001 & 0.377 $\pm$ 0.001 & 0.985 $\pm$ 0.043 \\
+T1 & GNN & zero-shot & XXL & 3 & 1.615 $\pm$ 0.582 [1.334] & 0.727 $\pm$ 0.002 & 0.352 $\pm$ 0.007 & 1.709 $\pm$ 0.125 \\
+T1 & U-Net & scale-aware & L & 1 & 0.369 [0.369] & 0.873 & 0.542 & 0.116 \\
+T1 & U-Net & scale-aware & XL & 1 & 0.957 [0.957] & 0.729 & 0.413 & 0.973 \\
+T1 & U-Net & scale-aware & XXL & 1 & 0.987 [0.987] & 0.597 & 0.286 & 0.980 \\
+T1 & U-Net & zero-shot & L & 3 & 0.397 $\pm$ 0.011 [0.392] & 0.876 $\pm$ 0.008 & 0.549 $\pm$ 0.023 & 0.107 $\pm$ 0.011 \\
+T1 & U-Net & zero-shot & XL & 3 & 1.250 $\pm$ 0.421 [1.026] & 0.721 $\pm$ 0.020 & 0.418 $\pm$ 0.008 & 0.943 $\pm$ 0.018 \\
+T1 & U-Net & zero-shot & XXL & 3 & 4.425 $\pm$ 3.659 [4.015] & 0.461 $\pm$ 0.034 & 0.301 $\pm$ 0.006 & 0.959 $\pm$ 0.033 \\
+T1 & ViT & scale-aware & L & 1 & 0.617 [0.617] & 0.665 & 0.147 & 0.329 \\
+T1 & ViT & scale-aware & XL & 1 & 0.656 [0.656] & 0.657 & 0.141 & 0.363 \\
+T1 & ViT & zero-shot & L & 3 & 0.648 $\pm$ 0.033 [0.644] & 0.665 $\pm$ 0.000 & 0.146 $\pm$ 0.001 & 0.354 $\pm$ 0.007 \\
+T1 & ViT & zero-shot & XL & 3 & 0.768 $\pm$ 0.006 [0.767] & 0.657 $\pm$ 0.001 & 0.141 $\pm$ 0.001 & 0.591 $\pm$ 0.069 \\
+T4 & FNO & scale-aware & L & 1 & 0.115 [0.115] & 0.975 & 0.726 & -- \\
+T4 & FNO & scale-aware & XL & 1 & 0.157 [0.157] & 0.958 & 0.679 & -- \\
+T4 & FNO & scale-aware & XXL & 1 & 0.197 [0.197] & 0.941 & 0.637 & -- \\
+T4 & FNO & zero-shot & L & 3 & 0.116 $\pm$ 0.000 [0.116] & 0.975 $\pm$ 0.000 & 0.723 $\pm$ 0.002 & -- \\
+T4 & FNO & zero-shot & XL & 3 & 0.531 $\pm$ 0.002 [0.532] & 0.958 $\pm$ 0.000 & 0.676 $\pm$ 0.002 & -- \\
+T4 & FNO & zero-shot & XXL & 3 & 0.764 $\pm$ 0.001 [0.764] & 0.942 $\pm$ 0.000 & 0.635 $\pm$ 0.002 & -- \\
+T4 & GNN & scale-aware & L & 1 & 0.142 [0.142] & 0.962 & 0.643 & -- \\
+T4 & GNN & scale-aware & XL & 1 & 0.308 [0.308] & 0.894 & 0.472 & -- \\
+T4 & GNN & scale-aware & XXL & 1 & 0.438 [0.438] & 0.872 & 0.438 & -- \\
+T4 & GNN & zero-shot & L & 3 & 0.142 $\pm$ 0.001 [0.142] & 0.962 $\pm$ 0.000 & 0.641 $\pm$ 0.003 & -- \\
+T4 & GNN & zero-shot & XL & 3 & 0.498 $\pm$ 0.003 [0.497] & 0.894 $\pm$ 0.001 & 0.469 $\pm$ 0.002 & -- \\
+T4 & GNN & zero-shot & XXL & 3 & 0.739 $\pm$ 0.002 [0.738] & 0.872 $\pm$ 0.001 & 0.435 $\pm$ 0.002 & -- \\
+T4 & U-Net & scale-aware & L & 1 & 0.080 [0.080] & 0.991 & 0.807 & -- \\
+T4 & U-Net & scale-aware & XL & 1 & 0.189 [0.189] & 0.946 & 0.597 & -- \\
+T4 & U-Net & scale-aware & XXL & 1 & 0.312 [0.312] & 0.905 & 0.507 & -- \\
+T4 & U-Net & zero-shot & L & 3 & 0.081 $\pm$ 0.001 [0.081] & 0.992 $\pm$ 0.000 & 0.812 $\pm$ 0.005 & -- \\
+T4 & U-Net & zero-shot & XL & 3 & 0.515 $\pm$ 0.002 [0.515] & 0.946 $\pm$ 0.000 & 0.596 $\pm$ 0.002 & -- \\
+T4 & U-Net & zero-shot & XXL & 3 & 0.749 $\pm$ 0.002 [0.749] & 0.904 $\pm$ 0.001 & 0.505 $\pm$ 0.003 & -- \\
+T4 & ViT & scale-aware & L & 1 & 0.161 [0.161] & 0.951 & 0.602 & -- \\
+T4 & ViT & scale-aware & XL & 1 & 0.203 [0.203] & 0.935 & 0.572 & -- \\
+T4 & ViT & zero-shot & L & 3 & 0.159 $\pm$ 0.004 [0.161] & 0.953 $\pm$ 0.002 & 0.605 $\pm$ 0.009 & -- \\
+T4 & ViT & zero-shot & XL & 3 & 0.538 $\pm$ 0.000 [0.538] & 0.937 $\pm$ 0.002 & 0.573 $\pm$ 0.008 & -- \\
+\bottomrule
+\end{tabular}}
+\end{table*}

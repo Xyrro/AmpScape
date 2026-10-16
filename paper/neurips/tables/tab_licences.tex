@@ -1,0 +1,24 @@
+% src: docs/licenses.md
+\begin{table*}[tb]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{Upstream data sources, their licences and what AmpScape stores (derived rasters only; never the source tiles). WDPA polygons (restrictive licence) and OpenStreetMap (ODbL) are not used. The dataset is released under CC BY 4.0, code and solver wrapper under MIT.}
+\label{tab:licences}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{p{3.0cm}p{3.0cm}p{5.2cm}p{3.0cm}}
+\toprule
+layer & version & licence & derived rasters redistributed \\
+\midrule
+ESA WorldCover land cover, 10 m & 2021 v200 & CC BY 4.0 & class codes \\
+Copernicus DEM GLO-30 & 2021 release (DLR 2010--2014, Airbus 2014--2018) & Copernicus licence; Art. 4 rights of use, Art. 6 notices reproduced & elevation, slope \\
+GRIP4 global roads & v4, 2018 & CC0 by the publisher; CC BY 4.0 in secondary catalogues (attributed as CC BY 4.0) & distance-to-road only \\
+HydroRIVERS & v1.0 & CC BY 4.0 & distance-to-river only \\
+gHM global Human Modification & v1, 1 km & CC BY 4.0 & gHM \\
+RESOLVE Ecoregions 2017 & 2017 & CC BY 4.0 & stratification only (biome, realm) \\
+Eurac Alps permeability & 2022 & CC BY 4.0 & published resistance tiles \\
+Hawaiian gallinule resistance & 2020 & CC0 1.0 & published resistance tiles \\
+Northern raccoon Europe maps & 2025 & CC BY 4.0 & published resistance tiles \\
+\bottomrule
+\end{tabular}}
+\end{table*}

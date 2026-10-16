@@ -1,0 +1,21 @@
+% src: docs/tables/precision_pass.md
+\begin{table*}[tb]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{Post-run precision pass per tier: every T1/T1W/T1R/T3 row above $10^{-9}$, unmeasured, CG+AMG-solved or QC-failed was re-solved with CHOLMOD on the reduced system plus up to three refinement steps; rows that cannot reach $10^{-6}$ in double precision are flagged and excluded from the split lists.}
+\label{tab:precision}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrlrr}
+\toprule
+tier & rows re-solved & of which CG+AMG $\textbackslash{}rightarrow$ CHOLMOD & residual after: p50 / p90 / p99 / max & rows $> 10^{-9}$ (recorded) & rows $> 10^{-6}$ (flagged) \\
+\midrule
+S & 68,008 & 9 & 2.9e-13 / 3.4e-11 / 1.6e-09 / 5.0e-07 & 1,013 & 0 \\
+M & 37,639 & 14 & 9.1e-13 / 1.9e-10 / 5.2e-09 / 1.4e-06 & 1,136 & 4 \\
+L & 18,691 & 110 & 6.8e-12 / 4.9e-10 / 1.4e-08 / 1.5e-05 & 1,014 & 9 \\
+XL & 4,774 & 47 & 6.9e-11 / 1.3e-09 / 4.3e-08 / 6.6e-06 & 551 & 5 \\
+XXL & 610 & 9 & 2.7e-10 / 4.3e-09 / 2.0e-07 / 4.0e-05 & 147 & 2 \\
+total & 129,722 & 189 &  & 3,861 & 20 \\
+\bottomrule
+\end{tabular}}
+\end{table*}

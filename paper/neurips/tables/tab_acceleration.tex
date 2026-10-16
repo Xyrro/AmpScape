@@ -1,0 +1,39 @@
+% src: docs/tables/acceleration.md
+\begin{table*}[tb]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{Solver acceleration: AMG-preconditioned CG warm-started from the predicted voltage versus a zero start, to a relative residual of $10^{-6}$ (medians over systems; reduction = median of $1 - $ warm/zero per system; warm-start residual = relative Kirchhoff residual of the prediction, zero start = 1). T1V = first pair of each T1 landscape.}
+\label{tab:acceleration}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llllrlrlrr}
+\toprule
+task & tier & model & split & systems & iterations zero $\textbackslash{}rightarrow$ warm & reduction & time zero $\textbackslash{}rightarrow$ warm (ms) & reduction & warm-start residual \\
+\midrule
+T1V & L & FNO & test\_id & 1928 & 16 $\rightarrow$ 18 & -7.7 \% & 517.9 $\rightarrow$ 580.5 & -7.5 \% & 34.7 \\
+T1V & L & FNO & test\_ood & 1278 & 25 $\rightarrow$ 26 & -7.1 \% & 860.1 $\rightarrow$ 930.0 & -7.3 \% & 91.1 \\
+T1V & M & FNO & test\_id & 4823 & 12 $\rightarrow$ 12 & +0.0 \% & 102.5 $\rightarrow$ 105.7 & -4.5 \% & 22.2 \\
+T1V & M & FNO & test\_ood & 3225 & 16 $\rightarrow$ 16 & +0.0 \% & 141.3 $\rightarrow$ 143.4 & -1.8 \% & 22.2 \\
+T1V & S & FNO & test\_id & 9850 & 9 $\rightarrow$ 10 & +0.0 \% & 23.2 $\rightarrow$ 23.4 & -0.8 \% & 11 \\
+T1V & S & FNO & test\_ood & 6460 & 11 $\rightarrow$ 12 & +0.0 \% & 30.2 $\rightarrow$ 30.7 & -0.2 \% & 11.4 \\
+T3 & L & FNO & test\_id & 1928 & 17 $\rightarrow$ 18 & -5.6 \% & 757.0 $\rightarrow$ 808.7 & -6.2 \% & 1.62e+03 \\
+T3 & L & FNO & test\_ood & 1275 & 23 $\rightarrow$ 24 & -4.2 \% & 1159.8 $\rightarrow$ 1221.1 & -4.4 \% & 1.89e+03 \\
+T3 & M & FNO & test\_id & 4823 & 12 $\rightarrow$ 13 & +0.0 \% & 119.9 $\rightarrow$ 120.9 & -0.5 \% & 559 \\
+T3 & M & FNO & test\_ood & 3222 & 16 $\rightarrow$ 16 & +0.0 \% & 167.2 $\rightarrow$ 169.3 & -0.5 \% & 653 \\
+T3 & S & FNO & test\_id & 9850 & 10 $\rightarrow$ 10 & +0.0 \% & 19.3 $\rightarrow$ 19.7 & -0.1 \% & 181 \\
+T3 & S & FNO & test\_ood & 6460 & 11 $\rightarrow$ 11 & +0.0 \% & 25.4 $\rightarrow$ 25.6 & +0.0 \% & 212 \\
+T1V & L & U-Net & test\_id & 1928 & 16 $\rightarrow$ 17 & -6.7 \% & 739.5 $\rightarrow$ 821.4 & -7.4 \% & 22.5 \\
+T1V & L & U-Net & test\_ood & 1278 & 25 $\rightarrow$ 26 & -5.6 \% & 1248.0 $\rightarrow$ 1320.7 & -5.7 \% & 22.5 \\
+T1V & M & U-Net & test\_id & 4823 & 12 $\rightarrow$ 12 & -5.6 \% & 86.9 $\rightarrow$ 91.6 & -6.5 \% & 19.4 \\
+T1V & M & U-Net & test\_ood & 3225 & 16 $\rightarrow$ 17 & -4.8 \% & 129.4 $\rightarrow$ 137.6 & -5.7 \% & 17.6 \\
+T1V & S & U-Net & test\_id & 9850 & 9 $\rightarrow$ 9 & +0.0 \% & 14.4 $\rightarrow$ 14.4 & +0.0 \% & 5.06 \\
+T1V & S & U-Net & test\_ood & 6460 & 11 $\rightarrow$ 11 & +0.0 \% & 19.2 $\rightarrow$ 19.3 & +0.1 \% & 4.69 \\
+T3 & L & U-Net & test\_id & 1928 & 17 $\rightarrow$ 19 & -9.1 \% & 763.2 $\rightarrow$ 858.6 & -9.5 \% & 3.32e+03 \\
+T3 & L & U-Net & test\_ood & 1275 & 23 $\rightarrow$ 25 & -8.8 \% & 1164.0 $\rightarrow$ 1281.7 & -8.8 \% & 3.87e+03 \\
+T3 & M & U-Net & test\_id & 4823 & 12 $\rightarrow$ 13 & -2.9 \% & 99.9 $\rightarrow$ 102.3 & -1.0 \% & 580 \\
+T3 & M & U-Net & test\_ood & 3222 & 16 $\rightarrow$ 16 & -4.5 \% & 140.7 $\rightarrow$ 144.5 & -4.5 \% & 783 \\
+T3 & S & U-Net & test\_id & 9850 & 10 $\rightarrow$ 10 & +0.0 \% & 19.3 $\rightarrow$ 19.1 & +0.1 \% & 82.5 \\
+T3 & S & U-Net & test\_ood & 6460 & 11 $\rightarrow$ 11 & +0.0 \% & 25.4 $\rightarrow$ 24.5 & +0.1 \% & 109 \\
+\bottomrule
+\end{tabular}}
+\end{table*}

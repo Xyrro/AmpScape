@@ -1,3 +1,5 @@
+<!-- ARCHIVED 2026-10-16: this Markdown draft was superseded by the LaTeX submission in paper/neurips/ (main.tex, built to main.pdf). It is kept for the record; its numbers were current at commit 24a5991 and are not regenerated. -->
+
 # AmpScape: a benchmark for learned surrogates of circuit-theoretic landscape connectivity
 
 <!-- Draft assembled 2026-10-15 from paper/sections/*, the regenerated tables under paper/tables/ and docs/tables/, and the
