@@ -11,7 +11,7 @@ Logs: `work/verify/` (untracked, scratch); JSON results named per item.
 | 2. Regenerate every paper table and figure from Hub-published results only, diff against the committed versions | **PASS** — every table and figure byte-identical after one fix | the acceleration evaluations (`eval_accel_*`) of the 12 voltage-head runs had never been published → pushed, added to the offloader's include list |
 | 3. Cross-check every number in `paper/draft.md` against its tagged source file | **PASS** — 1,508 numeric tokens, 0 untraceable, 0 untagged (`scripts/verify/check_draft_numbers.py`) | 29 initial mismatches fixed in the draft (rounded or derived values replaced by the source values or tagged `[derived]`) |
 | 4. Dataset card, Croissant and CITATION.cff against the index | **PASS** — 97/97 checks after fixes (`scripts/verify/audit_metadata.py`) | `croissant.json` `datePublished` 2026-09-25 (local date) → 2026-09-26 (UTC date of the tag; re-validated, 0 errors / 0 warnings, uploaded); card: `aux/` size 20.5 GB was the v1.0 figure (605 GB today) → dated statement; viewer-config comment corrected; Hub revisions stated (`v1.0`, `v1.0.2`; `v1.0.1` is a GitHub tag only) |
-| 5. Full Hub audit, five tiers and `aux/` | tiers S, XXL **PASS** (0 discrepancies); M, L, XL: running (12-h jobs, results appended below when done); `aux/`: 9,443 files / 605 GB listed, 8,243 covered by sha256 push records (5 stale records refreshed), 1,066 unrecorded files hashed from their local sources (0 mismatches), 134 files without local source or non-LFS downloaded and verified — 132 ok, **2 prediction files defective** (below) | stale push records refreshed; stale Hub copy of `generation_postmortem.md` re-pushed; one defective file repaired (complete content, wrong size metadata), the other (corrupt content) regenerated on a GPU and re-pushed; the offloader no longer ships a transfer leg's predictions with the whole-run push (root cause) |
+| 5. Full Hub audit, five tiers and `aux/` | **all five tiers PASS** (3,067 shards, 14,798 Hub files, 0 discrepancies; 40 shards whose first download hit Hub CDN errors were re-audited clean with the xet backend disabled); `aux/`: 9,443 files / 605 GB listed, 8,243 covered by sha256 push records (5 stale records refreshed), 1,066 unrecorded files hashed from their local sources (0 mismatches), 134 files without local source or non-LFS downloaded and verified — 132 ok, **2 prediction files defective** (below) | stale push records refreshed; stale Hub copy of `generation_postmortem.md` re-pushed; one defective file repaired (complete content, wrong size metadata), the other (corrupt content) regenerated on a GPU and re-pushed; the offloader no longer ships a transfer leg's predictions with the whole-run push (root cause) |
 
 ## 1. Reviewer path on a compute node (`scripts/verify/fresh_clone_verify.sbatch`)
 
@@ -83,7 +83,15 @@ and viewer-config comment, and the statement of which revisions exist on the Hub
 **Tiers** (`scripts/audit_tier.py`, one 12-h job per tier, 4 workers; every shard downloaded, sha256 against the local
 upload record, sample-id set against the plan, every planned configuration present, index rows against file contents):
 S — 500 shards, 2,500 Hub files, 0 discrepancies (job 6286544); XXL — 400 shards, 1,708 Hub files, 0 discrepancies
-(job 6286548); M, L, XL — jobs 6286545–6286547, results appended below. The previous audits (2026-09, `audit_<tier>_2026-09.json`) are kept beside the new ones.
+(job 6286548); XL — 667 shards, 3,132 Hub files, 9 shards flagged in the first pass (job 6286547), every flag a Hub CDN
+transfer error (`502`/`504` from the xet backend made one file per shard unreadable; every sha256 matched), all 9 clean
+when re-audited with the xet backend disabled (job 6287917) → **PASS**; M — 500 shards, 2,500 Hub files, 19 shards flagged
+for the same transfer errors (job 6286545, every sha256 matched); L — 1,000 shards, 4,958 Hub files, 12 shards flagged
+likewise (job 6286546, every sha256 matched); the M and L re-audits with the xet backend disabled are jobs 6288141 and
+6288142 (result line below). The previous audits (2026-09, `audit_<tier>_2026-09.json`) and the first-pass JSONs
+(`audit_<tier>_full_2026-10-16.json`) are kept beside the per-shard re-audit records.
+
+M/L re-audit result: all 19 M shards and all 12 L shards clean (jobs 6288141 / 6288142, 10 min each) → **M PASS, L PASS**. Every tier is clean: 3,067 shards, 14,798 Hub files, 0 discrepancies.
 
 **`aux/`** (`scripts/verify/audit_aux_hub.py`, `audit_aux_local_sha.py`, `audit_aux_download.py`): 9,443 files, 605.49 GB.
 (a) 8,243 files have a sha256 push record; 3,294 of them carry an LFS sha256 on the Hub and all but 5 matched; the 5
