@@ -51,11 +51,12 @@ def tex(s: str) -> str:
 
 def table(rows: list[list[str]], header: list[str], src: list[str], caption: str, label: str, colspec: str | None = None,
           size: str = "\\small", note: str | None = None, star: bool = False, bold: set[tuple[int, int]] | None = None,
-          placement: str = "tb") -> str:
+          placement: str = "tb", body_only: bool = False) -> str:
+    """body_only: caption, label and tabular without the float environment (main.tex packs it into its own float)."""
     ncol = len(header)
     colspec = colspec or ("l" * ncol)
     env = "table*" if star else "table"
-    out = [f"% src: {'; '.join(src)}", f"\\begin{{{env}}}[{placement}]", "\\centering", size, "\\setlength{\\tabcolsep}{3.5pt}", f"\\caption{{{caption}}}", f"\\label{{{label}}}"]
+    out = [f"% src: {'; '.join(src)}"] + ([] if body_only else [f"\\begin{{{env}}}[{placement}]"]) + ["\\centering", size, "\\setlength{\\tabcolsep}{3.5pt}", f"\\caption{{{caption}}}", f"\\label{{{label}}}"]
     if star:
         out.append("\\setlength{\\tabcolsep}{2.2pt}")  # wide appendix tables: never scaled below the font size
     out += [f"\\begin{{tabular}}{{{colspec}}}", "\\toprule", " & ".join(tex(h) for h in header) + " \\\\", "\\midrule"]
@@ -67,7 +68,8 @@ def table(rows: list[list[str]], header: list[str], src: list[str], caption: str
     out += ["\\bottomrule", "\\end{tabular}"]
     if note:
         out.append(f"\\par\\vspace{{2pt}}{{\\footnotesize {tex(note)}}}")
-    out.append(f"\\end{{{env}}}")
+    if not body_only:
+        out.append(f"\\end{{{env}}}")
     return "\n".join(out) + "\n"
 
 
@@ -193,7 +195,7 @@ def main() -> None:
     rows = [[r["model"], r["n train"], {"ep30": "fixed epochs (30)", "steps": "fixed steps", "full": "official run"}.get(r["regime"], r["regime"]), r["rel-L2"], r["MAE log10"], r["top-5 % IoU"], r["epochs"], r["train GPU-h"]] for r in wp4]
     (out / "tab_wp4.tex").write_text(table(rows, ["model", "n train", "regime", "rel-L2", "MAE log$_{10}$", "top-5\\,\\% IoU", "epochs", "GPU-h"], ["paper/tables/wp4_data_scaling.md"],
                                            "Data-scaling ablation at S on T1 (seed 1): training on 1,000 / 5,000 / 20,000 landscapes for 30 epochs or for the official run's number of optimisation steps, against the official run on all training landscapes.",
-                                           "tab:wp4", "llllllrr", size="\\small"))
+                                           "tab:wp4", "llllllrr", size="\\footnotesize", body_only=True))
 
     # ---- appendix: precision pass
     pp = md_rows(ROOT / "docs" / "tables" / "precision_pass.md")

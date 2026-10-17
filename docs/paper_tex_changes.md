@@ -78,6 +78,11 @@ the following was fixed:
 - Appendix layout: `placeins` with `\FloatBarrier` before every appendix section (a figure no longer precedes the
   heading of the section it belongs to); the data-scaling figure sits next to its table in Appendix B.
 
+- **Second round (owner, 2026-10-17):** every legend now sits outside its axes (above the panel, or beside it for the
+  realm chart) so no legend covers data; Figure 1's covariate stack has room for the "elevation" title and the arrows
+  start and end clear of the panels; Table 11 and the data-scaling figure share one float (`capt-of`), so Appendix B no
+  longer has a page with one small figure; appendix float pages are top-aligned (`\@fptop = 0pt`) instead of centred.
+
 ## Open points for the owner
 - The main text is at the nine-page limit with no slack; any addition needs an equal cut.
 - The paper cites GitHub/Hub locations generically (anonymous submission); the camera-ready version needs the

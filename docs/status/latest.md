@@ -1,4 +1,4 @@
-# Status — 2026-10-17 04:40Z: paper print-legibility pass complete (every page re-checked at print size)
+# Status — 2026-10-17 05:20Z: paper print-legibility pass complete, second round (legends outside axes, Figure 1 overlaps, appendix float pages)
 
 ## Done (owner request 2026-10-16/17: "recheck the paper carefully, i found many bugs, especially in the images …
 make sure there's nothing like this anymore … also check for every parts of the paper at the end … pictures in part D
@@ -27,8 +27,10 @@ they combined together, it's too small to read")
 - Scratch deletion: the inventory and recommendations from 2026-10-16 are waiting for your choice of rows; nothing
   has been deleted.
 - Screenshot paths you pasted are on your Mac; attach them or `scp` to `work/screenshots/` if any bug is still open.
-- Appendix float pages (Table 8 alone on p. 16, Figure 9 alone on p. 19) are LaTeX float pages, not defects; say so if
-  you want them packed differently.
+- Second round after your review: all legends moved outside the axes; Figure 1's "elevation" title and arrows no
+  longer touch the panels; Table 11 and the data-scaling figure share one float, so the lone-figure page is gone;
+  float pages are top-aligned. Pages 16 and 18 still hold one wide table each (Tables 8 and 10 are too tall to share a
+  page with their neighbours); that is the normal LaTeX float page and I suggest leaving it.
 
 ## Operations
 GPU use for this step: none. Login-node work: figure regeneration (≈ 4 min, 1.2 GB peak) and Tectonic builds.

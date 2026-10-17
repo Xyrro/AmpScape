@@ -814,10 +814,15 @@ def fig_overview() -> None:
         side = 0.74 / W  # panel width in figure fraction (0.74 in)
         ph = 0.74 / H
         y0 = 1.0 - 0.085 - ph  # top row of panels
-        gap = 0.1 / W
+        gap = 0.08 / W  # between panels of one group
+        agap = 0.2 / W  # where an arrow sits
         box_w = 1.05 / W
         x_start = 0.01
-        cols = [x_start, x_start + side + gap, x_start + 2 * (side + gap), x_start + 2 * (side + gap) + box_w + gap, x_start + 3 * (side + gap) + box_w + gap, x_start + 4 * (side + gap) + box_w + gap]
+        c0 = x_start
+        c1 = c0 + side + agap
+        c2 = c1 + side + agap
+        c3 = c2 + box_w + agap
+        cols = [c0, c1, c2, c3, c3 + side + gap, c3 + 2 * (side + gap)]
 
         def panel(x, y, img, cmap, title, w=side, h=ph):
             ax = fig.add_axes([x, y, w, h])
@@ -826,8 +831,9 @@ def fig_overview() -> None:
             return ax
 
         if cov is not None and len(cov) >= 2:
-            panel(cols[0], y0 + ph / 2 + 0.012, cov[0], "Greens", (names[0] if names else "covariate 1")[:14], h=ph / 2 - 0.012)
-            panel(cols[0], y0, cov[min(1, len(cov) - 1)], "terrain", (names[1] if len(names) > 1 else "covariate 2")[:14], h=ph / 2 - 0.012)
+            hh = ph / 2 - 0.04  # two half-height panels with room for the lower one's title
+            panel(cols[0], y0 + ph - hh, cov[0], "Greens", (names[0] if names else "covariate 1")[:14], h=hh)
+            panel(cols[0], y0, cov[min(1, len(cov) - 1)], "terrain", (names[1] if len(names) > 1 else "covariate 2")[:14], h=hh)
             fig.text(cols[0] + side / 2, y0 - 0.04, "covariate layers", ha="center", fontsize=7)
         else:
             ax = fig.add_axes([cols[0], y0, side, ph]); ax.axis("off")
@@ -847,8 +853,9 @@ def fig_overview() -> None:
         panel(cols[5], y0, _log_current(d["omniscape__out_cum_current"], nd), "magma", "T4 omnidirectional")
         fig.text((cols[3] + cols[5] + side) / 2, y0 - 0.04, "exact targets (float32 maps, float64 effective resistances)", ha="center", fontsize=7)
         ym = y0 + ph / 2
-        for x0, x1 in ((cols[0] + side + 0.003, cols[1] - 0.003), (cols[1] + side + 0.003, cols[2] - 0.003), (cols[2] + box_w + 0.003, cols[3] - 0.003)):
-            fig.patches.append(matplotlib.patches.FancyArrowPatch((x0, ym), (x1, ym), transform=fig.transFigure, arrowstyle="-|>", mutation_scale=8, color="#444", lw=0.9))
+        ins = 0.03 / W  # arrows start and end clear of the panel edges
+        for x0, x1 in ((cols[0] + side + ins, cols[1] - ins), (cols[1] + side + ins, cols[2] - ins), (cols[2] + box_w + ins, cols[3] - ins)):
+            fig.patches.append(matplotlib.patches.FancyArrowPatch((x0, ym), (x1, ym), transform=fig.transFigure, arrowstyle="-|>", mutation_scale=7, color="#444", lw=0.9, shrinkA=0, shrinkB=0))
         yb, hb = 0.0, y0 - 0.12
         for x0, w, txt in ((0.01, 0.32, "Tiers\nS 128$^2$ at 100 m · M 256$^2$ at 100 m\nL 512$^2$ at 200 m · XL 1024$^2$ at 500 m\nXXL 2048$^2$ at 1 km\n174,400 landscapes · 920,372 rows\n1,157 GB on the Hub"),
                            (0.35, 0.33, "Tasks\nT1 pairwise current map\nT2 effective resistances\nT1W wall-to-wall strips · T1R regions\nT3 advanced mode (sources → grounds)\nT4 Omniscape omnidirectional current"),
@@ -1040,7 +1047,7 @@ def fig_pareto_L_tex() -> None:
         ax.set_ylim(1.2e-3, 0.5)
         ax.set_xlim(1e-3, 8e4)
         ax.grid(alpha=0.3, which="both", lw=0.5)
-        ax.legend(frameon=False, fontsize=6.3, loc="lower left", ncol=1, handletextpad=0.3, borderaxespad=0.2)
+        ax.legend(frameon=False, fontsize=6.3, loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2, handletextpad=0.3, columnspacing=1.0)
         _save(fig, "fig5_pareto_L")
 
 
@@ -1205,14 +1212,14 @@ def figA_data_scaling() -> None:
         ax.set_xlabel("training landscapes (tier S, T1)")
         ax.set_ylabel("relative L2 on test_id")
         ax.grid(alpha=0.3, which="both", lw=0.5)
-        ax.legend(frameon=False, fontsize=6.5)
+        ax.legend(frameon=False, fontsize=6.5, loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2, columnspacing=1.0)
         _save(fig, "figA_data_scaling")
 
 
 def figA_fidelity() -> None:
     """Appendix: per-landscape deviation of the production T4 target from the exact block-1 map (reference subsets)."""
     with plt.rc_context(PAPER_STYLE):
-        fig, axes = plt.subplots(1, 3, figsize=(FULLW, 1.9), gridspec_kw=dict(wspace=0.4))
+        fig, axes = plt.subplots(1, 3, figsize=(FULLW, 2.05), gridspec_kw=dict(wspace=0.4))
         for ax, tier in zip(axes[:2], ("M", "L"), strict=False):
             p = ROOT / "aux" / "t4_bs1_reference" / f"{tier}_bs1" / "index.parquet"
             if not p.exists():
@@ -1222,29 +1229,28 @@ def figA_fidelity() -> None:
             bins = np.linspace(0, max(0.1, float(d.rel_l2.quantile(0.995))), 30)
             for fam, col in (("synthetic", "#ff7f0e"), ("real", "#1f77b4")):
                 g = d[d.family == fam]
-                ax.hist(g.rel_l2.clip(upper=bins[-1]), bins=bins, alpha=0.65, color=col, label=f"{fam} (n = {len(g)})")
+                ax.hist(g.rel_l2.clip(upper=bins[-1]), bins=bins, alpha=0.65, color=col, label=f"{fam} ({len(g)})")
             ax.axvline(d.rel_l2.mean(), color="k", lw=0.8, ls="--")
             ax.axvline(0.05, color="#d62728", lw=0.7, ls=":")
-            ax.set_ylim(0, ax.get_ylim()[1] * 1.3)
-            ax.set_title(f"{tier}: block {int(d.prod_block.iloc[0])} vs 1 (n = {len(d)})", fontsize=8)
+            ax.set_title(f"{tier}: block {int(d.prod_block.iloc[0])} vs 1 (n = {len(d)})", fontsize=8, pad=15)
             ax.set_xlabel("rel-L2, production vs exact")
             ax.set_ylabel("landscapes")
-            ax.legend(frameon=False, fontsize=6.5, loc="upper right")
+            ax.legend(frameon=False, fontsize=6, loc="lower center", bbox_to_anchor=(0.5, 0.99), ncol=2, columnspacing=0.6, handlelength=1.0, handletextpad=0.4, borderaxespad=0.0)
             ax.grid(alpha=0.3, lw=0.5)
         ax = axes[2]
         for tier, col in (("M", "#1f77b4"), ("L", "#d62728")):
             p = ROOT / "aux" / "t4_bs1_reference" / f"{tier}_bs1" / "index.parquet"
             if p.exists():
                 d = pd.read_parquet(p)
-                ax.scatter(d.prod_solve_s, d.aux_solve_s, s=6, alpha=0.5, color=col, label=f"{tier} (median ratio {float((d.aux_solve_s / d.prod_solve_s).median()):.1f}×)", lw=0)
+                ax.scatter(d.prod_solve_s, d.aux_solve_s, s=6, alpha=0.5, color=col, label=f"{tier}: {float((d.aux_solve_s / d.prod_solve_s).median()):.1f}× median", lw=0)
         lim = [10, 3e4]
         ax.plot(lim, lim, "k--", lw=0.6)
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlabel("production solve (s)")
         ax.set_ylabel("block-1 solve (s)")
-        ax.set_title("exact reference: cost", fontsize=8)
-        ax.legend(frameon=False, fontsize=6, loc="lower right")
+        ax.set_title("exact reference: cost", fontsize=8, pad=15)
+        ax.legend(frameon=False, fontsize=6, loc="lower center", bbox_to_anchor=(0.5, 0.99), ncol=2, handlelength=1.0, columnspacing=0.6, handletextpad=0.4, borderaxespad=0.0, markerscale=1.5)
         ax.grid(alpha=0.3, which="both", lw=0.5)
         _save(fig, "figA_fidelity")
 
@@ -1359,16 +1365,16 @@ def figA_stats() -> None:
         ax = axes[2]
         real = samples[samples.family == "real"].merge(tiles, on="tile_id", how="left")
         nd_f = ROOT / "docs" / "tables" / "nodata_sample.parquet"
-        ax.hist(real.qc_frac_unusable.dropna(), bins=40, histtype="step", lw=1.0, color="#1f77b4", label=f"real tiles\n({int(real.qc_frac_unusable.notna().sum()):,})")
+        ax.hist(real.qc_frac_unusable.dropna(), bins=40, histtype="step", lw=1.0, color="#1f77b4", label=f"real tiles ({int(real.qc_frac_unusable.notna().sum()):,})")
         if nd_f.exists():
             nd = pd.read_parquet(nd_f)
             syn = nd[nd.family == "synthetic"]
-            ax.hist(syn.nodata_frac_measured, bins=40, histtype="step", lw=1.0, color="#ff7f0e", label=f"synthetic sample\n({len(syn):,})")
+            ax.hist(syn.nodata_frac_measured, bins=40, histtype="step", lw=1.0, color="#ff7f0e", label=f"synthetic sample ({len(syn):,})")
         ax.set_yscale("log")
         ax.set_xlabel("NoData fraction of the raster")
         ax.set_ylabel("landscapes")
         ax.set_title("NoData fraction")
-        ax.legend(frameon=False, fontsize=5.8, loc="upper right", handlelength=1.0, labelspacing=0.9)
+        ax.legend(frameon=False, fontsize=6.5, loc="lower center", bbox_to_anchor=(0.5, 1.12), ncol=2, handlelength=1.0, columnspacing=0.8)
         ax.grid(alpha=0.3, lw=0.5)
         _save(fig, "figA_stats_contrast")
 
@@ -1386,7 +1392,7 @@ def figA_stats() -> None:
             ax.set_xlabel("real landscapes")
             ax.set_title(title)
             ax.grid(alpha=0.3, axis="x", lw=0.5)
-        axes[1].legend(frameon=False, fontsize=6.5, title="tier", title_fontsize=6.5, loc="lower right")
+        axes[1].legend(frameon=False, fontsize=6.5, title="tier", title_fontsize=6.5, loc="center left", bbox_to_anchor=(1.02, 0.5))
         _save(fig, "figA_stats_biome_realm")
 
         # (c) solve time per configuration and tier
@@ -1420,8 +1426,9 @@ def figA_stats() -> None:
         for i, t in enumerate(TIER_ORDER):
             ax.text(i, bottom[i] + 4, f"{bottom[i]:.0f}", ha="center", va="bottom", fontsize=6.5)
         ax.set_ylabel("GB on the Hub")
-        ax.set_title(f"storage by tier and task group ({counts['total_data_gb']:,.0f} GB)")
-        ax.legend(frameon=False, fontsize=6.5, ncol=1, loc="upper right")
+        ax.set_ylim(0, bottom.max() * 1.12)
+        ax.legend(frameon=False, fontsize=6.5, ncol=5, loc="lower center", bbox_to_anchor=(0.5, 1.0), columnspacing=1.2, handlelength=1.2)
+        ax.set_title(f"storage by tier and task group ({counts['total_data_gb']:,.0f} GB)", pad=16)
         ax.grid(alpha=0.3, axis="y", lw=0.5)
         _save(fig, "figA_stats_storage")
 
