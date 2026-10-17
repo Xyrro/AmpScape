@@ -5,11 +5,26 @@
 \setlength{\tabcolsep}{3.5pt}
 \caption{Effect of the per-tier tuning on \texttt{test\_id} (mean $\pm$ std over three seeds), with the official choice of Table~\ref{tab:decisions}. The validation rule keeps the pre-tuning configuration for U-Net T3 M despite a better test rel-L2 and for ViT and GNN T4 M where the tuned one is worse on test: test metrics are never read.}
 \label{tab:tuning_effect}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{llllllr}
+\setlength{\tabcolsep}{2.2pt}
+\begin{tabular}{llllrrrr}
 \toprule
-task & tier & model & official & rel-L2 pre-tuning $\textbackslash{}rightarrow$ tuned & median & MAE log$\_{10}$ pre-tuning $\textbackslash{}rightarrow$ tuned \\
+task & tier & model & official & rel-L2 pre-tuning $\rightarrow$ tuned & $\Delta$ & MAE log$_{10}$ pre-tuning $\rightarrow$ tuned & $\Delta$ \\
 \midrule
+T1 & L & FNO & tuned & 0.361 $\pm$ 0.024 $\rightarrow$ 0.299 $\pm$ 0.012 & -17.3 \% & 0.146 $\pm$ 0.001 $\rightarrow$ 0.141 $\pm$ 0.001 & -3.7 \% \\
+T1 & L & GNN & tuned & 1.067 $\pm$ 0.026 $\rightarrow$ 0.941 $\pm$ 0.160 & -11.8 \% & 0.416 $\pm$ 0.001 $\rightarrow$ 0.382 $\pm$ 0.012 & -8.2 \% \\
+T1 & M & FNO & tuned & 0.248 $\pm$ 0.016 $\rightarrow$ 0.208 $\pm$ 0.003 & -16.1 \% & 0.122 $\pm$ 0.001 $\rightarrow$ 0.115 $\pm$ 0.001 & -6.0 \% \\
+T1 & M & GNN & tuned & 0.849 $\pm$ 0.005 $\rightarrow$ 0.607 $\pm$ 0.027 & -28.5 \% & 0.337 $\pm$ 0.002 $\rightarrow$ 0.282 $\pm$ 0.003 & -16.5 \% \\
+T1 & M & U-Net & tuned & 0.212 $\pm$ 0.023 $\rightarrow$ 0.187 $\pm$ 0.022 & -11.7 \% & 0.103 $\pm$ 0.014 $\rightarrow$ 0.091 $\pm$ 0.009 & -12.0 \% \\
+T1 & M & ViT & tuned & 0.419 $\pm$ 0.123 $\rightarrow$ 0.306 $\pm$ 0.012 & -27.0 \% & 0.240 $\pm$ 0.099 $\rightarrow$ 0.127 $\pm$ 0.003 & -46.9 \% \\
+T3 & L & FNO & tuned & 0.347 $\pm$ 0.004 $\rightarrow$ 0.323 $\pm$ 0.002 & -6.8 \% & 0.195 $\pm$ 0.004 $\rightarrow$ 0.182 $\pm$ 0.001 & -6.5 \% \\
+T3 & M & FNO & tuned & 0.284 $\pm$ 0.006 $\rightarrow$ 0.255 $\pm$ 0.003 & -10.2 \% & 0.163 $\pm$ 0.004 $\rightarrow$ 0.149 $\pm$ 0.001 & -9.0 \% \\
+T3 & M & U-Net & pre-tuning & 0.202 $\pm$ 0.006 $\rightarrow$ 0.192 $\pm$ 0.009 & -5.0 \% & 0.106 $\pm$ 0.002 $\rightarrow$ 0.105 $\pm$ 0.006 & -1.6 \% \\
+T4 & L & FNO & tuned & 0.120 $\pm$ 0.001 $\rightarrow$ 0.116 $\pm$ 0.000 & -3.3 \% & 0.073 $\pm$ 0.001 $\rightarrow$ 0.070 $\pm$ 0.000 & -3.7 \% \\
+T4 & L & GNN & tuned & 0.142 $\pm$ 0.001 $\rightarrow$ 0.142 $\pm$ 0.001 & +0.0 \% & 0.074 $\pm$ 0.000 $\rightarrow$ 0.071 $\pm$ 0.001 & -4.5 \% \\
+T4 & M & FNO & tuned & 0.079 $\pm$ 0.001 $\rightarrow$ 0.073 $\pm$ 0.001 & -7.6 \% & 0.052 $\pm$ 0.001 $\rightarrow$ 0.049 $\pm$ 0.000 & -6.4 \% \\
+T4 & M & GNN & pre-tuning & 0.099 $\pm$ 0.001 $\rightarrow$ 0.103 $\pm$ 0.001 & +4.7 \% & 0.054 $\pm$ 0.001 $\rightarrow$ 0.055 $\pm$ 0.000 & +2.5 \% \\
+T4 & M & U-Net & tuned & 0.051 $\pm$ 0.000 $\rightarrow$ 0.042 $\pm$ 0.001 & -18.3 \% & 0.025 $\pm$ 0.000 $\rightarrow$ 0.022 $\pm$ 0.001 & -13.3 \% \\
+T4 & M & ViT & pre-tuning & 0.094 $\pm$ 0.004 $\rightarrow$ 0.103 $\pm$ 0.001 & +8.8 \% & 0.056 $\pm$ 0.005 $\rightarrow$ 0.061 $\pm$ 0.001 & +9.5 \% \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table*}

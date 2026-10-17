@@ -17,6 +17,7 @@
 \usepackage{xcolor}
 \usepackage{graphicx}
 \usepackage{textcomp}
+\usepackage{placeins}      % \FloatBarrier: appendix figures stay inside their section
 \graphicspath{{figures/}}
 \hypersetup{colorlinks=true, linkcolor=blue!60!black, citecolor=blue!60!black, urlcolor=blue!60!black}
 % float packing: let figures share pages with text instead of pushing it
@@ -97,8 +98,8 @@ Each sample pairs a resistance raster $R$ ($H\times W$, $R\ge 1$, NoData masked)
 
 \begin{figure}[tb]
   \centering
-  \includegraphics[width=0.6\linewidth]{fig2_gallery.pdf}
-  \caption{Data gallery: one synthetic (left) and one real (right) \code{test\_id} landscape per tier---$\log_{10}$ resistance, the T1 pairwise current map and the T4 omnidirectional current map ($\log_{10}$ scale, NoData grey). Rows are S ($128^2$) to XXL ($2048^2$); labels name the generator or the resistance table.}
+  \includegraphics[width=\linewidth]{fig2_gallery.pdf}
+  \caption{Data gallery: one synthetic (left) and one real (right) landscape per tier, columns S ($128^2$) to XXL ($2048^2$); rows are $\log_{10}$ resistance, the T1 pairwise current map and the T4 omnidirectional current map ($\log_{10}$ scale, NoData grey). Column labels name the generator or the resistance table; every sample is from \code{test\_id} except the S real tile, which is from the \code{mini} subset's training split.}
   \label{fig:gallery}
   % src: docs/dataset_card.md
 \end{figure}
@@ -140,8 +141,8 @@ Results are reported on \code{test\_id} and every OOD split, three seeds per con
 
 \begin{figure}[tb]
   \centering
-  \includegraphics[width=0.5\linewidth]{fig3_qualitative.pdf}
-  \caption{Qualitative results at L for the official T1 model (FNO w48) and T4 model (U-Net) on a real \code{test\_id} landscape and a \code{test\_ood} landscape built with the held-out \code{forest\_bird} table: input $\log_{10}R$ with the focal nodes, exact target, prediction and the error in $\log_{10}$ units. Pairwise errors concentrate along the long-range flow paths; omnidirectional errors are local and small except at the NoData boundary.}
+  \includegraphics[width=\linewidth]{fig3_qualitative.pdf}
+  \caption{Qualitative results at L for the official T1 model (FNO w48, top) and T4 model (U-Net, bottom) on a real \code{test\_id} landscape (left) and a \code{test\_ood} landscape built with the held-out \code{forest\_bird} table (right): input $\log_{10}R$ with the T1 focal nodes in cyan, exact target, prediction and the error in $\log_{10}$ units (one colour scale per row). Pairwise errors concentrate along the long-range flow paths; omnidirectional errors are local and small except at the NoData boundary.}
   \label{fig:qualitative}
 \end{figure}
 
@@ -218,6 +219,7 @@ The paper does not claim that Circuitscape is slow (a pairwise solve takes secon
 \newpage
 \appendix
 
+\FloatBarrier
 \section{Why zero-shot T4 scale transfer fails by $1-r_{\mathrm{train}}/r_{\mathrm{eval}}$}
 \label{app:derivation}
 
@@ -235,6 +237,7 @@ where $\varepsilon$ is the model's intrinsic error (its in-tier \relltwo{} is 0.
 \paragraph{The scale-aware target.} The variant trains on $k\cdot C$ with $k=r_{\mathrm{ref}}/r_{\mathrm{tier}}$, $r_{\mathrm{ref}}=64$, so the regression target $k\cdot C\propto r_{\mathrm{ref}}\,\bar s\,g$ is tier-independent; at evaluation the prediction is divided by $k_{\mathrm{eval}}$, restoring $C_{\mathrm{eval}}\propto r_{\mathrm{eval}}\,\bar s\,g$. No quantity of the evaluation tier other than its radius (a protocol constant) enters, and no XL/XXL data is used in training or in the inverse. What remains is the error that is not a common factor: 0.157--0.308 at XL and 0.197--0.438 at XXL against in-tier 0.081--0.159---the operator-learning transfer error proper, since $b$ and $r$ both scale and the resistance field has a different pixel size and extent. For a pairwise solve a unit current is injected per source regardless of landscape size; under a uniform rescaling by $s$ per axis the current crossing any front spreads over $\propto s$ pixels, so the per-pixel current $\propto 1/s$ while the valid pixel count $N\propto s^2$; $k=\sqrt{N_{\mathrm{valid}}/N_{\mathrm{ref}}}$ with $N_{\mathrm{ref}}=512^2$ makes $k\cdot C$ invariant and is computed from the input mask alone. The measured throughput error of the zero-shot T1 transfers (0.434--0.985 at XL) is the signature of the same mismatch; the correction helps the FNO at XXL (1.352 $\rightarrow$ 0.762) but not the U-Net (0.957~/ 0.987 at XL~/ XXL), whose receptive field does not cover the longer flow paths of larger landscapes. The argument assumes $b/r$ fixed by the block rule, sources with tier-independent mean strength, the same resistance statistics across tiers (real XL/XXL tiles have coarser pixels than L, part of the residual) and windows that fit inside the landscape for most pixels; it explains the magnitude of the zero-shot error and does not predict which model transfers best once the magnitude is corrected.
 % src: ampscape/models/common.py; paper/tables/scale_transfer.md; paper/tables/baselines_sml.md
 
+\FloatBarrier
 \section{Full result tables}
 \label{app:tables}
 
@@ -248,7 +251,7 @@ Every table is generated by \code{scripts/paper\_tables\_tex.py} from the regene
 \input{tables/tab_scale_transfer.tex}
 \input{tables/tab_ood.tex}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
   \centering
   \includegraphics[width=\linewidth]{figA_ood_all.pdf}
   \caption{Per-split OOD degradation for all three tasks (the main-text Figure~\ref{fig:ood} shows T1 and T4).}
@@ -257,63 +260,86 @@ Every table is generated by \code{scripts/paper\_tables\_tex.py} from the regene
 \input{tables/tab_acceleration.tex}
 \input{tables/tab_wp4.tex}
 
-\clearpage
-\section{Training and validation curves}
-\label{app:curves}
-
-\begin{figure}[h]
+\begin{figure}[htbp]
   \centering
-  \includegraphics[width=\linewidth]{figA_training_curves.pdf}
-  \caption{Training (dotted) and validation (solid) loss per epoch for every official run---one panel per model $\times$ task $\times$ tier, seeds overlaid (masked MSE in the log-target space; early stopping on the validation loss with patience 8; MgNO one seed).}
-  \label{fig:curves}
-\end{figure}
-
-\begin{figure}[h]
-  \centering
-  \includegraphics[width=0.48\linewidth]{figA_data_scaling.pdf}
+  \includegraphics[width=0.55\linewidth]{figA_data_scaling.pdf}
   \caption{Data-scaling ablation at S on T1 (seed 1): relative L2 on \code{test\_id} against the number of training landscapes in the fixed-epoch and fixed-step regimes; the rightmost point of each curve is the official run (Table~\ref{tab:wp4}).}
   \label{fig:scaling}
 \end{figure}
 
 \clearpage
+\FloatBarrier
+\section{Training and validation curves}
+\label{app:curves}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figA_training_curves.pdf}
+  \caption{Training (dotted) and validation (solid) loss per epoch for every official run---one panel per model $\times$ task $\times$ tier, seeds overlaid (masked MSE in the log-target space; early stopping on the validation loss with patience 8; three seeds per panel, MgNO one).}
+  \label{fig:curves}
+\end{figure}
+
+
+\clearpage
+\FloatBarrier
 \section{Dataset statistics}
 \label{app:stats}
 
 Contrast ($\log_{10}$, p10~/ p50~/ p90): synthetic 1.00~/ 3.00~/ 4.00 at every tier with a maximum of $10^6$; real 0.76~/ 1.79~/ 2.79 at S rising to 2.00~/ 3.00~/ 3.00 at XXL with a maximum of $10^3$. Real landscapes cover 14 RESOLVE biomes and 7 realms (largest: Palearctic 16,760 landscapes, Neotropic 15,405, Nearctic 12,005, Australasia 10,470). NoData fraction of real tiles: p50 0.002, p90 0.159, max 0.896.
 % src: docs/tables/dataset_statistics.md
 
-\begin{figure}[h]
+\begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.48\linewidth]{figA_stats_contrast.png}\hfill
-  \includegraphics[width=0.48\linewidth]{figA_stats_solve_times.png}\\[2pt]
-  \includegraphics[width=0.48\linewidth]{figA_stats_biome_realm.png}\hfill
-  \includegraphics[width=0.48\linewidth]{figA_stats_storage.png}
-  \caption{Dataset statistics (v1.0 index): contrast per tier and family, solve time per configuration and tier, biome and realm coverage of the real landscapes, and storage per tier and task group.}
+  \includegraphics[width=\linewidth]{figA_stats_contrast.pdf}
+  \caption{Dataset statistics (v1.0 index), I: contrast per tier for the synthetic and the real landscapes, and the NoData fraction of the real tiles (manifest) and of a sample of synthetic shards.}
   \label{fig:stats}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figA_stats_biome_realm.pdf}
+  \caption{Dataset statistics, II: biome and biogeographic realm of the real landscapes, stacked by tier.}
+  \label{fig:stats_biome}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figA_stats_solve_times.pdf}
+  \caption{Dataset statistics, III: solver wall time per configuration row and tier (boxes: quartiles; whiskers: 1.5 IQR; w2w = wall-to-wall strips). Omniscape rows dominate the generation budget at every tier.}
+  \label{fig:stats_solve}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.55\linewidth]{figA_stats_storage.pdf}
+  \caption{Dataset statistics, IV: storage on the Hub per tier and task group (GB; totals above the bars).}
+  \label{fig:stats_storage}
 \end{figure}
 
 \input{tables/tab_splits.tex}
 
 \clearpage
+\FloatBarrier
 \section{Omniscape fidelity}
 \label{app:fidelity}
 
 The block rule (block = largest odd integer $\le$ radius/10) came from a 3-sample-per-cell study against the exact block-1 map: block 3 at S deviated by 4.49\,\% mean~/ 7.60\,\% max relative L2 and block 5 at M by 2.00\,\%~/ 2.45\,\%, while coarsening XL 17$\rightarrow$33 changed the cumulative current by 2.47\,\%~/ 2.93\,\% and XXL 33$\rightarrow$65 by 9.46\,\%~/ 11.85\,\% (both rejected); block 1 was 6.4$\times$ (S) and 22.6$\times$ (M) more expensive at those anchors. The $\approx 1$\,\% target was an extrapolation and proved optimistic: the production M block deviates from the exact map by 3.1\,\% relative L2 on average on 200 synthetic test/OOD landscapes (median 2.8\,\%, top-5\,\% IoU 0.95, pinch-point recall 0.95), and the full 1\,000-sample M reference gives mean \relltwo{} 0.029 (median 0.027) with 4.7\,\% of samples above 5\,\% (11\,\% of synthetic, 1.4\,\% of real tiles; real tiles never above 8\,\%). At L (block 5, 60 samples) the mean is 0.028 (max 0.058; 2 of 60 above 5\,\%); block 1 costs 6.7$\times$ (M) and 22$\times$ (L) the production solve. T4 rows carry no single residual; each window solve is bounded by Circuitscape's enforced relative residual $\le 10^{-4}$, with a rescue path for the contrast-$10^6$ solves that the stock package aborts.
 % src: docs/t4_fidelity.md; docs/dataset_card.md
 
-\begin{figure}[h]
+\begin{figure}[htbp]
   \centering
   \includegraphics[width=\linewidth]{figA_fidelity.pdf}
   \caption{Fidelity of the production T4 targets on the reference subsets: per-landscape \relltwo{} of the production block against the exact block-1 map at M and L (dashed: mean; dotted: the 5\,\% tail threshold), and the solve-time cost of the exact reference against the production solve.}
   \label{fig:fidelity}
 \end{figure}
 
+\FloatBarrier
 \section{Precision pass}
 \label{app:precision}
 
 \input{tables/tab_precision.tex}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
   \centering
   \includegraphics[width=\linewidth]{figA_precision.pdf}
   \caption{The post-run precision pass per tier: quantiles of the relative Kirchhoff residual after the pass against the QC threshold ($10^{-6}$) and the target ($10^{-9}$), and the number of rows re-solved and flagged.}
@@ -323,27 +349,30 @@ The block rule (block = largest odd integer $\le$ radius/10) came from a 3-sampl
 Generation ran from 2026-09-16 to 2026-09-22 followed by a 29~h precision pass, 16\,552 core-hours in all (generation 14\,379, precision pass 1\,249, audits 30, auxiliary sets and probes 893); the eleven operational incidents and their resolutions are in the post-mortem.
 % src: docs/generation_postmortem.md
 
-\clearpage
+\FloatBarrier
 \section{Many-query demonstration, per tile}
 \label{app:wp7}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
   \centering
   \includegraphics[width=\linewidth]{figA_wp7.pdf}
   \caption{Per-tile agreement between the solver route and the surrogate route in the many-query demonstration (20 real L tiles $\times$ 8 resistance tables): stability of the top-5\,\% regions across tables, consensus-core overlap and persistent pinch-point recall/precision.}
   \label{fig:wp7}
 \end{figure}
 
+\FloatBarrier
 \section{Splits per tier}
 \label{app:splits}
 The per-tier split counts are in Table~\ref{tab:splits} (Appendix~\ref{app:stats}); subset sizes and the QC exclusion rule are in Section~\ref{sec:data}.
 
+\FloatBarrier
 \section{Evaluation CLI and prediction format}
 \label{app:format}
 
-\code{python scripts/evaluate.py --predictions <dir> --split <name>[,<name>] [--root <data root> --tier <tier> --subset <name> --out <dir> --acceleration --t4-reference <aux build> --t4-blocks <builds> --workers <n>]} writes \code{results.json} and \code{results.md}. \code{<dir>/predictions.h5} holds one group per sample and one subgroup per configuration with \code{cum\_current} (float32 $H\times W$; T1, T1W, T1R, T4), optional \code{voltage} (float32 $H\times W$ or $P\times H\times W$), optional \code{pairwise\_current} ($P\times H\times W$), \code{reff} (float64 $K\times K$; T2), \code{current} (float32 $H\times W$; T3) and optional \code{flow\_potential}~/ \code{normalized} (T4), plus a group attribute \code{inference\_time\_s} per configuration (wall clock including preprocessing); \code{<dir>/meta.json} records model, task, tier, split, seed and notes. Only \code{qc\_pass} rows of the requested splits are evaluated, samples absent from the file are skipped with the row count reported, processing is deterministic in sorted order, an oracle scores 0 error~/ 1.0 on every similarity metric and an all-zero predictor scores \relltwo{} = 1 and top-$q$ IoU = 0. The leaderboard entry schema, the validator and the submission procedure are in \code{docs/submission.md}.
+\code{python scripts/evaluate.py -{}-predictions <dir> -{}-split <name>[,<name>] [-{}-root <data root> -{}-tier <tier> -{}-subset <name> -{}-out <dir> -{}-acceleration -{}-t4-reference <aux build> -{}-t4-blocks <builds> -{}-workers <n>]} writes \code{results.json} and \code{results.md}. \code{<dir>/predictions.h5} holds one group per sample and one subgroup per configuration with \code{cum\_current} (float32 $H\times W$; T1, T1W, T1R, T4), optional \code{voltage} (float32 $H\times W$ or $P\times H\times W$), optional \code{pairwise\_current} ($P\times H\times W$), \code{reff} (float64 $K\times K$; T2), \code{current} (float32 $H\times W$; T3) and optional \code{flow\_potential}~/ \code{normalized} (T4), plus a group attribute \code{inference\_time\_s} per configuration (wall clock including preprocessing); \code{<dir>/meta.json} records model, task, tier, split, seed and notes. Only \code{qc\_pass} rows of the requested splits are evaluated, samples absent from the file are skipped with the row count reported, processing is deterministic in sorted order, an oracle scores 0 error~/ 1.0 on every similarity metric and an all-zero predictor scores \relltwo{} = 1 and top-$q$ IoU = 0. The leaderboard entry schema, the validator and the submission procedure are in \code{docs/submission.md}.
 % src: scripts/evaluate.py; ampscape/eval/harness.py; docs/evaluation.md
 
+\FloatBarrier
 \section{Licences and attributions}
 \label{app:licences}
 
@@ -353,13 +382,14 @@ Every file in the source manifest (21 entries, 5.45~GB) has a recorded licence a
 % src: docs/licenses.md; docs/dataset_card.md
 
 \clearpage
+\FloatBarrier
 \section*{NeurIPS Paper Checklist}
 
 \begin{enumerate}
 \item {\bf Claims}\\
     Question: Do the main claims made in the abstract and introduction accurately reflect the paper's contributions and scope?\\
     Answer: \answerYes{}\\
-    Justification: The abstract and Section~1 state the dataset, the protocol, the harness, the baselines and the demonstration; every number quoted is from the tables of Section~7 and Appendix~B, and the scope (``a trade-off, not a replacement'') matches the results.
+    Justification: The abstract and Section~1 state the dataset, the protocol, the harness, the baselines and the demonstration; every number quoted is from the tables of Section~7 and Appendix~\ref{app:tables}, and the scope (``a trade-off, not a replacement'') matches the results.
 \item {\bf Limitations}\\
     Question: Does the paper discuss the limitations of the work performed by the authors?\\
     Answer: \answerYes{}\\
@@ -367,7 +397,7 @@ Every file in the source manifest (21 entries, 5.45~GB) has a recorded licence a
 \item {\bf Theory assumptions and proofs}\\
     Question: For each theoretical result, does the paper provide the full set of assumptions and a complete (and correct) proof?\\
     Answer: \answerYes{}\\
-    Justification: The only derivation (the zero-shot scale-transfer error, Appendix~A) states its assumptions and scope.
+    Justification: The only derivation (the zero-shot scale-transfer error, Appendix~\ref{app:derivation}) states its assumptions and scope.
 \item {\bf Experimental result reproducibility}\\
     Question: Does the paper fully disclose all the information needed to reproduce the main experimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper?\\
     Answer: \answerYes{}\\
@@ -375,11 +405,11 @@ Every file in the source manifest (21 entries, 5.45~GB) has a recorded licence a
 \item {\bf Open access to data and code}\\
     Question: Does the paper provide open access to the data and code, with sufficient instructions to faithfully reproduce the main experimental results?\\
     Answer: \answerYes{}\\
-    Justification: Data on the Hugging Face Hub (CC BY 4.0) with Croissant metadata and a \code{mini} sample; code (MIT) with a README quickstart, the exact evaluation command (Appendix~H) and the leaderboard tooling; anonymised at submission.
+    Justification: Data on the Hugging Face Hub (CC BY 4.0) with Croissant metadata and a \code{mini} sample; code (MIT) with a README quickstart, the exact evaluation command (Appendix~\ref{app:format}) and the leaderboard tooling; anonymised at submission.
 \item {\bf Experimental setting/details}\\
     Question: Does the paper specify all the training and test details necessary to understand the results?\\
     Answer: \answerYes{}\\
-    Justification: Section~7 (models, epochs, optimiser, patience, seeds, normalisation, configuration selection on validation loss), Appendix~B (per-task decisions) and Appendix~C (training curves).
+    Justification: Section~7 (models, epochs, optimiser, patience, seeds, normalisation, configuration selection on validation loss), Appendix~\ref{app:tables} (per-task decisions) and Appendix~\ref{app:curves} (training curves).
 \item {\bf Experiment statistical significance}\\
     Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments?\\
     Answer: \answerYes{}\\
@@ -387,12 +417,12 @@ Every file in the source manifest (21 entries, 5.45~GB) has a recorded licence a
 \item {\bf Experiments compute resources}\\
     Question: For each experiment, does the paper provide sufficient information on the computer resources needed to reproduce the experiments?\\
     Answer: \answerYes{}\\
-    Justification: Section~9 (701.5 GPU-hours over 773 jobs on L40S, A100, H100 and H200 GPUs; 16\,552 CPU core-hours for generation), Table~\ref{tab:baselines_full} (GPU-hours per run) and Appendix~F (generation breakdown); the total includes abandoned and duplicate runs.
+    Justification: Section~9 (701.5 GPU-hours over 773 jobs on L40S, A100, H100 and H200 GPUs; 16\,552 CPU core-hours for generation), Table~\ref{tab:baselines_full} (GPU-hours per run) and Appendix~\ref{app:precision} (generation breakdown); the total includes abandoned and duplicate runs.
     % src: docs/tables/gpu_usage.md; docs/generation_postmortem.md
 \item {\bf Code of ethics}\\
     Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics?\\
     Answer: \answerYes{}\\
-    Justification: No human subjects, no personal data; licences of every source respected (Appendix~I).
+    Justification: No human subjects, no personal data; licences of every source respected (Appendix~\ref{app:licences}).
 \item {\bf Broader impacts}\\
     Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed?\\
     Answer: \answerYes{}\\
@@ -404,7 +434,7 @@ Every file in the source manifest (21 entries, 5.45~GB) has a recorded licence a
 \item {\bf Licenses for existing assets}\\
     Question: Are the creators or original owners of assets used in the paper properly credited and are the license and terms of use explicitly mentioned and properly respected?\\
     Answer: \answerYes{}\\
-    Justification: Appendix~I lists every upstream layer with version and licence; the solvers and the vendored MgNO code are MIT and cited.
+    Justification: Appendix~\ref{app:licences} lists every upstream layer with version and licence; the solvers and the vendored MgNO code are MIT and cited.
 \item {\bf New assets}\\
     Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets?\\
     Answer: \answerYes{}\\

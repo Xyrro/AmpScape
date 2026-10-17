@@ -5,10 +5,10 @@
 \setlength{\tabcolsep}{3.5pt}
 \caption{Rel-L2 per in-tier split (mean over three seeds, median in brackets) and ratios to \texttt{test\_id}; \texttt{test\_ood} = held-out resistance table and contrast $10^6$, \texttt{ood\_region} = held-out biomes and realm, published = real tiles with published resistance surfaces (S only).}
 \label{tab:ood}
-\resizebox{\textwidth}{!}{%
+\setlength{\tabcolsep}{2.2pt}
 \begin{tabular}{lllrrrrrrr}
 \toprule
-task & tier & model & test\textbackslash{}\_id & test\textbackslash{}\_ood & ood\textbackslash{}\_region & published & test\textbackslash{}\_ood / id & ood\textbackslash{}\_region / id & published / id \\
+task & tier & model & test\_id & test\_ood & ood\_region & published & test\_ood / id & ood\_region / id & published / id \\
 \midrule
 T1 & S & FNO & 0.199 [0.199] & 0.200 [0.201] & 0.135 [0.135] & 0.188 [0.188] & 1.005 & 0.679 & 0.941 \\
 T1 & S & GNN & 0.561 [0.563] & 0.528 [0.529] & 0.476 [0.479] & 0.610 [0.608] & 0.941 & 0.847 & 1.087 \\
@@ -45,5 +45,5 @@ T4 & L & GNN & 0.142 [0.142] & 0.136 [0.136] & 0.100 [0.100] & -- & 0.960 & 0.70
 T4 & L & U-Net & 0.081 [0.081] & 0.089 [0.090] & 0.064 [0.063] & -- & 1.103 & 0.786 & -- \\
 T4 & L & ViT & 0.159 [0.161] & 0.152 [0.154] & 0.125 [0.127] & -- & 0.960 & 0.790 & -- \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table*}

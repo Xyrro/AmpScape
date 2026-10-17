@@ -713,6 +713,8 @@ PAPER_STYLE = {
 MODEL_COLOR = {"unet": "#1f77b4", "fno": "#d62728", "vit": "#2ca02c", "gnn": "#9467bd", "mgno": "#ff7f0e"}
 MODEL_ORDER = ["unet", "fno", "vit", "gnn", "mgno"]
 TEX_FIG = ROOT / "paper" / "neurips" / "figures"
+FULLW = 5.5  # NeurIPS text width in inches: full-width figures are drawn at this width so fonts print at their size
+HALFW = 2.64  # 0.48 * text width (two figures side by side)
 FIGDATA = ROOT / "paper" / "figdata"
 
 
@@ -773,12 +775,23 @@ def _imshow(ax, img, cmap, vmin=None, vmax=None, title=None):
     return im
 
 
+def _log_ticks(ax, subs=(1.0, 2.0, 3.0, 5.0)):
+    """Plain decimal labels on a log axis that spans less than two decades (no '6 × 10^-1' labels)."""
+    ax.yaxis.set_major_locator(matplotlib.ticker.LogLocator(base=10, subs=subs, numticks=12))
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:g}"))
+    ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+
+
 def _npz(name: str) -> dict | None:
     p = FIGDATA / f"{name}.npz"
     if not p.exists():
         return None
     with np.load(p, allow_pickle=False) as z:
         return {k: z[k] for k in z.files}
+
+
+def _short(name: str) -> str:
+    return str(name).replace("_", " ").replace("nan", "")
 
 
 def fig_overview() -> None:
@@ -796,58 +809,59 @@ def fig_overview() -> None:
     if cov is not None and (len(names) != len(cov) or any(len(n) <= 2 for n in names)):
         names = ["land cover", "elevation", "slope", "distance to road", "distance to river", "human modification"][: len(cov)]
     with plt.rc_context(PAPER_STYLE):
-        W, H = 7.0, 2.3
+        W, H = FULLW, 2.3
         fig = plt.figure(figsize=(W, H))
-        side = 1.0 / W  # one-inch panels in figure fraction
-        ph = 1.0 / H
-        y0 = 1.0 - 0.09 - ph  # top row of panels
-        cols = [0.01, 0.01 + side + 0.03, 0.01 + 2 * (side + 0.03), 0.01 + 2 * (side + 0.03) + 0.21, 0.01 + 3 * (side + 0.03) + 0.21, 0.01 + 4 * (side + 0.03) + 0.21]
+        side = 0.74 / W  # panel width in figure fraction (0.74 in)
+        ph = 0.74 / H
+        y0 = 1.0 - 0.085 - ph  # top row of panels
+        gap = 0.1 / W
+        box_w = 1.05 / W
+        x_start = 0.01
+        cols = [x_start, x_start + side + gap, x_start + 2 * (side + gap), x_start + 2 * (side + gap) + box_w + gap, x_start + 3 * (side + gap) + box_w + gap, x_start + 4 * (side + gap) + box_w + gap]
 
         def panel(x, y, img, cmap, title, w=side, h=ph):
             ax = fig.add_axes([x, y, w, h])
             _imshow(ax, img, cmap)
-            ax.set_title(title, fontsize=6.5, pad=1.5)
+            ax.set_title(title, fontsize=7, pad=2)
             return ax
 
-        # covariates: two half-height stacks
         if cov is not None and len(cov) >= 2:
-            panel(cols[0], y0 + ph / 2 + 0.01, cov[0], "Greens", (names[0] if names else "covariate 1")[:16], h=ph / 2 - 0.01)
-            panel(cols[0], y0, cov[min(1, len(cov) - 1)], "terrain", (names[1] if len(names) > 1 else "covariate 2")[:16], h=ph / 2 - 0.01)
-            fig.text(cols[0] + side / 2, y0 - 0.035, "open covariate layers", ha="center", fontsize=6.5)
+            panel(cols[0], y0 + ph / 2 + 0.012, cov[0], "Greens", (names[0] if names else "covariate 1")[:14], h=ph / 2 - 0.012)
+            panel(cols[0], y0, cov[min(1, len(cov) - 1)], "terrain", (names[1] if len(names) > 1 else "covariate 2")[:14], h=ph / 2 - 0.012)
+            fig.text(cols[0] + side / 2, y0 - 0.04, "covariate layers", ha="center", fontsize=7)
         else:
             ax = fig.add_axes([cols[0], y0, side, ph]); ax.axis("off")
-            ax.text(0.5, 0.5, "synthetic\ngenerator", ha="center", va="center", fontsize=7)
+            ax.text(0.5, 0.5, "synthetic\ngenerator", ha="center", va="center", fontsize=7.5)
         panel(cols[1], y0, np.where(nd, np.nan, np.log10(d["points__resistance"])), "viridis", "resistance $\\log_{10} R$")
-        fig.text(cols[1] + side / 2, y0 - 0.035, "resistance table", ha="center", fontsize=6.5)
-        ax = fig.add_axes([cols[2], y0, 0.19, ph]); ax.axis("off")
-        ax.text(0.5, 0.5, "reference solvers\nCircuitscape.jl 5.17.1\nOmniscape.jl 0.6.2\nCHOLMOD, double precision\nresidual recorded per row", ha="center", va="center", fontsize=6.3,
-                bbox=dict(boxstyle="round,pad=0.5", fc="#f4f4f4", ec="#888", lw=0.8))
-        ax = panel(cols[3], y0, _log_current(d["points__out_cum_current"], nd), "magma", "T1 pairwise current")
+        fig.text(cols[1] + side / 2, y0 - 0.04, "resistance table", ha="center", fontsize=7)
+        ax = fig.add_axes([cols[2], y0, box_w, ph]); ax.axis("off")
+        ax.text(0.5, 0.5, "reference solvers\nCircuitscape.jl 5.17.1\nOmniscape.jl 0.6.2\nCHOLMOD, float64\nresidual per row", ha="center", va="center", fontsize=6.8,
+                bbox=dict(boxstyle="round,pad=0.4", fc="#f4f4f4", ec="#888", lw=0.8))
+        ax = panel(cols[3], y0, _log_current(d["points__out_cum_current"], nd), "magma", "T1 pairwise")
         focal = d.get("points__in_focal_mask")
         if focal is not None:
             yy, xx = np.nonzero(focal > 0)
-            ax.scatter(xx, yy, s=5, c="cyan", marker="s", linewidths=0)
+            ax.scatter(xx, yy, s=6, c="cyan", marker="s", linewidths=0)
         if "advanced__out_current" in d:
-            panel(cols[4], y0, _log_current(d["advanced__out_current"], nd), "magma", "T3 advanced current")
-        panel(cols[5], y0, _log_current(d["omniscape__out_cum_current"], nd), "magma", "T4 omnidirectional current")
-        fig.text((cols[3] + cols[5] + side) / 2, y0 - 0.035, "exact targets (float32 maps, float64 effective resistances)", ha="center", fontsize=6.5)
+            panel(cols[4], y0, _log_current(d["advanced__out_current"], nd), "magma", "T3 advanced")
+        panel(cols[5], y0, _log_current(d["omniscape__out_cum_current"], nd), "magma", "T4 omnidirectional")
+        fig.text((cols[3] + cols[5] + side) / 2, y0 - 0.04, "exact targets (float32 maps, float64 effective resistances)", ha="center", fontsize=7)
         ym = y0 + ph / 2
-        for x0, x1 in ((cols[0] + side + 0.003, cols[1] - 0.003), (cols[1] + side + 0.003, cols[2] - 0.003), (cols[2] + 0.19 + 0.003, cols[3] - 0.003)):
+        for x0, x1 in ((cols[0] + side + 0.003, cols[1] - 0.003), (cols[1] + side + 0.003, cols[2] - 0.003), (cols[2] + box_w + 0.003, cols[3] - 0.003)):
             fig.patches.append(matplotlib.patches.FancyArrowPatch((x0, ym), (x1, ym), transform=fig.transFigure, arrowstyle="-|>", mutation_scale=8, color="#444", lw=0.9))
-        # bottom block: three readable columns (tiers | tasks | splits and metrics)
         yb, hb = 0.0, y0 - 0.12
-        for x0, w, txt in ((0.01, 0.30, "Tiers\nS 128$^2$ at 100 m · M 256$^2$ at 100 m\nL 512$^2$ at 200 m · XL 1024$^2$ at 500 m\nXXL 2048$^2$ at 1 km\n174,400 landscapes · 920,372 rows · 1,157 GB"),
-                           (0.33, 0.36, "Tasks\nT1 pairwise current map, T2 effective resistances\nT1W wall-to-wall strips · T1R habitat regions\nT3 advanced mode (sources → grounds)\nT4 Omniscape cumulative current"),
-                           (0.71, 0.29, "Splits and metrics\ntrain / val / test_id by macro-cell and seed family\nOOD: region, table, contrast, scale (XL, XXL),\nsynthetic→real, published surfaces\npixel · ranking · non-source · physics · speed-up")):
+        for x0, w, txt in ((0.01, 0.32, "Tiers\nS 128$^2$ at 100 m · M 256$^2$ at 100 m\nL 512$^2$ at 200 m · XL 1024$^2$ at 500 m\nXXL 2048$^2$ at 1 km\n174,400 landscapes · 920,372 rows\n1,157 GB on the Hub"),
+                           (0.35, 0.33, "Tasks\nT1 pairwise current map\nT2 effective resistances\nT1W wall-to-wall strips · T1R regions\nT3 advanced mode (sources → grounds)\nT4 Omniscape omnidirectional current"),
+                           (0.70, 0.30, "Splits and metrics\nsplit by macro-cell and seed family\nOOD: region · table · contrast ·\nscale (XL, XXL) · published surfaces\nmetrics: pixel · ranking ·\nnon-source · physics · speed-up")):
             ax = fig.add_axes([x0, yb, w, hb]); ax.axis("off")
             head, body = txt.split("\n", 1)
             ax.text(0.0, 1.0, head, ha="left", va="top", fontsize=8, fontweight="bold")
-            ax.text(0.0, 0.76, body, ha="left", va="top", fontsize=7.4, linespacing=1.3)
+            ax.text(0.0, 0.8, body, ha="left", va="top", fontsize=6.8, linespacing=1.3)
         _save(fig, "fig1_overview")
 
 
 def fig_gallery() -> None:
-    """Figure 2: synthetic and real landscapes with their T1 and T4 targets at every tier."""
+    """Figure 2: synthetic and real landscapes with their T1 and T4 targets at every tier (columns = tiers)."""
     import json as _json
 
     man = _json.loads((FIGDATA / "manifest.json").read_text()) if (FIGDATA / "manifest.json").exists() else {}
@@ -855,28 +869,33 @@ def fig_gallery() -> None:
     if not tiers:
         log("paper fig2: figdata missing — skipped")
         return
+    n = len(tiers)
     with plt.rc_context(PAPER_STYLE):
-        fig, axes = plt.subplots(len(tiers), 6, figsize=(6.2, 1.0 * len(tiers) + 0.2), gridspec_kw=dict(wspace=0.05, hspace=0.08))
-        axes = np.atleast_2d(axes)
-        cols = ["synthetic: resistance", "T1 current", "T4 current", "real: resistance", "T1 current", "T4 current"]
-        for i, tier in enumerate(tiers):
-            for j, fam in enumerate(("synthetic", "real")):
+        fig, axes = plt.subplots(3, 2 * n + 1, figsize=(FULLW, 1.95), gridspec_kw=dict(wspace=0.1, hspace=0.06, width_ratios=[1] * n + [0.3] + [1] * n))
+        for ax in axes[:, n]:
+            ax.axis("off")
+        rows = (("$\\log_{10} R$", "viridis"), ("T1\ncurrent", "magma"), ("T4\ncurrent", "magma"))
+        for j, fam in enumerate(("synthetic", "real")):
+            for i, tier in enumerate(tiers):
+                c = i + j * (n + 1)
                 d = _npz(f"gallery_{tier}_{fam}")
                 nd = d["points__nodata"].astype(bool)
-                _imshow(axes[i, 3 * j], np.where(nd, np.nan, np.log10(d["points__resistance"])), "viridis")
-                _imshow(axes[i, 3 * j + 1], _log_current(d["points__out_cum_current"], nd), "magma")
-                _imshow(axes[i, 3 * j + 2], _log_current(d["omniscape__out_cum_current"], nd), "magma")
+                _imshow(axes[0, c], np.where(nd, np.nan, np.log10(d["points__resistance"])), "viridis")
+                _imshow(axes[1, c], _log_current(d["points__out_cum_current"], nd), "magma")
+                _imshow(axes[2, c], _log_current(d["omniscape__out_cum_current"], nd), "magma")
                 m = man.get(f"gallery_{tier}_{fam}", {})
-                lab = (m.get("generator", "") if fam == "synthetic" else m.get("table", "")) or ""
-                axes[i, 3 * j].text(0.02, 0.98, lab, transform=axes[i, 3 * j].transAxes, ha="left", va="top", fontsize=5.5, color="w", bbox=dict(fc="k", alpha=0.45, pad=1.0, lw=0))
-            axes[i, 0].set_ylabel(f"{tier}", rotation=0, labelpad=12, va="center")
-        for j, c in enumerate(cols):
-            axes[0, j].set_title(c, pad=2)
+                lab = _short(m.get("generator", "") if fam == "synthetic" else m.get("table", ""))
+                axes[0, c].set_title(f"{tier}\n{d['points__resistance'].shape[0]}$^2$", fontsize=6.5, pad=2, linespacing=1.0)
+            x_mid = (axes[0, j * (n + 1)].get_position().x0 + axes[0, j * (n + 1) + n - 1].get_position().x1) / 2
+            fig.text(x_mid, 1.0, f"{fam} landscapes", ha="center", va="bottom", fontsize=8, fontweight="bold")
+        for i, (lab, _) in enumerate(rows):
+            axes[i, 0].set_ylabel(lab, fontsize=6.5, labelpad=2)
         _save(fig, "fig2_gallery")
 
 
 def fig_qualitative() -> None:
-    """Figure 3: input, exact target, best-model prediction and error map for T1 and T4 at L, in-distribution and OOD."""
+    """Figure 3: input, exact target, best-model prediction and error map for T1 and T4 at L, in-distribution and OOD
+    side by side (one row per task, a shared error colour scale per row)."""
     import json as _json
 
     man = _json.loads((FIGDATA / "manifest.json").read_text()) if (FIGDATA / "manifest.json").exists() else {}
@@ -884,35 +903,52 @@ def fig_qualitative() -> None:
     if not cases:
         log("paper fig3: figdata missing — skipped")
         return
+    nc = len(cases)
     with plt.rc_context(PAPER_STYLE):
-        rows = [(c, t) for t in ("T1", "T4") for c in cases]
-        fig, axes = plt.subplots(len(rows), 4, figsize=(5.6, 1.38 * len(rows) + 0.15), gridspec_kw=dict(wspace=0.05, hspace=0.12))
-        axes = np.atleast_2d(axes)
-        for i, (case, task) in enumerate(rows):
-            d = _npz(f"qual_L_{case}")
+        ratios = ([1, 1, 1, 1] + [0.18]) * nc
+        ratios = ratios[:-1] + [0.08]  # last column: colour bar
+        fig, axes = plt.subplots(2, len(ratios), figsize=(FULLW, 1.85), gridspec_kw=dict(wspace=0.06, hspace=0.08, width_ratios=ratios))
+        for i, task in enumerate(("T1", "T4")):
             cfg = "points" if task == "T1" else "omniscape"
-            nd = d[f"{cfg}__nodata"].astype(bool)
-            tgt = _log_current(d[f"{cfg}__out_cum_current"], nd)
-            prd = _log_current(d[f"{cfg}__pred_cum_current"], nd)
-            vmin, vmax = np.nanpercentile(tgt, 1), np.nanmax(tgt)
-            _imshow(axes[i, 0], np.where(nd, np.nan, np.log10(d[f"{cfg}__resistance"])), "viridis")
-            if task == "T1" and f"{cfg}__in_focal_mask" in d:
-                yy, xx = np.nonzero(d[f"{cfg}__in_focal_mask"] > 0)
-                axes[i, 0].scatter(xx, yy, s=6, c="cyan", marker="s", linewidths=0)
-            _imshow(axes[i, 1], tgt, "magma", vmin, vmax)
-            _imshow(axes[i, 2], prd, "magma", vmin, vmax)
-            err = prd - tgt
-            lim = np.nanpercentile(np.abs(err), 99)
-            im = _imshow(axes[i, 3], err, "RdBu_r", -lim, lim)
-            cb = fig.colorbar(im, ax=axes[i, 3], fraction=0.046, pad=0.02)
-            cb.ax.tick_params(labelsize=5.5)
-            m = man.get(f"qual_L_{case}", {})
-            run = (m.get("runs") or {}).get(task, "")
+            data = {c: _npz(f"qual_L_{c}") for c in cases}
+            lims = []
+            for c in cases:
+                d = data[c]
+                nd = d[f"{cfg}__nodata"].astype(bool)
+                err = _log_current(d[f"{cfg}__pred_cum_current"], nd) - _log_current(d[f"{cfg}__out_cum_current"], nd)
+                lims.append(np.nanpercentile(np.abs(err), 99))
+            lim = max(lims)
+            im = None
+            for k, c in enumerate(cases):
+                d = data[c]
+                nd = d[f"{cfg}__nodata"].astype(bool)
+                tgt = _log_current(d[f"{cfg}__out_cum_current"], nd)
+                prd = _log_current(d[f"{cfg}__pred_cum_current"], nd)
+                vmin, vmax = np.nanpercentile(tgt, 1), np.nanmax(tgt)
+                c0 = k * 5
+                _imshow(axes[i, c0], np.where(nd, np.nan, np.log10(d[f"{cfg}__resistance"])), "viridis")
+                if task == "T1" and f"{cfg}__in_focal_mask" in d:
+                    yy, xx = np.nonzero(d[f"{cfg}__in_focal_mask"] > 0)
+                    axes[i, c0].scatter(xx, yy, s=7, c="cyan", marker="s", linewidths=0)
+                _imshow(axes[i, c0 + 1], tgt, "magma", vmin, vmax)
+                _imshow(axes[i, c0 + 2], prd, "magma", vmin, vmax)
+                im = _imshow(axes[i, c0 + 3], prd - tgt, "RdBu_r", -lim, lim)
+                if k < nc - 1:
+                    axes[i, c0 + 4].axis("off")
+            cb = fig.colorbar(im, cax=axes[i, -1])
+            cb.ax.tick_params(labelsize=5.5, pad=1)
+            cb.set_label("error (log$_{10}$)", fontsize=6)
+            run = (man.get("qual_L_id", {}).get("runs") or {}).get(task, "")
             model = MODEL_LABEL.get(run.split("_")[0], run.split("_")[0]) if run else ""
-            lab = f"{task} · {model}\n{'in-distribution' if case == 'id' else 'OOD: ' + str(m.get('table', '')) + ' table'}"
-            axes[i, 0].set_ylabel(lab, fontsize=6.5)
-        for j, c in enumerate(("input $\\log_{10} R$ (cyan: focal nodes)", "exact target", "prediction", "error, log$_{10}$ pred − log$_{10}$ target")):
-            axes[0, j].set_title(c, pad=2, fontsize=7)
+            axes[i, 0].set_ylabel(f"{task} · {model}", fontsize=7)
+        titles = ("input", "target", "prediction", "error")
+        for k, c in enumerate(cases):
+            for j, t in enumerate(titles):
+                axes[0, k * 5 + j].set_title(t, pad=2, fontsize=6.5)
+            m = man.get(f"qual_L_{c}", {})
+            head = "in-distribution (test_id)" if c == "id" else f"OOD: held-out {_short(m.get('table', ''))} table (test_ood)"
+            x_mid = (axes[0, k * 5].get_position().x0 + axes[0, k * 5 + 3].get_position().x1) / 2
+            fig.text(x_mid, 1.0, head, ha="center", va="bottom", fontsize=7.5, fontweight="bold")
         _save(fig, "fig3_qualitative")
 
 
@@ -923,7 +959,7 @@ def fig_error_vs_tier_tex() -> None:
         return
     with plt.rc_context(PAPER_STYLE):
         tasks = ["T1", "T3", "T4"]
-        fig, axes = plt.subplots(1, 3, figsize=(7.0, 2.0), gridspec_kw=dict(wspace=0.3))
+        fig, axes = plt.subplots(1, 3, figsize=(FULLW, 1.9), gridspec_kw=dict(wspace=0.35))
         for ax, task in zip(axes, tasks, strict=False):
             for base in MODEL_ORDER:
                 lab = MODEL_LABEL[base]
@@ -939,23 +975,25 @@ def fig_error_vs_tier_tex() -> None:
             ax.set_xticks([0, 1, 2])
             ax.set_xticklabels(["S\n128²", "M\n256²", "L\n512²"])
             ax.set_yscale("log")
+            _log_ticks(ax)
             ax.set_title(task + {"T1": " pairwise current", "T3": " advanced mode", "T4": " omnidirectional"}[task])
             ax.grid(alpha=0.3, which="both", lw=0.5)
             if ax is axes[0]:
                 ax.set_ylabel("relative L2 on test_id")
         h, l = axes[0].get_legend_handles_labels()
-        axes[1].legend(h, l, frameon=False, loc="lower right")
+        fig.legend(h, l, frameon=False, loc="upper center", ncol=5, bbox_to_anchor=(0.5, 1.1), columnspacing=1.2)
         _save(fig, "fig4_error_vs_tier")
 
 
 def fig_pareto_L_tex() -> None:
-    """Figure 5: T4 error against the exact block-1 map versus cost per landscape at L (test_id reference subset)."""
+    """Figure 5 (half width): T4 error against the exact block-1 map versus cost per landscape at L."""
     rows = [r for r in _md_rows(ROOT / "paper" / "tables" / "t4_pareto_L.md") if r["split"] == "test_id"]
     if not rows:
         return
     with plt.rc_context(PAPER_STYLE):
-        fig, ax = plt.subplots(figsize=(3.4, 2.75))
+        fig, ax = plt.subplots(figsize=(HALFW, 2.55))
         seen = set()
+        solver_pts = []
         for r in rows:
             cost = r["cost s / landscape"].replace("–", "")
             if not cost:
@@ -965,25 +1003,44 @@ def fig_pareto_L_tex() -> None:
             if "learned" in m:
                 base = m.split("_")[0]
                 sa = "scalenorm" in m
-                lab = MODEL_LABEL.get(base, base) + (" (scale-aware target)" if sa else "")
-                ax.scatter(c, y, s=36, marker="^" if sa else "o", facecolor=MODEL_COLOR.get(base, "k") if not sa else "w",
-                           edgecolor=MODEL_COLOR.get(base, "k"), lw=1.0, zorder=3, label=lab if lab not in seen else None)
-                seen.add(lab)
+                lab = MODEL_LABEL.get(base, base)
+                ax.scatter(c, y, s=30, marker="^" if sa else "o", facecolor="w" if sa else MODEL_COLOR.get(base, "k"),
+                           edgecolor=MODEL_COLOR.get(base, "k"), lw=1.0, zorder=3, label=lab if (lab not in seen and not sa) else None)
+                if not sa:
+                    seen.add(lab)
             else:
                 yy = max(y, 2e-3)
-                lab = m.replace(" (correct_artifacts=1)", "").replace(" (correct_artifacts=0)", ", no artefact correction").replace("(exact, reference)", "(exact; plotted at 0.002)")
-                ax.scatter(c, yy, s=30, marker="s", color="#555", zorder=3, label="Omniscape solver" if "Omniscape solver" not in seen else None)
+                blk = re.search(r"block (\d+)", m)
+                lab = f"block {blk.group(1)}" if blk else m
+                if "exact" in m:
+                    lab = "block 1, exact\n(plotted at 0.002)"
+                elif "production" in m:
+                    lab += " (production)"
+                elif "correct_artifacts=0" in m:
+                    lab += ", no corr."
+                solver_pts.append((c, yy, lab))
+                ax.scatter(c, yy, s=26, marker="s", color="#555", zorder=3, label="Omniscape solver" if "Omniscape solver" not in seen else None)
                 seen.add("Omniscape solver")
-                ax.annotate(lab, (c, yy), textcoords="offset points", xytext=(0, 6), fontsize=6.5, ha="center")
+        for c, yy, lab in solver_pts:
+            if "exact" in lab:
+                kw = dict(xytext=(0, 5), ha="center", va="bottom")
+            elif lab == "block 3":
+                kw = dict(xytext=(0, -5), ha="center", va="top")
+            elif "no corr" in lab:
+                kw = dict(xytext=(0, 5), ha="center", va="bottom")
+            else:
+                kw = dict(xytext=(-5, 0), ha="right", va="center")
+            ax.annotate(lab, (c, yy), textcoords="offset points", fontsize=6, color="#333", **kw)
+        ax.scatter([], [], marker="^", facecolor="w", edgecolor="k", s=30, lw=1.0, label="open: scale-aware target")
         ax.set_xscale("log")
         ax.set_yscale("log")
-        ax.set_xlabel("cost per landscape (s)\nsolver: one CPU core · learned: one GPU", fontsize=7.5)
+        ax.set_xlabel("cost per landscape (s): solver one CPU core, learned one GPU", fontsize=7)
         ax.set_ylabel("rel-L2 vs exact block-1 map", fontsize=7.5)
         ax.tick_params(labelsize=7)
-        ax.set_ylim(1.5e-3, 0.4)
-        ax.set_xlim(1e-3, 5e4)
+        ax.set_ylim(1.2e-3, 0.5)
+        ax.set_xlim(1e-3, 8e4)
         ax.grid(alpha=0.3, which="both", lw=0.5)
-        ax.legend(frameon=False, fontsize=6.5, loc="lower left", ncol=1)
+        ax.legend(frameon=False, fontsize=6.3, loc="lower left", ncol=1, handletextpad=0.3, borderaxespad=0.2)
         _save(fig, "fig5_pareto_L")
 
 
@@ -993,7 +1050,7 @@ def fig_scale_transfer_tex() -> None:
     if not rows:
         return
     with plt.rc_context(PAPER_STYLE):
-        fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.05), gridspec_kw=dict(wspace=0.28))
+        fig, axes = plt.subplots(1, 2, figsize=(FULLW, 2.0), gridspec_kw=dict(wspace=0.3))
         for ax, task in zip(axes, ("T4", "T1"), strict=False):
             for base in MODEL_ORDER:
                 lab = MODEL_LABEL[base]
@@ -1008,57 +1065,73 @@ def fig_scale_transfer_tex() -> None:
             ax.set_xticks([0, 1, 2])
             ax.set_xticklabels(["L (trained)\n512²", "XL\n1024²", "XXL\n2048²"])
             ax.set_yscale("log")
+            _log_ticks(ax, subs=(1.0, 2.0, 3.0, 5.0) if task == "T4" else (1.0, 2.0, 5.0))
             ax.set_title({"T4": "T4 omnidirectional current", "T1": "T1 pairwise current"}[task])
             ax.grid(alpha=0.3, which="both", lw=0.5)
             if task == "T4":
                 ax.axhline(0.5, color="#999", lw=0.7, ls=":")
                 ax.axhline(0.75, color="#999", lw=0.7, ls=":")
-                ax.text(0.02, 0.765, "1 − r$_L$/r$_{XXL}$ = 0.75", fontsize=6, color="#666", va="bottom")
-                ax.text(0.02, 0.51, "1 − r$_L$/r$_{XL}$ = 0.50", fontsize=6, color="#666", va="bottom")
+                ax.text(0.08, 0.77, "1 − r$_L$/r$_{XXL}$ = 0.75", fontsize=6.5, color="#666", va="bottom")
+                ax.text(0.08, 0.515, "1 − r$_L$/r$_{XL}$ = 0.50", fontsize=6.5, color="#666", va="bottom")
         axes[0].set_ylabel("relative L2 on test_id")
         h, l = axes[1].get_legend_handles_labels()
-        fig.legend(h, l, loc="upper center", ncol=4, frameon=False, bbox_to_anchor=(0.5, 1.12))
+        fig.legend(h, l, loc="upper center", ncol=4, frameon=False, bbox_to_anchor=(0.5, 1.16), columnspacing=1.0, handlelength=1.6)
         _save(fig, "fig6_scale_transfer")
 
 
+def _ood_panel(ax, sub, ratios, tier_y=1.5):
+    x = np.arange(len(sub))
+    w = 0.27
+    for k, (col, lab, color) in enumerate(ratios):
+        vals = [float(r[col]) if r[col] not in ("–", "") else np.nan for r in sub]
+        ax.bar(x + (k - 1) * w, vals, width=w, color=color, label=lab, lw=0)
+    ax.axhline(1.0, color="k", lw=0.7, ls="--")
+    ax.set_xticks(x)
+    ax.set_xticklabels([r["model"] for r in sub], fontsize=6.5, rotation=60, ha="right", rotation_mode="anchor")
+    for tier in TIER_ORDER:
+        idx = [k for k, r in enumerate(sub) if r["tier"] == tier]
+        if idx:
+            ax.text(np.mean(idx), tier_y, tier, ha="center", va="center", fontsize=7.5, fontweight="bold", color="#333")
+            if idx[0] > 0:
+                ax.axvline(idx[0] - 0.5, color="#bbb", lw=0.5)
+    ax.grid(alpha=0.3, axis="y", lw=0.5)
+    ax.set_ylim(0.5, 1.6)
+    ax.set_xlim(-0.6, len(sub) - 0.4)
+
+
 def fig_ood_tex(tasks=("T1", "T4"), name="fig7_ood", stacked=True) -> None:
-    """Figure 7: rel-L2 on each OOD split relative to test_id, per task, tier and model (stacked panels for the
-    half-width main figure; the three-task row version is the appendix figure)."""
+    """Figure 7: rel-L2 on each OOD split relative to test_id, per task, tier and model. stacked=True draws the
+    half-width main figure (one panel per task, one above the other); stacked=False the full-width appendix row."""
     rows = _md_rows(ROOT / "paper" / "tables" / "ood_degradation.md")
     if not rows:
         return
     inv = {v: k for k, v in MODEL_LABEL.items()}
+    ratios = [("test_ood / id", "held-out table + contrast", "#d62728"), ("ood_region / id", "held-out region", "#1f77b4"), ("published / id", "published surfaces (S)", "#2ca02c")]
+    subs = {}
+    for task in tasks:
+        sub = [r for r in rows if r["task"] == task and r["model"] != "MgNO"]
+        subs[task] = sorted(sub, key=lambda r: (TIER_ORDER.index(r["tier"]), MODEL_ORDER.index(inv[r["model"]])))
     with plt.rc_context(PAPER_STYLE):
-        if stacked:  # half-width main figure: the tasks side by side, compact
-            fig, axes = plt.subplots(1, len(tasks), figsize=(3.4, 2.1), gridspec_kw=dict(wspace=0.08), sharey=True)
+        if stacked:
+            fig, axes = plt.subplots(len(tasks), 1, figsize=(HALFW, 1.25 * len(tasks) + 0.45), gridspec_kw=dict(hspace=0.12), sharex=True)
+            axes = np.atleast_1d(axes)
+            for ax, task in zip(axes, tasks, strict=False):
+                _ood_panel(ax, subs[task], ratios)
+                ax.set_ylabel(f"{task}: ratio to test_id", fontsize=7)
+            for ax in axes[:-1]:
+                ax.tick_params(axis="x", length=0)
+            h, l = axes[0].get_legend_handles_labels()
+            fig.legend(h, l, frameon=False, loc="upper center", ncol=2, bbox_to_anchor=(0.55, 1.07), fontsize=6.5, columnspacing=0.8, handlelength=1.2)
         else:
-            fig, axes = plt.subplots(1, len(tasks), figsize=(7.0, 2.3), gridspec_kw=dict(wspace=0.08, width_ratios=[5, 2.4, 5][: len(tasks)]), sharey=True)
-        axes = np.atleast_1d(axes)
-        ratios = [("test_ood / id", "held-out table + contrast", "#d62728"), ("ood_region / id", "held-out region", "#1f77b4"), ("published / id", "published surfaces (S)", "#2ca02c")]
-        for ax, task in zip(axes, tasks, strict=False):
-            sub = [r for r in rows if r["task"] == task and r["model"] != "MgNO"]
-            sub = sorted(sub, key=lambda r: (TIER_ORDER.index(r["tier"]), MODEL_ORDER.index(inv[r["model"]])))
-            x = np.arange(len(sub))
-            w = 0.27
-            for k, (col, lab, color) in enumerate(ratios):
-                vals = [float(r[col]) if r[col] not in ("–", "") else np.nan for r in sub]
-                ax.bar(x + (k - 1) * w, vals, width=w, color=color, label=lab, lw=0)
-            ax.axhline(1.0, color="k", lw=0.7, ls="--")
-            ax.set_xticks(x)
-            ax.set_xticklabels([r["model"] for r in sub], fontsize=5.5, rotation=60, ha="right")
-            for tier in TIER_ORDER:
-                idx = [k for k, r in enumerate(sub) if r["tier"] == tier]
-                if idx:
-                    ax.text(np.mean(idx), 1.56, tier, ha="center", va="top", fontsize=7, fontweight="bold")
-                    if idx[0] > 0:
-                        ax.axvline(idx[0] - 0.5, color="#bbb", lw=0.5)
-            ax.set_title(task, pad=10, loc="left")
-            ax.grid(alpha=0.3, axis="y", lw=0.5)
-            ax.set_ylim(0.5, 1.6)
-            if ax is axes[0]:
-                ax.set_ylabel("rel-L2 ratio to test_id", fontsize=6.5)
-        h, l = axes[0].get_legend_handles_labels()
-        fig.legend(h, l, frameon=False, loc="upper center", ncol=3 if not stacked else 1, bbox_to_anchor=(0.5, 1.06 if not stacked else 1.16), fontsize=6)
+            widths = [max(len(subs[t]), 1) for t in tasks]
+            fig, axes = plt.subplots(1, len(tasks), figsize=(FULLW, 2.3), gridspec_kw=dict(wspace=0.08, width_ratios=widths), sharey=True)
+            axes = np.atleast_1d(axes)
+            for ax, task in zip(axes, tasks, strict=False):
+                _ood_panel(ax, subs[task], ratios)
+                ax.set_title(task, loc="left", fontsize=8.5)
+            axes[0].set_ylabel("rel-L2 ratio to test_id")
+            h, l = axes[0].get_legend_handles_labels()
+            fig.legend(h, l, frameon=False, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.07))
         _save(fig, name)
 
 
@@ -1087,7 +1160,7 @@ def figA_training_curves() -> None:
     ncol = 6
     nrow = int(np.ceil(len(keys) / ncol))
     with plt.rc_context(PAPER_STYLE):
-        fig, axes = plt.subplots(nrow, ncol, figsize=(7.0, 1.35 * nrow + 0.3), gridspec_kw=dict(wspace=0.35, hspace=0.6))
+        fig, axes = plt.subplots(nrow, ncol, figsize=(FULLW, 1.05 * nrow + 0.35), gridspec_kw=dict(wspace=0.45, hspace=0.7))
         axes = np.atleast_2d(axes).ravel()
         for ax, key in zip(axes, keys, strict=False):
             task, tier, base = key
@@ -1104,12 +1177,13 @@ def figA_training_curves() -> None:
                 ax.set_ylim(lo * 0.5, hi * 1.5)
             ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
             ax.yaxis.set_major_locator(matplotlib.ticker.LogLocator(numticks=4))
-            ax.set_title(f"{MODEL_LABEL[base]} {task} {tier} ({len(groups[key])} seed{'s' if len(groups[key]) > 1 else ''})", fontsize=6.5, pad=2)
-            ax.tick_params(labelsize=5.5)
+            seeds = len(groups[key])
+            ax.set_title(f"{MODEL_LABEL[base]} · {task} · {tier}", fontsize=6.8, pad=2)
+            ax.tick_params(labelsize=5.8, pad=1.5)
             ax.grid(alpha=0.25, which="both", lw=0.4)
         for ax in axes[len(keys):]:
             ax.axis("off")
-        fig.text(0.5, 0.005, "epoch — solid: validation loss (masked MSE, log target); dotted: training loss", ha="center", fontsize=7)
+        fig.text(0.5, 0.0, "epoch — solid: validation loss (masked MSE, log target); dotted: training loss; one line per seed (MgNO: one seed)", ha="center", va="bottom", fontsize=7)
         _save(fig, "figA_training_curves")
 
 
@@ -1118,7 +1192,7 @@ def figA_data_scaling() -> None:
     if not rows:
         return
     with plt.rc_context(PAPER_STYLE):
-        fig, ax = plt.subplots(figsize=(3.4, 2.5))
+        fig, ax = plt.subplots(figsize=(3.4, 2.1))
         for base, ls in (("unet", "-"), ("fno", "--")):
             lab = MODEL_LABEL[base]
             for regime, mk, name in (("ep30", "o", "fixed epochs (30)"), ("steps", "s", "fixed steps")):
@@ -1127,17 +1201,18 @@ def figA_data_scaling() -> None:
                 ax.plot([int(r["n train"].replace(",", "")) for r in g], [float(r["rel-L2"]) for r in g], marker=mk, ms=3.5, ls=ls, lw=1.1, color=MODEL_COLOR[base], mfc=MODEL_COLOR[base] if regime == "ep30" else "w", label=f"{lab}, {name}")
         ax.set_xscale("log")
         ax.set_yscale("log")
+        _log_ticks(ax)
         ax.set_xlabel("training landscapes (tier S, T1)")
         ax.set_ylabel("relative L2 on test_id")
         ax.grid(alpha=0.3, which="both", lw=0.5)
-        ax.legend(frameon=False, fontsize=6)
+        ax.legend(frameon=False, fontsize=6.5)
         _save(fig, "figA_data_scaling")
 
 
 def figA_fidelity() -> None:
     """Appendix: per-landscape deviation of the production T4 target from the exact block-1 map (reference subsets)."""
     with plt.rc_context(PAPER_STYLE):
-        fig, axes = plt.subplots(1, 3, figsize=(7.0, 2.2), gridspec_kw=dict(wspace=0.32))
+        fig, axes = plt.subplots(1, 3, figsize=(FULLW, 1.9), gridspec_kw=dict(wspace=0.4))
         for ax, tier in zip(axes[:2], ("M", "L"), strict=False):
             p = ROOT / "aux" / "t4_bs1_reference" / f"{tier}_bs1" / "index.parquet"
             if not p.exists():
@@ -1150,10 +1225,11 @@ def figA_fidelity() -> None:
                 ax.hist(g.rel_l2.clip(upper=bins[-1]), bins=bins, alpha=0.65, color=col, label=f"{fam} (n = {len(g)})")
             ax.axvline(d.rel_l2.mean(), color="k", lw=0.8, ls="--")
             ax.axvline(0.05, color="#d62728", lw=0.7, ls=":")
-            ax.set_title(f"{tier}: block {int(d.prod_block.iloc[0])} vs block 1, n = {len(d)}")
-            ax.set_xlabel("rel-L2 of the production target")
+            ax.set_ylim(0, ax.get_ylim()[1] * 1.3)
+            ax.set_title(f"{tier}: block {int(d.prod_block.iloc[0])} vs 1 (n = {len(d)})", fontsize=8)
+            ax.set_xlabel("rel-L2, production vs exact")
             ax.set_ylabel("landscapes")
-            ax.legend(frameon=False, fontsize=6)
+            ax.legend(frameon=False, fontsize=6.5, loc="upper right")
             ax.grid(alpha=0.3, lw=0.5)
         ax = axes[2]
         for tier, col in (("M", "#1f77b4"), ("L", "#d62728")):
@@ -1167,9 +1243,8 @@ def figA_fidelity() -> None:
         ax.set_yscale("log")
         ax.set_xlabel("production solve (s)")
         ax.set_ylabel("block-1 solve (s)")
-        ax.set_title("cost of the exact reference")
         ax.set_title("exact reference: cost", fontsize=8)
-        ax.legend(frameon=False, fontsize=6)
+        ax.legend(frameon=False, fontsize=6, loc="lower right")
         ax.grid(alpha=0.3, which="both", lw=0.5)
         _save(fig, "figA_fidelity")
 
@@ -1180,7 +1255,7 @@ def figA_precision() -> None:
     if not rows:
         return
     with plt.rc_context(PAPER_STYLE):
-        fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.2), gridspec_kw=dict(wspace=0.3))
+        fig, axes = plt.subplots(1, 2, figsize=(FULLW, 2.0), gridspec_kw=dict(wspace=0.4))
         x = np.arange(len(rows))
         ax = axes[0]
         q = {k: [] for k in ("p50", "p90", "p99", "max")}
@@ -1191,30 +1266,31 @@ def figA_precision() -> None:
         for k, mk in zip(q, ("o", "s", "^", "x"), strict=False):
             ax.plot(x, q[k], marker=mk, ms=4, lw=0.8, label=k)
         ax.axhline(1e-6, color="#d62728", lw=0.7, ls=":")
-        ax.text(len(rows) - 0.9, 1.3e-6, "QC threshold", fontsize=6, color="#d62728")
+        ax.text(-0.3, 1.6e-6, "QC threshold 10$^{-6}$", fontsize=6.5, color="#d62728", va="bottom")
         ax.axhline(1e-9, color="#999", lw=0.7, ls=":")
-        ax.text(len(rows) - 0.9, 1.3e-9, "target", fontsize=6, color="#666")
+        ax.text(-0.3, 1.6e-9, "target 10$^{-9}$", fontsize=6.5, color="#666", va="bottom")
         ax.set_yscale("log")
         ax.set_xticks(x)
-        ax.set_xticklabels([r["tier"] for r in rows])
+        ax.set_xticklabels([r["tier"].strip("*") for r in rows])
         ax.set_ylabel("relative Kirchhoff residual after the pass")
-        ax.legend(frameon=False, fontsize=6, ncol=2)
+        ax.legend(frameon=False, fontsize=6.5, ncol=4, loc="upper center", bbox_to_anchor=(0.5, 1.2), columnspacing=1.0)
         ax.grid(alpha=0.3, which="both", lw=0.5)
         ax = axes[1]
-        n = [int(r["rows re-solved"].replace(",", "")) for r in rows]
-        f = [int(r["rows > 1e-6 (flagged, excluded from splits)"].replace(",", "")) for r in rows]
-        ax.bar(x - 0.2, n, width=0.4, color="#1f77b4", label="rows re-solved", lw=0)
+        n = [int(r["rows re-solved"].replace(",", "").replace("*", "")) for r in rows]
+        f = [int(r["rows > 1e-6 (flagged, excluded from splits)"].replace(",", "").replace("*", "")) for r in rows]
+        ax.bar(x - 0.2, n, width=0.4, color="#1f77b4", label="rows re-solved (left axis)", lw=0)
         ax2 = ax.twinx()
-        ax2.bar(x + 0.2, f, width=0.4, color="#d62728", label="rows flagged (> 1e-6)", lw=0)
+        ax2.bar(x + 0.2, f, width=0.4, color="#d62728", label="rows flagged > 10$^{-6}$ (right axis)", lw=0)
         ax.set_yscale("log")
         ax.set_xticks(x)
-        ax.set_xticklabels([r["tier"] for r in rows])
+        ax.set_xticklabels([r["tier"].strip("*") for r in rows])
         ax.set_ylabel("rows re-solved")
         ax2.set_ylabel("rows flagged", color="#d62728")
         ax2.spines["right"].set_visible(True)
+        ax2.set_ylim(0, max(f) * 1.6)
         h1, l1 = ax.get_legend_handles_labels()
         h2, l2 = ax2.get_legend_handles_labels()
-        ax.legend(h1 + h2, l1 + l2, frameon=False, fontsize=6, loc="lower left")
+        ax.legend(h1 + h2, l1 + l2, frameon=False, fontsize=6.5, ncol=1, loc="upper center", bbox_to_anchor=(0.5, 1.2))
         ax.grid(alpha=0.3, axis="y", lw=0.5)
         _save(fig, "figA_precision")
 
@@ -1225,44 +1301,144 @@ def figA_wp7() -> None:
         return
     d = pd.read_parquet(src)
     with plt.rc_context(PAPER_STYLE):
-        fig, axes = plt.subplots(1, 3, figsize=(7.0, 2.2), gridspec_kw=dict(wspace=0.35))
+        fig, axes = plt.subplots(1, 3, figsize=(FULLW, 2.0), gridspec_kw=dict(wspace=0.45))
         ax = axes[0]
         ax.scatter(d.stability_mean_iou_solver, d.stability_mean_iou_model, s=16, color="#1f77b4", lw=0)
         lim = [0, max(d.stability_mean_iou_solver.max(), d.stability_mean_iou_model.max()) * 1.05]
         ax.plot(lim, lim, "k--", lw=0.7)
-        ax.set_xlabel("solver: mean pairwise top-5 % IoU across tables")
-        ax.set_ylabel("surrogate")
-        ax.set_title("stability of priority areas (per tile)")
+        ax.set_xlabel("solver route: mean pairwise\ntop-5 % IoU across tables")
+        ax.set_ylabel("surrogate route")
+        ax.set_title("stability of\npriority areas", fontsize=8)
         ax = axes[1]
         ax.hist(d.core75_iou_model_vs_solver, bins=10, color="#2ca02c", alpha=0.85)
-        ax.set_xlabel("IoU of consensus cores, surrogate vs solver")
-        ax.set_title(f"consensus core (median {d.core75_iou_model_vs_solver.median():.2f})")
+        ax.set_xlabel("IoU of consensus cores,\nsurrogate vs solver")
+        ax.set_ylabel("tiles")
+        ax.set_title(f"consensus core\n(median IoU {d.core75_iou_model_vs_solver.median():.2f})", fontsize=8)
         ax = axes[2]
         ax.scatter(d.pinch_persistent_recall, d.pinch_persistent_precision, s=16, color="#d62728", lw=0)
         ax.set_xlabel("persistent pinch-point recall")
         ax.set_ylabel("precision")
-        ax.set_title("persistent pinch points (per tile)")
+        ax.set_title("persistent\npinch points", fontsize=8)
         for a in axes:
             a.grid(alpha=0.3, lw=0.5)
         _save(fig, "figA_wp7")
 
 
-def tex_figures() -> None:
-    """All figures of the LaTeX paper (paper/neurips/figures/)."""
-    import shutil
+def figA_stats() -> None:
+    """Appendix: dataset statistics in the paper style (the Markdown versions are docs/figures/dataset_stats_*.png):
+    contrast and NoData per tier and family, biome and realm coverage, solve time per configuration, storage."""
+    idx_dir = ROOT / "data" / "hf" / "AmpScape" / "index"
+    tiles_f = ROOT / "data" / "tiles" / "v1.0" / "tiles.parquet"
+    counts_f = ROOT / "docs" / "tables" / "final_counts.json"
+    if not (idx_dir.exists() and tiles_f.exists() and counts_f.exists()):
+        log("paper figA_stats: index / tiles / counts missing — skipped")
+        return
+    cols = ["sample_id", "config", "family", "contrast", "tile_id", "realm", "solve_time_s"]
+    idx = pd.concat([pd.read_parquet(idx_dir / f"{t}.parquet", columns=cols).assign(tier=t) for t in TIER_ORDER], ignore_index=True)
+    samples = idx.drop_duplicates("sample_id")
+    tiles = pd.read_parquet(tiles_f, columns=["tile_id", "biome_name", "qc_frac_unusable"])
+    counts = json.loads(counts_f.read_text())
+    tier_color = dict(zip(TIER_ORDER, ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"], strict=False))
+    with plt.rc_context(PAPER_STYLE):
+        # (a) contrast per tier and family, NoData fraction
+        fig, axes = plt.subplots(1, 3, figsize=(FULLW, 1.9), gridspec_kw=dict(wspace=0.45))
+        for fam, ax in (("synthetic", axes[0]), ("real", axes[1])):
+            sub = samples[samples.family == fam]
+            for t in TIER_ORDER:
+                c = sub[sub.tier == t].contrast.dropna()
+                if len(c):
+                    ax.hist(np.log10(c), bins=40, histtype="step", lw=1.0, color=tier_color[t], label=f"{t} (n = {len(c):,})")
+            ax.set_xlabel("log$_{10}$ contrast")
+            ax.set_ylabel("landscapes")
+            ax.set_title(f"{fam} landscapes")
+            if fam == "synthetic":
+                ax.set_xlim(0.5, 6.5)
+                h_t, l_t = ax.get_legend_handles_labels()
+                fig.legend(h_t, [l.split(" (")[0] for l in l_t], frameon=False, fontsize=6.5, ncol=5, loc="upper center", bbox_to_anchor=(0.36, 1.24), title="tier", title_fontsize=6.5, columnspacing=1.0)
+            ax.grid(alpha=0.3, lw=0.5)
+        ax = axes[2]
+        real = samples[samples.family == "real"].merge(tiles, on="tile_id", how="left")
+        nd_f = ROOT / "docs" / "tables" / "nodata_sample.parquet"
+        ax.hist(real.qc_frac_unusable.dropna(), bins=40, histtype="step", lw=1.0, color="#1f77b4", label=f"real tiles\n({int(real.qc_frac_unusable.notna().sum()):,})")
+        if nd_f.exists():
+            nd = pd.read_parquet(nd_f)
+            syn = nd[nd.family == "synthetic"]
+            ax.hist(syn.nodata_frac_measured, bins=40, histtype="step", lw=1.0, color="#ff7f0e", label=f"synthetic sample\n({len(syn):,})")
+        ax.set_yscale("log")
+        ax.set_xlabel("NoData fraction of the raster")
+        ax.set_ylabel("landscapes")
+        ax.set_title("NoData fraction")
+        ax.legend(frameon=False, fontsize=5.8, loc="upper right", handlelength=1.0, labelspacing=0.9)
+        ax.grid(alpha=0.3, lw=0.5)
+        _save(fig, "figA_stats_contrast")
 
-    for fn in (fig_overview, fig_gallery, fig_qualitative, fig_error_vs_tier_tex, fig_pareto_L_tex, fig_scale_transfer_tex,
-               fig_ood_tex, lambda: fig_ood_tex(("T1", "T3", "T4"), "figA_ood_all", stacked=False),
-               figA_training_curves, figA_data_scaling, figA_fidelity, figA_precision, figA_wp7):
+        # (b) biome and realm coverage of the real landscapes, stacked by tier
+        fig, axes = plt.subplots(1, 2, figsize=(FULLW, 2.9), gridspec_kw=dict(wspace=0.75, width_ratios=[1.35, 1]))
+        for ax, key, title in ((axes[0], "biome_name", "biome (RESOLVE Ecoregions 2017)"), (axes[1], "realm", "biogeographic realm")):
+            tab = real.groupby([key, "tier"]).size().unstack(fill_value=0).reindex(columns=TIER_ORDER, fill_value=0)
+            tab = tab.loc[tab.sum(axis=1).sort_values(ascending=True).index]
+            left = np.zeros(len(tab))
+            for t in TIER_ORDER:
+                ax.barh(np.arange(len(tab)), tab[t].values, left=left, color=tier_color[t], label=t, height=0.75, lw=0)
+                left += tab[t].values
+            ax.set_yticks(np.arange(len(tab)))
+            ax.set_yticklabels([str(b).replace("Tropical & Subtropical", "Trop. & Subtrop.")[:44] for b in tab.index], fontsize=6.5)
+            ax.set_xlabel("real landscapes")
+            ax.set_title(title)
+            ax.grid(alpha=0.3, axis="x", lw=0.5)
+        axes[1].legend(frameon=False, fontsize=6.5, title="tier", title_fontsize=6.5, loc="lower right")
+        _save(fig, "figA_stats_biome_realm")
+
+        # (c) solve time per configuration and tier
+        configs = ["points", "wall_to_wall_NS", "wall_to_wall_EW", "regions", "advanced", "omniscape"]
+        short = {"points": "points", "wall_to_wall_NS": "w2w NS", "wall_to_wall_EW": "w2w EW", "regions": "regions", "advanced": "advanced", "omniscape": "omniscape"}
+        fig, axes = plt.subplots(1, 5, figsize=(FULLW, 2.1), gridspec_kw=dict(wspace=0.55))
+        for ax, t in zip(axes, TIER_ORDER, strict=False):
+            sub = idx[idx.tier == t]
+            data = [np.log10(sub[sub.config == c].solve_time_s.clip(lower=1e-2).dropna().values) for c in configs]
+            present = [(short[c], d) for c, d in zip(configs, data, strict=False) if len(d)]
+            bp = ax.boxplot([d for _, d in present], showfliers=False, widths=0.6, patch_artist=True,
+                            medianprops=dict(color="k", lw=0.9), boxprops=dict(lw=0.6, facecolor=tier_color[t], alpha=0.55), whiskerprops=dict(lw=0.6), capprops=dict(lw=0.6))
+            ax.set_xticks(np.arange(1, len(present) + 1))
+            ax.set_xticklabels([n for n, _ in present], rotation=60, ha="right", rotation_mode="anchor", fontsize=6)
+            ax.tick_params(axis="y", labelsize=6)
+            ax.set_title(f"tier {t}")
+            ax.grid(alpha=0.3, axis="y", lw=0.5)
+            if ax is axes[0]:
+                ax.set_ylabel("log$_{10}$ solve time (s)")
+        _save(fig, "figA_stats_solve_times")
+
+        # (d) storage per tier and task group
+        gb = counts["per_tier_group_gb"]
+        groups = ["T1", "T1W", "T1R", "T3", "T4"]
+        mat = np.array([[gb.get(f"{t}/{g}", 0.0) for g in groups] for t in TIER_ORDER])
+        fig, ax = plt.subplots(figsize=(3.4, 2.3))
+        bottom = np.zeros(len(TIER_ORDER))
+        for j, g in enumerate(groups):
+            ax.bar(TIER_ORDER, mat[:, j], bottom=bottom, label=g, lw=0)
+            bottom += mat[:, j]
+        for i, t in enumerate(TIER_ORDER):
+            ax.text(i, bottom[i] + 4, f"{bottom[i]:.0f}", ha="center", va="bottom", fontsize=6.5)
+        ax.set_ylabel("GB on the Hub")
+        ax.set_title(f"storage by tier and task group ({counts['total_data_gb']:,.0f} GB)")
+        ax.legend(frameon=False, fontsize=6.5, ncol=1, loc="upper right")
+        ax.grid(alpha=0.3, axis="y", lw=0.5)
+        _save(fig, "figA_stats_storage")
+
+
+def tex_figures(only: set[str] | None = None) -> None:
+    """All figures of the LaTeX paper (paper/neurips/figures/)."""
+    fns = [fig_overview, fig_gallery, fig_qualitative, fig_error_vs_tier_tex, fig_pareto_L_tex, fig_scale_transfer_tex,
+           fig_ood_tex, lambda: fig_ood_tex(("T1", "T3", "T4"), "figA_ood_all", stacked=False),
+           figA_training_curves, figA_data_scaling, figA_fidelity, figA_precision, figA_wp7, figA_stats]
+    for fn in fns:
+        name = getattr(fn, "__name__", "fig_ood_all")
+        if only and not any(o in name for o in only):
+            continue
         try:
             fn()
         except Exception as e:  # noqa: BLE001 — one broken panel must not stop the rest
-            log(f"paper figure {getattr(fn, '__name__', 'lambda')} FAILED: {e!r}")
-    for name in ("contrast", "biome_realm", "nodata", "solve_times", "storage"):
-        src = ROOT / "docs" / "figures" / f"dataset_stats_{name}.png"
-        if src.exists():
-            TEX_FIG.mkdir(parents=True, exist_ok=True)
-            shutil.copy(src, TEX_FIG / f"figA_stats_{name}.png")
+            log(f"paper figure {name} FAILED: {e!r}")
 
 
 def main() -> None:
@@ -1274,6 +1450,7 @@ def main() -> None:
         "--skip-stats", action="store_true", help="skip F1 (reads the full indexes; slow)"
     )
     ap.add_argument("--tex", action="store_true", help="also draw the LaTeX paper's figures into paper/neurips/figures/")
+    ap.add_argument("--only", nargs="*", help="with --tex: draw only the figures whose function name contains one of these strings")
     a = ap.parse_args()
     out = ROOT / a.out
     (out / "figures").mkdir(parents=True, exist_ok=True)
@@ -1290,7 +1467,7 @@ def main() -> None:
     ood_degradation(out)
     baselines_all_splits(out)
     if a.tex:
-        tex_figures()
+        tex_figures(set(a.only) if a.only else None)
     log("done")
 
 

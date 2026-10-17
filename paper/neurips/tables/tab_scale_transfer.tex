@@ -3,12 +3,12 @@
 \centering
 \scriptsize
 \setlength{\tabcolsep}{3.5pt}
-\caption{Scale transfer on \texttt{test\_id}: models trained at L evaluated at L, XL and XXL at batch 1 with the training tier's normalisation statistics; zero-shot = official configuration (three seeds), scale-aware = \texttt{--target-norm scale} (seed 1). The ViT's interpolated positional embedding stops at XL.}
+\caption{Scale transfer on \texttt{test\_id}: models trained at L evaluated at L, XL and XXL at batch 1 with the training tier's normalisation statistics; zero-shot = official configuration (three seeds), scale-aware = \texttt{-{}-target-norm scale} (seed 1). The ViT's interpolated positional embedding stops at XL.}
 \label{tab:scale_transfer}
-\resizebox{\textwidth}{!}{%
+\setlength{\tabcolsep}{2.2pt}
 \begin{tabular}{lllllllll}
 \toprule
-task & model & variant & eval tier & seeds & rel-L2 [median] & Spearman & top-5\textbackslash{},\textbackslash{}\% IoU & throughput err. \\
+task & model & variant & eval tier & seeds & rel-L2 [median] & Spearman & top-5 \% IoU & throughput err. \\
 \midrule
 T1 & FNO & scale-aware & L & 1 & 0.302 [0.302] & 0.949 & 0.664 & 0.085 \\
 T1 & FNO & scale-aware & XL & 1 & 0.700 [0.700] & 0.928 & 0.496 & 0.453 \\
@@ -55,5 +55,5 @@ T4 & ViT & scale-aware & XL & 1 & 0.203 [0.203] & 0.935 & 0.572 & -- \\
 T4 & ViT & zero-shot & L & 3 & 0.159 $\pm$ 0.004 [0.161] & 0.953 $\pm$ 0.002 & 0.605 $\pm$ 0.009 & -- \\
 T4 & ViT & zero-shot & XL & 3 & 0.538 $\pm$ 0.000 [0.538] & 0.937 $\pm$ 0.002 & 0.573 $\pm$ 0.008 & -- \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table*}

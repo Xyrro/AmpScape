@@ -1,6 +1,6 @@
 # From the Markdown draft to the LaTeX submission — what changed (2026-10-16)
 
-**Deliverable.** `paper/neurips/main.pdf` (28 pages: 9 content pages, references from page 10, appendices A–I, NeurIPS
+**Deliverable.** `paper/neurips/main.pdf` (27 pages: 9 content pages, references from page 10, appendices A–J, NeurIPS
 checklist last), built with Tectonic 0.17.0 from `paper/neurips/main.tex` using **`neurips_2026.sty` (revision
 2026-01-29, the latest available; `eandd` option = Evaluations & Datasets track, submission mode: anonymous with line
 numbers)**. The Markdown draft is retired to `paper/draft_md_archive.md`. Rebuild: `scripts/paper_figures.py --skip-stats
@@ -30,7 +30,7 @@ numbers)**. The Markdown draft is retired to `paper/draft_md_archive.md`. Rebuil
 | 5 | T4 speed–accuracy Pareto at L, solver and learned points | `paper/tables/t4_pareto_L.md` |
 | 6 | scale transfer, zero-shot vs scale-aware, with the $1-r_L/r_{\mathrm{tier}}$ lines | `paper/tables/scale_transfer.md` |
 | 7 | per-split OOD degradation (T1 and T4; all three tasks in the appendix) | `paper/tables/ood_degradation.md` |
-| A | training and validation curves of every official run (seeds overlaid), data-scaling curves, dataset statistics (5 panels), fidelity (per-landscape deviation and cost), precision pass, WP7 per tile, OOD all tasks | `runs/full/*/log.csv`, `paper/tables/wp4_data_scaling.md`, `docs/figures/`, `aux/t4_bs1_reference/*/index.parquet`, `docs/tables/precision_pass.md`, `aux/wp7/demo_results.parquet` |
+| A | training and validation curves of every official run (seeds overlaid), data-scaling curves, dataset statistics (four figures: contrast and NoData, biome and realm, solve time per configuration, storage), fidelity (per-landscape deviation and cost), precision pass, WP7 per tile, OOD all tasks | `runs/full/*/log.csv`, `paper/tables/wp4_data_scaling.md`, `data/hf/AmpScape/index/*.parquet` + `data/tiles/v1.0/tiles.parquet` + `docs/tables/final_counts.json`, `aux/t4_bs1_reference/*/index.parquet`, `docs/tables/precision_pass.md`, `aux/wp7/demo_results.parquet` |
 
 New in this version (not in the Markdown draft): Figures 1–3 and the appendix curves/fidelity/precision figures; Figures
 4–7 are redrawn versions of the Markdown figures in the paper style. New helper: `scripts/paper_figdata.py` extracts the
@@ -54,10 +54,32 @@ the decisions and OOD tables in the main text; both moved to the appendix.
   make" became one sentence; ethics/maintenance/reproducibility are three short paragraphs.
 - Checklist: the 16 NeurIPS questions answered (Yes/NA with a one-line justification each).
 
+## Print-legibility pass (owner review, 2026-10-17)
+The owner found overlapping labels and unreadable panels in the first PDF. Every page was then checked at print size and
+the following was fixed:
+- **Figures are drawn at the width they are printed** (`FULLW = 5.5` in, `HALFW = 2.64` in in `scripts/paper_figures.py`),
+  so no font is scaled: the earlier 7-inch figures were shrunk by 0.79 and the half-width ones by 0.78, and Figures 2
+  and 3 had been printed at 60 % / 50 % width. Figure 2 is now a 3 × 10 grid (rows log R / T1 / T4, columns = tiers,
+  synthetic and real side by side); Figure 3 is one row per task with the in-distribution and OOD cases side by side and
+  one error colour bar per row; Figures 5 and 6 are native half-width designs (OOD panels stacked, legend above).
+- Overlaps removed: Figure 1 bottom text and panel titles, Figure 4 legend (now above the panels) and log tick labels
+  (plain decimals via `_log_ticks`), Figure 5 solver annotations, OOD tier letters vs panel titles, training-curve
+  titles (6 columns, short titles), fidelity and WP7 titles and axis labels, precision-pass legends.
+- **Dataset statistics redrawn** in the paper style as four separate full-width figures (`figA_stats_*`, Appendix D)
+  instead of four shrunk PNG copies of `docs/figures/`.
+- **Tables:** headers printed raw LaTeX (`\rightarrow`, `\Delta`, `test\_id`, `top-5\,\%`) because `tex()` escaped the
+  backslashes — the escaper is now math-aware; Table 5 (tuning effect) was empty because `md_rows` kept the first
+  table's header for the whole file; the five wide tables are no longer `\resizebox`-shrunk to ≈ 5 pt (slimmer
+  columns, `\scriptsize`, `tabcolsep` 2.2 pt; the build log reports no overfull box); Table 1's `²`/`·` glyphs fixed;
+  `--target-norm` and the evaluate CLI keep their double hyphens.
+- **Bibliography:** author lists were split at every comma (`McRae and B. H.`) — rebuilt as `Surname, Initials`;
+  titles protected against lower-casing (`{{...}}`); arXiv ids moved from titles to `note`; en/em dashes replaced.
+- **Checklist:** appendix letters were hard-coded and had drifted (licences cited as Appendix I); now `\ref`s.
+- Appendix layout: `placeins` with `\FloatBarrier` before every appendix section (a figure no longer precedes the
+  heading of the section it belongs to); the data-scaling figure sits next to its table in Appendix B.
+
 ## Open points for the owner
 - The main text is at the nine-page limit with no slack; any addition needs an equal cut.
-- Figures 2 and 3 are printed at 60 % / 50 % of the text width to fit; at full size they are in
-  `paper/neurips/figures/*.png`.
 - The paper cites GitHub/Hub locations generically (anonymous submission); the camera-ready version needs the
   `final` option, author block and the code tag discussed in `docs/verification_report.md`.
 - Bubbleformer's track could not be confirmed from public pages (listed as a NeurIPS 2025 spotlight); EngiBench is a

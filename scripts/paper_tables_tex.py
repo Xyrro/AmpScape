@@ -21,6 +21,7 @@ def md_rows(path: pathlib.Path) -> list[dict]:
     rows, header = [], None
     for line in path.read_text().splitlines():
         if not line.startswith("|"):
+            header = None  # a file may hold several tables; each one carries its own header
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         if header is None:
@@ -33,9 +34,15 @@ def md_rows(path: pathlib.Path) -> list[dict]:
 
 
 def tex(s: str) -> str:
+    """Escape a table cell for LaTeX. Text written with LaTeX already (math segments between $, \\rightarrow, \\Delta,
+    \\, and escaped characters) is kept; everything else is escaped."""
     s = str(s)
+    if "$" in s:  # keep math segments verbatim
+        parts = s.split("$")
+        return "$".join(part if i % 2 else tex(part) for i, part in enumerate(parts))
+    s = s.replace("\\rightarrow", "→").replace("\\Delta", "Δ").replace("\\,", " ").replace("\\%", "%").replace("\\_", "_").replace("\\&", "&").replace("\\#", "#")
     s = s.replace("\\", "\\textbackslash{}").replace("%", "\\%").replace("&", "\\&").replace("_", "\\_").replace("#", "\\#")
-    s = s.replace("±", "$\\pm$").replace("→", "$\\rightarrow$").replace("−", "$-$").replace("–", "--").replace("×", "$\\times$")
+    s = s.replace("±", "$\\pm$").replace("Δ", "$\\Delta$").replace("²", "$^2$").replace("·", "$\\cdot$").replace("→", "$\\rightarrow$").replace("−", "$-$").replace("–", "--").replace("×", "$\\times$")
     s = s.replace("≥", "$\\geq$").replace("≤", "$\\leq$").replace("√", "$\\surd$").replace("⁴", "$^4$").replace("⁶", "$^6$")
     s = re.sub(r"\*\*(.+?)\*\*", r"\\textbf{\1}", s)
     s = re.sub(r"`([^`]+)`", r"\\texttt{\1}", s)
@@ -43,24 +50,35 @@ def tex(s: str) -> str:
 
 
 def table(rows: list[list[str]], header: list[str], src: list[str], caption: str, label: str, colspec: str | None = None,
-          size: str = "\\small", note: str | None = None, star: bool = False, bold: set[tuple[int, int]] | None = None) -> str:
+          size: str = "\\small", note: str | None = None, star: bool = False, bold: set[tuple[int, int]] | None = None,
+          placement: str = "tb") -> str:
     ncol = len(header)
     colspec = colspec or ("l" * ncol)
     env = "table*" if star else "table"
-    out = [f"% src: {'; '.join(src)}", f"\\begin{{{env}}}[tb]", "\\centering", size, "\\setlength{\\tabcolsep}{3.5pt}", f"\\caption{{{caption}}}", f"\\label{{{label}}}"]
+    out = [f"% src: {'; '.join(src)}", f"\\begin{{{env}}}[{placement}]", "\\centering", size, "\\setlength{\\tabcolsep}{3.5pt}", f"\\caption{{{caption}}}", f"\\label{{{label}}}"]
     if star:
-        out.append("\\resizebox{\\textwidth}{!}{%")  # wide appendix tables are scaled to the text width
+        out.append("\\setlength{\\tabcolsep}{2.2pt}")  # wide appendix tables: never scaled below the font size
     out += [f"\\begin{{tabular}}{{{colspec}}}", "\\toprule", " & ".join(tex(h) for h in header) + " \\\\", "\\midrule"]
     for i, r in enumerate(rows):
         cells = [tex(c) for c in r]
         if bold:
             cells = [f"\\textbf{{{c}}}" if (i, j) in bold else c for j, c in enumerate(cells)]
         out.append(" & ".join(cells) + " \\\\")
-    out += ["\\bottomrule", "\\end{tabular}" + ("}" if star else "")]
+    out += ["\\bottomrule", "\\end{tabular}"]
     if note:
         out.append(f"\\par\\vspace{{2pt}}{{\\footnotesize {tex(note)}}}")
     out.append(f"\\end{{{env}}}")
     return "\n".join(out) + "\n"
+
+
+def pareto_method(m: str) -> str:
+    """'unet_T4_M_s1_scalenorm (learned, 1 seed)' -> 'U-Net, scale-aware target (1 seed)'; solver rows keep their block."""
+    m = m.replace(" (correct_artifacts=1)", ", corr. on").replace(" (correct_artifacts=0)", ", corr. off").replace("(exact, reference)", "(exact)").replace("production ", "prod. ")
+    r = re.match(r"^(unet|fno|vit|gnn|mgno)_T4_[A-Z]+(?:_s\d)?(_t2)?(_scalenorm)?(?: \((tuned)\))? \(learned, (\d seeds?)\)$", m)
+    if r:
+        base = {"unet": "U-Net", "fno": "FNO", "vit": "ViT", "gnn": "GNN", "mgno": "MgNO"}[r.group(1)]
+        return base + (" tuned" if (r.group(2) or r.group(4)) else "") + (", scale-aware target" if r.group(3) else "") + f" ({r.group(5)})"
+    return m.replace(" (learned, 3 seeds)", " (3 seeds)").replace(" (learned, 1 seed)", " (1 seed)")
 
 
 def ms_value(cell: str) -> float:
@@ -111,12 +129,12 @@ def main() -> None:
                                                      "tab:results", "llccc", size="\\small", bold=bold))
 
     # ---- appendix: full metric table on test_id
-    rows = [[r["task"], r["tier"], r["model"], r["seeds"], f"{r['rel-L2']} [{r['rel-L2 median']}]", r["MAE log10"], r["top-5 % IoU"], r["pinch recall"], r["Spearman"], r["speed-up (median)"], r["train GPU-h"]]
+    rows = [[r["task"], r["tier"], r["model"], f"{r['rel-L2']} [{r['rel-L2 median']}]", r["MAE log10"], r["top-5 % IoU"], r["pinch recall"], r["Spearman"], r["speed-up (median)"], r["train GPU-h"]]
             for r in sorted(bs, key=lambda r: (r["task"], TIERS.index(r["tier"]), MODELS.index(r["model"])))]
-    (out / "tab_baselines_full.tex").write_text(table(rows, ["task", "tier", "model", "seeds", "rel-L2 [median]", "MAE log$_{10}$", "top-5\\,\\% IoU", "pinch recall", "Spearman", "speed-up", "GPU-h / run"],
+    (out / "tab_baselines_full.tex").write_text(table(rows, ["task", "tier", "model", "rel-L2 [median]", "MAE log$_{10}$", "top-5\\,\\% IoU", "pinch recall", "Spearman", "speed-up", "GPU-h / run"],
                                                        ["paper/tables/baselines_sml.md"],
-                                                       "Learned baselines on \\texttt{test\\_id}, every metric (mean $\\pm$ std over seeds; median speed-up = solver wall time / inference time per landscape; GPU-h = training cost per run).",
-                                                       "tab:baselines_full", "lllrlllllrr", size="\\scriptsize", star=True))
+                                                       "Learned baselines on \\texttt{test\\_id}, every metric (mean $\\pm$ std over three seeds, MgNO one seed; median speed-up = solver wall time / inference time per landscape; GPU-h = training cost per run).",
+                                                       "tab:baselines_full", "llllllllrr", size="\\scriptsize", star=True))
 
     # ---- appendix: configuration decisions
     dec = md_rows(ROOT / "docs" / "tables" / "tuning_decisions.md")
@@ -127,24 +145,33 @@ def main() -> None:
 
     # ---- appendix: tuning effect on test_id
     te = [r for r in md_rows(ROOT / "docs" / "tables" / "tuning_effect.md") if r.get("split") == "test_id"]
-    rows = [[r["task"], r["tier"], r["model"], r["official"], r["rel-L2 pre-tuning → tuned (Δ)"], r["rel-L2 median pre-tuning → tuned"], r["MAE log10 pre-tuning → tuned (Δ)"]] for r in te]
-    (out / "tab_tuning_effect.tex").write_text(table(rows, ["task", "tier", "model", "official", "rel-L2 pre-tuning $\\rightarrow$ tuned", "median", "MAE log$_{10}$ pre-tuning $\\rightarrow$ tuned"], ["docs/tables/tuning_effect.md"],
+    def _split(cell: str) -> tuple[str, str]:
+        m = re.match(r"(.*?)\s*\((.*)\)\s*$", cell)
+        return (m.group(1), m.group(2)) if m else (cell, "")
+
+    rows = []
+    for r in te:
+        rl, d_rl = _split(r["rel-L2 pre-tuning → tuned (Δ)"])
+        mae, d_mae = _split(r["MAE log10 pre-tuning → tuned (Δ)"])
+        rows.append([r["task"], r["tier"], r["model"], r["official"], rl, d_rl, mae, d_mae])
+    (out / "tab_tuning_effect.tex").write_text(table(rows, ["task", "tier", "model", "official", "rel-L2 pre-tuning $\\rightarrow$ tuned", "$\\Delta$", "MAE log$_{10}$ pre-tuning $\\rightarrow$ tuned", "$\\Delta$"], ["docs/tables/tuning_effect.md"],
                                                      "Effect of the per-tier tuning on \\texttt{test\\_id} (mean $\\pm$ std over three seeds), with the official choice of Table~\\ref{tab:decisions}. The validation rule keeps the pre-tuning configuration for U-Net T3 M despite a better test rel-L2 and for ViT and GNN T4 M where the tuned one is worse on test: test metrics are never read.",
-                                                     "tab:tuning_effect", "llllllr", size="\\scriptsize", star=True))
+                                                     "tab:tuning_effect", "llllrrrr", size="\\scriptsize", star=True))
 
     # ---- appendix: T4 Pareto at M and L (test_id rows)
     for tier in ("M", "L"):
         pr = [r for r in md_rows(ROOT / "paper" / "tables" / f"t4_pareto_{tier}.md") if r["split"] == "test_id"]
-        rows = [[r["method"].replace(" (correct_artifacts=1)", ", corr. on").replace(" (correct_artifacts=0)", ", corr. off").replace("(exact, reference)", "(exact)").replace(" (learned, 3 seeds)", " (3 seeds)").replace(" (learned, 1 seed)", " (1 seed)").replace("production ", "prod. "), r["n"], r["cost s / landscape"], r["rel_l2"], r["rel_l2 median (seeds)"], r["ns_rel_l2"], r["mae_log10eps"], r["top5_iou"], r["pinch_recall"], r["spearman"]] for r in pr]
-        (out / f"tab_pareto_{tier}.tex").write_text(table(rows, ["method", "n", "cost s / landscape", "rel-L2", "median (seeds)", "non-source rel-L2", "MAE log$_{10}$", "top-5\\,\\% IoU", "pinch recall", "Spearman"], [f"paper/tables/t4_pareto_{tier}.md"],
-                                                            f"T4 at tier {tier} against the exact block-1 Omniscape map on the \\texttt{{test\\_id}} reference subset: solver rows (single-core wall time per landscape) and learned models (median batch-amortised GPU inference per landscape; seeds averaged).",
-                                                            f"tab:pareto_{tier}", "lrrrrrrrrr", size="\\scriptsize", star=True))
+        n_sub = pr[0]["n"] if pr else ""
+        rows = [[pareto_method(r["method"]), r["cost s / landscape"], r["rel_l2"], r["rel_l2 median (seeds)"], r["ns_rel_l2"], r["mae_log10eps"], r["top5_iou"], r["pinch_recall"], r["spearman"]] for r in pr]
+        (out / f"tab_pareto_{tier}.tex").write_text(table(rows, ["method", "cost (s)", "rel-L2", "median", "non-source rel-L2", "MAE log$_{10}$", "top-5\\,\\% IoU", "pinch recall", "Spearman"], [f"paper/tables/t4_pareto_{tier}.md"],
+                                                            f"T4 at tier {tier} against the exact block-1 Omniscape map on the \\texttt{{test\\_id}} reference subset ($n = {n_sub}$ landscapes): Omniscape solver rows (corr. = artefact correction; cost = single-core wall time per landscape) and learned models (cost = median batch-amortised GPU inference per landscape; median = median over seeds; seeds averaged otherwise).",
+                                                            f"tab:pareto_{tier}", "lrrrrrrrr", size="\\scriptsize", star=True))
 
     # ---- appendix: scale transfer (test_id rows)
     st = [r for r in md_rows(ROOT / "paper" / "tables" / "scale_transfer.md") if r["split"] == "test_id"]
     rows = [[r["task"], r["model"], r["variant"], r["eval tier"], r["seeds"], f"{r['rel-L2']} [{r['rel-L2 median']}]", r["Spearman"], r["top-5 % IoU"], r["throughput err"]] for r in st]
     (out / "tab_scale_transfer.tex").write_text(table(rows, ["task", "model", "variant", "eval tier", "seeds", "rel-L2 [median]", "Spearman", "top-5\\,\\% IoU", "throughput err."], ["paper/tables/scale_transfer.md"],
-                                                      "Scale transfer on \\texttt{test\\_id}: models trained at L evaluated at L, XL and XXL at batch 1 with the training tier's normalisation statistics; zero-shot = official configuration (three seeds), scale-aware = \\texttt{--target-norm scale} (seed 1). The ViT's interpolated positional embedding stops at XL.",
+                                                      "Scale transfer on \\texttt{test\\_id}: models trained at L evaluated at L, XL and XXL at batch 1 with the training tier's normalisation statistics; zero-shot = official configuration (three seeds), scale-aware = \\texttt{-{}-target-norm scale} (seed 1). The ViT's interpolated positional embedding stops at XL.",
                                                       "tab:scale_transfer", "lllllllll", size="\\scriptsize", star=True))
 
     # ---- appendix: OOD degradation
@@ -171,7 +198,7 @@ def main() -> None:
     # ---- appendix: precision pass
     pp = md_rows(ROOT / "docs" / "tables" / "precision_pass.md")
     rows = [[r["tier"].replace("**", ""), r["rows re-solved"].replace("**", ""), r["of which `cg+amg` (now `cholmod`)"], r["residual after: p50 / p90 / p99 / max"], r["rows > 1e-9 (floor, recorded)"], r["rows > 1e-6 (flagged, excluded from splits)"]] for r in pp]
-    (out / "tab_precision.tex").write_text(table(rows, ["tier", "rows re-solved", "of which CG+AMG $\\rightarrow$ CHOLMOD", "residual after: p50 / p90 / p99 / max", "rows $> 10^{-9}$ (recorded)", "rows $> 10^{-6}$ (flagged)"], ["docs/tables/precision_pass.md"],
+    (out / "tab_precision.tex").write_text(table(rows, ["tier", "rows re-solved", "CG+AMG $\\rightarrow$ CHOLMOD", "residual after: p50 / p90 / p99 / max", "rows $> 10^{-9}$", "rows $> 10^{-6}$ (flagged)"], ["docs/tables/precision_pass.md"],
                                                 "Post-run precision pass per tier: every T1/T1W/T1R/T3 row above $10^{-9}$, unmeasured, CG+AMG-solved or QC-failed was re-solved with CHOLMOD on the reduced system plus up to three refinement steps; rows that cannot reach $10^{-6}$ in double precision are flagged and excluded from the split lists.",
                                                 "tab:precision", "lrrlrr", size="\\scriptsize", star=True))
 
@@ -196,7 +223,7 @@ def main() -> None:
             ["Northern raccoon Europe maps", "2025", "CC BY 4.0", "published resistance tiles"]]
     (out / "tab_licences.tex").write_text(table(rows, ["layer", "version", "licence", "derived rasters redistributed"], ["docs/licenses.md"],
                                                "Upstream data sources, their licences and what AmpScape stores (derived rasters only; never the source tiles). WDPA polygons (restrictive licence) and OpenStreetMap (ODbL) are not used. The dataset is released under CC BY 4.0, code and solver wrapper under MIT.",
-                                               "tab:licences", "p{3.0cm}p{3.0cm}p{5.2cm}p{3.0cm}", size="\\scriptsize", star=True))
+                                               "tab:licences", "p{2.9cm}p{2.9cm}p{4.6cm}p{2.7cm}", size="\\scriptsize", star=True, placement="htbp"))
     print("tables:", sorted(p.name for p in out.glob("*.tex")))
 
 

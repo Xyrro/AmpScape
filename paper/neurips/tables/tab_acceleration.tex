@@ -5,10 +5,10 @@
 \setlength{\tabcolsep}{3.5pt}
 \caption{Solver acceleration: AMG-preconditioned CG warm-started from the predicted voltage versus a zero start, to a relative residual of $10^{-6}$ (medians over systems; reduction = median of $1 - $ warm/zero per system; warm-start residual = relative Kirchhoff residual of the prediction, zero start = 1). T1V = first pair of each T1 landscape.}
 \label{tab:acceleration}
-\resizebox{\textwidth}{!}{%
+\setlength{\tabcolsep}{2.2pt}
 \begin{tabular}{llllrlrlrr}
 \toprule
-task & tier & model & split & systems & iterations zero $\textbackslash{}rightarrow$ warm & reduction & time zero $\textbackslash{}rightarrow$ warm (ms) & reduction & warm-start residual \\
+task & tier & model & split & systems & iterations zero $\rightarrow$ warm & reduction & time zero $\rightarrow$ warm (ms) & reduction & warm-start residual \\
 \midrule
 T1V & L & FNO & test\_id & 1928 & 16 $\rightarrow$ 18 & -7.7 \% & 517.9 $\rightarrow$ 580.5 & -7.5 \% & 34.7 \\
 T1V & L & FNO & test\_ood & 1278 & 25 $\rightarrow$ 26 & -7.1 \% & 860.1 $\rightarrow$ 930.0 & -7.3 \% & 91.1 \\
@@ -35,5 +35,5 @@ T3 & M & U-Net & test\_ood & 3222 & 16 $\rightarrow$ 16 & -4.5 \% & 140.7 $\righ
 T3 & S & U-Net & test\_id & 9850 & 10 $\rightarrow$ 10 & +0.0 \% & 19.3 $\rightarrow$ 19.1 & +0.1 \% & 82.5 \\
 T3 & S & U-Net & test\_ood & 6460 & 11 $\rightarrow$ 11 & +0.0 \% & 25.4 $\rightarrow$ 24.5 & +0.1 \% & 109 \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table*}
