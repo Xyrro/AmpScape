@@ -3249,7 +3249,7 @@ Offloader loop and keepalive running. GitHub main = origin after this push.
 
 ---
 
-# Status — 2026-10-17 05:20Z: paper print-legibility pass complete, second round (legends outside axes, Figure 1 overlaps, appendix float pages)
+# Status — 2026-10-17 05:50Z: paper target set to NeurIPS 2027; print-legibility pass complete (two rounds)
 
 ## Done (owner request 2026-10-16/17: "recheck the paper carefully, i found many bugs, especially in the images …
 make sure there's nothing like this anymore … also check for every parts of the paper at the end … pictures in part D
@@ -3274,6 +3274,10 @@ they combined together, it's too small to read")
    checklist). Details: `docs/paper_tex_changes.md` ("Print-legibility pass").
 
 ## Open for the owner
+- **Venue corrected to NeurIPS 2027** (your note). The 2027 style file and call do not exist yet (neurips.cc has no
+  2027 page on 2026-10-17), so the paper still builds with `neurips_2026.sty` and the preamble overrides the notice to
+  "41st … NeurIPS 2027"; the 2026 E&D call stays cited as the latest published guidance. When the 2027 kit appears:
+  swap the style file, delete the override, re-check page limit, track option and checklist (`DECISIONS.md`).
 - Nine pages with no slack (unchanged).
 - Scratch deletion: the inventory and recommendations from 2026-10-16 are waiting for your choice of rows; nothing
   has been deleted.

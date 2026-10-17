@@ -1,7 +1,8 @@
 # From the Markdown draft to the LaTeX submission — what changed (2026-10-16)
 
 **Deliverable.** `paper/neurips/main.pdf` (27 pages: 9 content pages, references from page 10, appendices A–J, NeurIPS
-checklist last), built with Tectonic 0.17.0 from `paper/neurips/main.tex` using **`neurips_2026.sty` (revision
+checklist last), **targeting NeurIPS 2027** (the 2027 style file and call were not yet published on 2026-10-17, so the
+notice string of the 2026 file is overridden to "41st … NeurIPS 2027" in the preamble), built with Tectonic 0.17.0 from `paper/neurips/main.tex` using **`neurips_2026.sty` (revision
 2026-01-29, the latest available; `eandd` option = Evaluations & Datasets track, submission mode: anonymous with line
 numbers)**. The Markdown draft is retired to `paper/draft_md_archive.md`. Rebuild: `scripts/paper_figures.py --skip-stats
 --tex` (figures), `scripts/paper_tables_tex.py` (tables), then `tectonic main.tex` in `paper/neurips/`
@@ -85,6 +86,8 @@ the following was fixed:
 - Figure 16 (precision pass): the "QC threshold" and "target" labels sat on the data lines; both are legend entries now.
 
 ## Open points for the owner
+- **Style file:** swap `neurips_2026.sty` for `neurips_2027.sty` and delete the preamble override as soon as NeurIPS
+  publishes it; re-check the page limit, the track option name and the checklist wording against the 2027 call.
 - The main text is at the nine-page limit with no slack; any addition needs an equal cut.
 - The paper cites GitHub/Hub locations generically (anonymous submission); the camera-ready version needs the
   `final` option, author block and the code tag discussed in `docs/verification_report.md`.

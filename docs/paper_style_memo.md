@@ -4,7 +4,7 @@ Read for form: PDEBench (NeurIPS D&B 2022, arXiv 2210.07182), The Well (NeurIPS 
 2505.22825), OGB (NeurIPS D&B 2020, 2005.00687), and two recent accepted papers — EngiBench (NeurIPS 2025 Datasets and
 Benchmarks Track, 2508.00831) and Bubbleformer / BubbleML 2.0 (NeurIPS 2025 spotlight, 2507.21244; a dataset-plus-model
 paper whose track label the public pages do not show) — plus the NeurIPS paper checklist (neurips.cc/public/guides/PaperChecklist),
-the NeurIPS 2026 formatting instructions (`neurips_2026.sty`, revision 2026-01-29) and the 2026 Evaluations & Datasets
+the NeurIPS 2026 formatting instructions (`neurips_2026.sty`, revision 2026-01-29; the target is NeurIPS 2027, whose style file and call were not yet published on 2026-10-17) and the 2026 Evaluations & Datasets
 track call. Structural counts come from the arXiv HTML of each paper (main text = sections before acknowledgements /
 references / appendix), parsed in `work/lit/`.
 
