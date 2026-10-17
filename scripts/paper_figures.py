@@ -1271,15 +1271,13 @@ def figA_precision() -> None:
                 q[k].append(v)
         for k, mk in zip(q, ("o", "s", "^", "x"), strict=False):
             ax.plot(x, q[k], marker=mk, ms=4, lw=0.8, label=k)
-        ax.axhline(1e-6, color="#d62728", lw=0.7, ls=":")
-        ax.text(-0.3, 1.6e-6, "QC threshold 10$^{-6}$", fontsize=6.5, color="#d62728", va="bottom")
-        ax.axhline(1e-9, color="#999", lw=0.7, ls=":")
-        ax.text(-0.3, 1.6e-9, "target 10$^{-9}$", fontsize=6.5, color="#666", va="bottom")
+        ax.axhline(1e-6, color="#d62728", lw=0.8, ls=":", label="QC threshold $10^{-6}$")
+        ax.axhline(1e-9, color="#777", lw=0.8, ls=":", label="target $10^{-9}$")
         ax.set_yscale("log")
         ax.set_xticks(x)
         ax.set_xticklabels([r["tier"].strip("*") for r in rows])
         ax.set_ylabel("relative Kirchhoff residual after the pass")
-        ax.legend(frameon=False, fontsize=6.5, ncol=4, loc="upper center", bbox_to_anchor=(0.5, 1.2), columnspacing=1.0)
+        ax.legend(frameon=False, fontsize=6.5, ncol=3, loc="lower center", bbox_to_anchor=(0.5, 1.0), columnspacing=1.0, handlelength=1.6)
         ax.grid(alpha=0.3, which="both", lw=0.5)
         ax = axes[1]
         n = [int(r["rows re-solved"].replace(",", "").replace("*", "")) for r in rows]
@@ -1296,7 +1294,7 @@ def figA_precision() -> None:
         ax2.set_ylim(0, max(f) * 1.6)
         h1, l1 = ax.get_legend_handles_labels()
         h2, l2 = ax2.get_legend_handles_labels()
-        ax.legend(h1 + h2, l1 + l2, frameon=False, fontsize=6.5, ncol=1, loc="upper center", bbox_to_anchor=(0.5, 1.2))
+        ax.legend(h1 + h2, l1 + l2, frameon=False, fontsize=6.5, ncol=1, loc="lower center", bbox_to_anchor=(0.5, 1.0))
         ax.grid(alpha=0.3, axis="y", lw=0.5)
         _save(fig, "figA_precision")
 

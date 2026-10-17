@@ -82,6 +82,7 @@ the following was fixed:
   realm chart) so no legend covers data; Figure 1's covariate stack has room for the "elevation" title and the arrows
   start and end clear of the panels; Table 11 and the data-scaling figure share one float (`capt-of`), so Appendix B no
   longer has a page with one small figure; appendix float pages are top-aligned (`\@fptop = 0pt`) instead of centred.
+- Figure 16 (precision pass): the "QC threshold" and "target" labels sat on the data lines; both are legend entries now.
 
 ## Open points for the owner
 - The main text is at the nine-page limit with no slack; any addition needs an equal cut.

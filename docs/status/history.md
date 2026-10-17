@@ -3280,7 +3280,7 @@ they combined together, it's too small to read")
 - Screenshot paths you pasted are on your Mac; attach them or `scp` to `work/screenshots/` if any bug is still open.
 - Second round after your review: all legends moved outside the axes; Figure 1's "elevation" title and arrows no
   longer touch the panels; Table 11 and the data-scaling figure share one float, so the lone-figure page is gone;
-  float pages are top-aligned. Pages 16 and 18 still hold one wide table each (Tables 8 and 10 are too tall to share a
+  float pages are top-aligned; Figure 16's threshold labels moved from the plot into the legend. Pages 16 and 18 still hold one wide table each (Tables 8 and 10 are too tall to share a
   page with their neighbours); that is the normal LaTeX float page and I suggest leaving it.
 
 ## Operations
