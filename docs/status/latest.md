@@ -1,4 +1,4 @@
-# Status — 2026-10-18 06:30Z: review round 2 applied — like-for-like costs, cheap baselines, MgNO/scale-aware seeds, XL-trained run; paper rebuilt at nine pages
+# Status — 2026-10-18 07:10Z: review round 2 applied — like-for-like costs, cheap baselines, MgNO/scale-aware seeds, XL-trained run; paper rebuilt at nine pages
 
 ## Done (owner: "fix the ones you agreed with … up to 16 GPU-hours … check the correctness")
 1. **Like-for-like speed-ups (point 1).** Production Omniscape re-timed with its own parallelisation on one CPU node
@@ -33,6 +33,13 @@ regenerated and byte-identical to the committed ones, 2,268 numeric tokens all t
 size. Two defects found and fixed: the MgNO divergence count in the text said 1 of 6 T1 runs (the table says 2 of 6,
 first exploding epoch up to 4, not 3) — corrected; the Appendix D heading sat alone at the foot of page 21 below the
 Appendix C tables — now starts its own page.
+
+## Dataset card (owner: rewrite for users)
+`docs/dataset_card.md` rewritten and pushed as the Hub README (round-trip verified): description, task table,
+tier/subset/split table with sizes, lite-subset loading example, metrics and leaderboard pointer, one-sentence
+limitations and provenance, licence table, BibTeX citation. 2,604 → 2,026 words. Dates, incidents, run histories and
+operational notes moved verbatim to the new `docs/datasheet.md`, linked from the card with the post-mortem. Front
+matter and `croissant.json` pointer unchanged (front matter validated with `DatasetCard.load`).
 
 ## Not done, by design (stated as limitations in the paper)
 Converged (non-budget-limited) retraining of every configuration, new operator families, published resistance

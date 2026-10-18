@@ -9,182 +9,150 @@ configs: []   # no dataset-viewer configs: the shards are HDF5 (not viewer-loada
 
 # AmpScape
 
-**v1.0 (2026-09-23).** Generated 2026-09-16 → 09-22 on Georgia Tech PACE-ICE with streaming, checksum-verified
-upload; every tier passed a full Hub-vs-plan audit; the post-run precision pass (09-22/23) re-solved 129 722 rows so
-that every T1/T1W/T1R/T3 row carries its true Kirchhoff residual. Pipeline tag `v1.0-pipeline` (freeze) and release tag
-`v1.0` (GitHub and Hub revision). Cost: 16 552 core-hours. Full account: `docs/generation_postmortem.md`.
+AmpScape is a benchmark for learned surrogates of circuit-theoretic landscape connectivity. It pairs 174,400 resistance
+rasters on five tiers from 128² to 2048² pixels (60 % synthetic landscapes from neutral landscape models and random
+fields, 40 % real tiles built from open global land-cover, terrain, road, river and human-modification layers) with the
+exact outputs of the reference solvers Circuitscape.jl and Omniscape.jl: 920,372 configuration rows holding
+current-density maps, voltage maps, effective resistances and omnidirectional connectivity, stored raw (float32 maps,
+float64 effective resistances) with the solver's residual and provenance on every row. The data come with official
+spatial splits, out-of-distribution test sets, a scale-transfer split, an evaluation harness with pixel, ranking,
+non-source and physics metrics, baselines from five model families and a leaderboard. The resistance surfaces are
+structural proxies built from literature-style tables, not species-calibrated truth; intended use is benchmarking and
+screening, not final conservation decisions. Code, harness and documentation: https://github.com/Xyrro/AmpScape (MIT).
 
-AmpScape is a benchmark of **circuit-theoretic landscape connectivity** solved with the reference
-solvers Circuitscape.jl 5.17.1 and Omniscape.jl 0.6.2, for training and fairly comparing learned
-surrogates. Each sample pairs a resistance raster and a source configuration with the exact solver
-outputs (current-density maps, voltage maps, effective resistances, omnidirectional connectivity).
+## Tasks
 
-**Honest framing.** (1) The *solver is the ground truth*: outputs are stored raw (float32 maps,
-float64 effective resistances), never normalised, clipped or post-processed; every sample records
-solver versions, parameters, timings and residuals. (2) *Real landscapes, synthesized resistance*:
-real tiles are genuine covariate stacks (ESA WorldCover, Copernicus DEM, GRIP4 roads, HydroRIVERS,
-gHM), but the resistance surfaces are produced by resistance tables whose class ordering and term
-structure follow the literature (Zeller et al. 2012; Cushman et al. 2006; Koen et al. 2014; Spear et
-al. 2010; Brennan et al. 2022) while the **numeric values are AmpScape's own** — they are not
-species-calibrated and must not be read as ecological truth for any taxon. (3) Synthetic landscapes
-come from neutral landscape models and random fields with documented priors. (4) Omniscape is run
-with `block_size = largest odd ≤ radius/10`, a deliberate, documented approximation of the
-per-pixel (block 1) Omniscape whose fidelity was measured (≈ 2–5 % relative L2 at coarser blocks).
+Every landscape carries one resistance raster `R` (H × W, R ≥ 1, NoData masked) and several source configurations.
+Inputs are the raster, the NoData mask and the configuration's source channels; targets are the solver outputs.
 
-## Versions
+| task | configuration | target(s) | notes |
+|---|---|---|---|
+| **T1** pairwise current | `points`: K ∈ [2, 8] single-pixel focal nodes, all K(K−1)/2 pairs | `cum_current` (H × W) | learned baselines provided |
+| **T2** effective resistance | same run as T1 | `reff` (K × K, float64) | released without learned baselines |
+| **T1W** wall-to-wall current | `wall_to_wall_NS`, `wall_to_wall_EW`: two edge strips as focal regions | `cum_current`; strip pixels masked in the metrics | released without learned baselines |
+| **T1R** region-to-region current | `regions`: habitat patches as short-circuited focal regions | `cum_current` | released without learned baselines; present only where ≥ 2 eligible patches exist |
+| **T3** advanced mode | `advanced`: source-strength raster and ground mask | `current`, `voltage` (H × W) | learned baselines provided |
+| **T4** omnidirectional connectivity | `omniscape`: Omniscape over every source pixel within a radius, block-centred | `cum_current`, `flow_potential`, `normalized` (H × W) | learned baselines provided; radius / block per tier: S 16 / 1, M 32 / 3, L 64 / 5, XL 128 / 11, XXL 256 / 25 px |
 
-- **v1.0** (2026-09-23) data revision. **v1.0.1** (2026-09-24) metadata: nested `lite` subset. **v1.0.2** (2026-09-26 UTC) metadata: XL amendment C3 corrected (synthetic XL train/val restored) and split lists rebuilt as cross-tier unions. Data files are identical across the three tags. Hub revisions (`revision=` in `load_from_hub` / `snapshot_download`): `v1.0` and `v1.0.2`; `v1.0.1` is a GitHub tag only (its metadata is contained in `v1.0.2`). `croissant.json` carries `version 1.0.2`, `datePublished 2026-09-26`.
+Configurations that are undefined on a landscape (a strip entirely NoData, too few habitat patches) are listed with a
+reason in the index column `skipped_configs`; everything else planned is present.
 
-## Final counts (v1.0)
+## Tiers, subsets and splits
 
-| tier | landscapes | configuration rows | synthetic / real | GB on the Hub | rows failing QC |
-|---|---|---|---|---|---|
-| S | 100,000 | 527,281 | 60,000 / 40,000 | 142.4 | 1 |
-| M | 50,000 | 264,128 | 30,000 / 20,000 | 251.7 | 4 |
-| L | 20,000 | 105,949 | 12,000 / 8,000 | 380.9 | 11 |
-| XL | 4,000 | 21,006 | 2,400 / 1,600 | 281.7 | 7 |
-| XXL | 400 | 2,008 | 210 / 190 | 100.7 | 2 |
-| **total** | **174,400** | **920,372** | | **1157.4** | 25 |
+| tier | raster · pixel | landscapes | configuration rows | synthetic / real | GB | train | val | test_id | test_ood | ood_region |
+|---|---|---|---|---|---|---|---|---|---|---|
+| S | 128² · 100 m | 100,000 | 527,281 | 60,000 / 40,000 | 142.4 | 63,303 | 10,917 | 9,850 | 6,460 | 9,470 |
+| M | 256² · 100 m | 50,000 | 264,128 | 30,000 / 20,000 | 251.7 | 31,496 | 5,651 | 4,823 | 3,225 | 4,805 |
+| L | 512² · 200 m | 20,000 | 105,949 | 12,000 / 8,000 | 380.9 | 12,613 | 2,235 | 1,928 | 1,279 | 1,945 |
+| XL | 1024² · 500 m | 4,000 | 21,006 | 2,400 / 1,600 | 281.7 | 880 | 131 | 2,335 | 254 | 400 |
+| XXL | 2048² · 1 km | 400 | 2,008 | 210 / 190 | 100.7 | 0 | 0 | 275 | 25 | 100 |
+| **total** | | **174,400** | **920,372** | | **1,157.4** | | | | | |
 
-Subsets (nested shard prefixes per tier; each also a Croissant FileSet, an index column `subset_<name>` and a split-list folder `splits/<name>/`): `mini` (0.6 GB, the first 3 S shards, 600 landscapes), `lite` (≈ 26 GB: 8 000 S + 2 400 M + 800 L landscapes, all tasks — added in 1.0.1 as metadata only), `core` (115.5 GB, 3 705 files: 20 000 S + 10 000 M + 5 000 L landscapes),
-`full` (1 157.4 GB). The prefix subsets are drawn from the synthetic stream, so real tiles and the `ood_region` split appear only in `full`. Auxiliary evaluation sets and results under `aux/` (`aux/README.md`): 20.5 GB of evaluation sets at v1.0, 605 GB on 2026-10-15 including the official baselines' predictions, checkpoints and metrics under `aux/results/` (552 GB) and the first-pair voltages `aux/t1_pair1/` (32 GB).
-Every tier and every task group is a self-contained set of HDF5 shards (`data/<tier>/<group>/shard-XXXXX.h5`, inputs
-included), so any tier or task group can be downloaded alone (`snapshot_download(allow_patterns="data/L/T4/*")`).
-The 25 rows failing QC after the precision pass (24 landscapes, all synthetic at contrast ≥ 10⁴) stay in the index
-with their flags and are excluded from the split lists. Statistics figures: `docs/tables/dataset_statistics.md`.
+Split counts are landscapes before quality-control exclusion. `test_ood` holds landscapes built with the held-out
+`forest_bird` resistance table or at the held-out contrast 10⁶; `ood_region` holds real tiles of the held-out biomes
+(Montane Grasslands & Shrublands, Mangroves) and realm (Australasia). Further boolean index columns mark the OOD sets:
+`test_ood_region`, `test_ood_table`, `test_ood_contrast`, `test_ood_scale` (XL/XXL for models trained at ≤ L),
+`test_ood_scale_strict` (XXL tiles overlapping no training tile at any tier), `test_ood_synth2real`,
+`test_ood_published` (45 S tiles and 1 XXL tile with published resistance surfaces, under `aux/`). Real tiles are
+assigned by spatial macro-cells shared across tiers, synthetic landscapes by seed family.
 
-## Generation incidents (summary; details in `docs/status/generation_log.md` and `docs/generation_postmortem.md`)
+Four nested subsets (shard prefixes per tier; each an index column `subset_<name>`, a split-list folder
+`splits/<name>/` and a Croissant FileSet):
 
-Eleven operational incidents occurred during the run, none of which left silently corrupted or missing data: scratch
-quota exhaustion (a), a partial-finalize race (b) and a double submission (c) on tier S — repaired and confirmed
-replaced shard by shard; duplicate supervisors after a login-node switch (d) and finals validated mid-write (e) —
-leases and atomic renames; an undersized L walltime (f) — 62 shards silently timed out, re-solved; out-of-memory
-kills on the `regions` CG+AMG fallback at XL/XXL (h); Circuitscape's hard 1e-4 residual check aborting T4/T3 solves
-on contrast-10⁶ 2048² landscapes (i) — rescued by refinement and re-solved; corrupt outputs after OOM kills (j); and an
-index column that briefly carried a staging file name. Every affected row was re-solved and every tier re-audited.
+| subset | size | landscapes | contents |
+|---|---|---|---|
+| `mini` | 0.6 GB | 600 S | first 3 S shards, all task groups |
+| `lite` | ≈ 26 GB | 8,000 S + 2,400 M + 800 L | all task groups |
+| `core` | 115.5 GB | 20,000 S + 10,000 M + 5,000 L | all task groups |
+| `full` | 1,157.4 GB | 174,400 | everything; the only subset with real tiles and `ood_region` |
 
-## Dataset structure
+Layout: `data/<tier>/<task_group>/shard-NNNNN.h5` (task groups `T1`, `T1W`, `T1R`, `T3`, `T4`; one HDF5 group per
+sample with inputs and outputs, so any tier or task group downloads alone), `index/<tier>.parquet` (one row per
+sample × configuration: identifiers, family, generator or table, tile, solver, timings, residuals, QC flags, split,
+OOD flags, subset membership), `splits/<subset>/<split>.parquet`, `stats/norm_stats.json` (train-only normalisation
+statistics), `croissant.json` (Croissant 1.0 with RAI fields). Schema: `docs/schema.md` in the code repository.
+Hub revisions: `v1.0` (data) and `v1.0.2` (current metadata); data files are identical across them.
 
-- `data/<tier>/<task_group>/shard-NNNNN.h5` — HDF5 shards, one group per sample, inputs + one
-  configuration each (`T1` = pairwise current/Reff, `T1W` = wall-to-wall, `T1R` = habitat-patch
-  regions, `T3` = advanced source/ground, `T4` = Omniscape). Any single tier or task group can be
-  downloaded alone. Schema: `docs/schema.md` in the code repository.
-- `index/<tier>.parquet` — one row per (sample, configuration): identifiers, family, generator or
-  resistance table, tile, K, placement, solver, timings, residuals, QC flags, split, OOD flags,
-  subset membership (`subset_mini`, `subset_lite`, `subset_core`, `subset_full`).
-- `splits/<subset>/<split>.parquet` — sample ids across all tiers; subsets are nested (mini ⊂ lite ⊂ core ⊂ full). (v1.0.2: rebuilt as cross-tier unions — the v1.0/1.0.1 files held only the last published tier's ids; the per-tier `index/<tier>.parquet` `split` column was always complete.)
-- `stats/norm_stats.json` — train-only normalisation statistics.
-- `croissant.json` — Croissant 1.0 metadata (core + RAI fields).
+## Loading
 
-Tiers: S 128² (100 m), M 256² (100 m), L 512² (200 m), XL 1024² (500 m), XXL 2048² (1 km).
-(The Phase 5 pilot mini release — tier S only, 250 landscapes — is superseded by the nested `mini` subset of v1.0: the first 3 S shards, 600 landscapes, all task groups.)
+```python
+# pip install "ampscape @ git+https://github.com/Xyrro/AmpScape"
 
-## Splits and leakage
+from ampscape.data import load_from_hub
 
-Real tiles are assigned by spatial macro-cells shared across tiers (equal-width 20° cells, one seeded
-assignment per cell), so S–XL test regions never overlap S–XL training regions at any resolution;
-synthetic landscapes by seed family. **XXL is test-only and its footprints (2 048 km, 32 tiles covering
-≈ 90 % of land) unavoidably overlap finer-tier training cells — for XXL, `test_ood_scale` therefore isolates
-*resolution* transfer, not spatial novelty; this is disclosed here and in the task specification.** A strict
-subset, `test_ood_scale_strict` (≈ 6 XXL real tiles placed entirely inside non-training cells, zero overlap
-with any training tile at any tier, verified geometrically), isolates both. Region hold-outs are
-tile-level: a tile is `ood_region` when its own biome (Montane Grasslands & Shrublands, Mangroves) or
-realm (Australasia) is held out. Other OOD sets: held-out resistance table (`forest_bird`), held-out
-contrast (10⁶), held-out scale (XL/XXL for models trained ≤ L), and a synthetic→real flag. **XL train/val (amendment C3, corrected in v1.0.2):** 25 % of the XL landscapes are train/val so that models can also be trained at XL — real tiles by macro-cell, synthetic landscapes by seed family (XL: train 880, val 131, test_id 2,335, test_ood 254, ood_region 400). In v1.0/1.0.1 the seed-family rule was not applied (synthetic XL landscapes had no macro-cell and were all placed in test_id: train 228, val 0); v1.0.2 is a metadata-only correction of the XL index `split` column and the split lists — no data file changed. **Pilot caveat:** the mini's 50 real tiles over-represent the held-out regions
-(20 of 50) because the Phase 2 pilot sampled those strata for coverage; this is not a v1.0 property.
+# one tier × task group of the lite subset: only its shards are downloaded (lite: 8,000 S + 2,400 M + 800 L landscapes)
+train = load_from_hub("T4", "M", split="train", subset="lite")
+item = train[0]
+item["resistance"], item["nodata"]          # (1, 256, 256) float32 raster and NoData mask
+item["source_strength"], item["cum_current"] # T4 input channel and target
+item["meta"]                                 # family, generator or table, tile, solver provenance
 
-## T4 targets: block-centred Omniscape with a measured approximation
+# raw files instead of the loader
+from huggingface_hub import snapshot_download
+snapshot_download("Xirro/AmpScape", repo_type="dataset", allow_patterns=["data/L/T4/*", "index/L.parquet", "splits/**"])
+```
 
-Omniscape targets at M–XXL use `block_size = largest odd ≤ radius/10` (block 1, i.e. exact, at S). Against the exact
-block-1 map the production M target deviates by 3.1 % relative L2 on average (tail to 25 % on fragmented high-contrast
-landscapes; top-5 % IoU 0.95, pinch-point recall 0.95). Against the exact map the production L target (block 5) deviates by 2.8 % on average (60-sample reference, 2 samples above 5 %). Block-1 reference subsets at M (1 000 samples) and L (60)
-are published under `aux/t4_bs1_reference/` with per-sample deviations and a > 5 % tail flag; T4 leaderboard metrics at M
-and L are reported against these exact targets (`docs/t4_fidelity.md`).
+Baselines predict `log10(C + 1e-6 · max C)` under a masked MSE; `scripts/train.py` in the code repository reproduces
+every official run, and `scripts/evaluate.py` scores any predictions file in the harness format.
 
-Every auxiliary evaluation set and result the benchmark depends on is on the Hub under `aux/` (dev subset, mini build,
-`test_ood_published`, the WP5 scale-probe set, the block-1 reference and block-size builds, dev baseline results):
-`docs/aux_layout.md`.
+## Metrics and leaderboard
 
-## Scale split caveat
+The harness (`ampscape.eval.harness`, `docs/evaluation.md`) reports, per task and split: relative L2 on raw currents
+(the primary metric), MAE in log10-ε space, MSE, SSIM/PSNR; top-q % IoU of the highest-current pixels (q = 1, 5, 10),
+corridor Dice, pinch-point recall, Spearman rank correlation; the same metrics outside source, focal and ground pixels;
+Kirchhoff residual, focal-current error, non-negativity and throughput error of predicted voltages; speed-up over the
+production solver (one solve per CPU core) and, optionally, the warm-start acceleration of the reference solver. At M
+and L the official T4 metrics are computed against exact block-1 Omniscape references on the `test_id` reference
+subsets (`aux/t4_bs1_reference/`). The domain metrics use conventional thresholds that are not validated against
+ecological outcomes.
 
-Pixel size, raster size and (for T4) the physical window radius co-vary across tiers (only S → M changes the raster
-alone), so `test_ood_scale` measures combined scale transfer; a controlled probe set separating the axes is planned
-(`docs/addendum_WP5_report.md`).
+The leaderboard lives in this repository: `aux/leaderboard/results.jsonl` (append-only entries) and
+`aux/leaderboard/README.md` (tables per task × tier × split). Its first entries are the official baselines (U-Net,
+FNO, ViT, GNN, MgNO; three seeds; one configuration per model × task × tier selected on validation loss; XL/XXL rows
+of L-trained models are zero-shot). To submit, run `scripts/submit_results.py validate` on a predictions directory and
+open an issue titled `Leaderboard: <model> <task> <tier> <split>` in the code repository; the full specification is
+`docs/submission.md`. Baseline predictions, checkpoints and metrics are under `aux/results/`; auxiliary evaluation
+sets are described in `aux/README.md`.
 
-## Solver precision: every pairwise/advanced row carries its true residual (post-run precision pass)
+## Known limitations and provenance
 
-After generation, every T1/T1W/T1R/T3 row whose Kirchhoff residual was above 1e-9, unmeasured (T1 `points` rows with
-K ≥ 5 and T1R rows keep no per-pair voltages, so production never measured them), solved by the CG+AMG fallback, or
-QC-failed was re-solved pair by pair with CHOLMOD on the reduced system plus iterative refinement and its true relative
-residual recorded (`residual_rel` = max over pairs; per-pair values and methods in `solver_stats.resolved_post_run`;
-`qc_flags` contains `resolved_post_run`; `solver_original` keeps the production solver where it changed). Per-tier
-counts and the achieved-residual distribution: `docs/tables/precision_pass.md`. Rows that could not reach 1e-6 in
-double precision (a few dozen synthetic landscapes at contrast ≥ 10⁴) are flagged `residual_high` with `qc_pass =
-false` and their samples are excluded from the split lists — never silently kept. T4 (Omniscape) rows have no single
-linear system; their solver's per-window residual check is enforced by Circuitscape (≤ 1e-4) with the rescue described
-in `docs/t4_fidelity.md`.
+- Reference solvers: Circuitscape.jl 5.17.1 and Omniscape.jl 0.6.2, CHOLMOD in double precision, average-conductance
+  8-neighbour graphs; every sample stores the solver version, parameters, timing and residual.
+- T4 targets at M and above use Omniscape's `block_size` (largest odd integer ≤ radius / 10) with artefact correction;
+  against the exact block-1 map the production target deviates by mean relative L2 0.029 at M (1,000-landscape
+  reference, 4.7 % of landscapes above 5 %) and 0.028 at L (60 landscapes, 2 above 5 %), and block 1 is exact at S.
+- Every T1/T1W/T1R/T3 row carries its measured relative Kirchhoff residual (`residual_rel`); a post-run precision pass
+  re-solved 129,722 rows with CHOLMOD plus refinement so that 3,861 rows lie between 10⁻⁹ and 10⁻⁶ and only 20 rows,
+  all synthetic at contrast ≥ 10⁴, remain above 10⁻⁶.
+- Those 20 rows and the other quality-control failures (25 rows, 24 landscapes in total) stay in the index with
+  `qc_pass = false` and are excluded from every split list.
+- v1.0.2 is a metadata-only correction: XL synthetic landscapes had all been placed in `test_id` in v1.0/1.0.1 (train
+  228, val 0); the seed-family rule now gives XL train 880 and val 131, and the split lists were rebuilt as cross-tier
+  unions; no data file changed.
+- XXL footprints (2,048 km) overlap finer-tier training cells, so `test_ood_scale` at XXL measures resolution transfer;
+  only `test_ood_scale_strict` isolates spatial novelty as well; pixel size, raster size and the T4 radius co-vary
+  across tiers.
+- Resistance tables follow the literature in class ordering and term structure but their numeric values are AmpScape's
+  own; real landscapes are real covariate stacks with synthesised resistance.
+- Regeneration from the frozen pipeline tag `v1.0-pipeline` is bitwise on the same CPU model and agrees to ≤ 1.2 × 10⁻⁹
+  relative across CPU models.
 
-## Absent configurations are labelled, not missing
+The generation record, incidents and their resolutions are in `docs/generation_postmortem.md`; the full datasheet
+(composition, collection, splits and leakage design, precision pass, absent configurations) is `docs/datasheet.md`;
+per-tier statistics are in `docs/tables/dataset_statistics.md` (all in the code repository).
 
-Some planned source configurations are undefined on a given landscape — a wall-to-wall strip that is entirely NoData,
-a real tile without two habitat patches for the focal-region task, a degenerate source/ground draw. Such samples keep
-their other configurations, and the index column `skipped_configs` (and the sample meta) lists each absent
-configuration with its task and reason, e.g. `regions (T1R: no eligible habitat patches …)`. Every other planned
-configuration is present: the per-tier audit against the plan enforces it before a tier is declared complete.
+## Licence and attributions
 
-## Reproducibility
-
-Generation note: during the tier-S run the scratch disk filled and 149 S shards had to be re-finalized from their
-intact solver outputs; no solve was lost and every shard was re-validated before upload.
-
-Every sample records the solver versions, parameters, residuals and the pipeline tag/commit. Regenerating a shard from
-`v1.0-pipeline` on the same CPU model reproduces every stored array bitwise; across CPU models (PACE-ICE node types)
-CHOLMOD/BLAS results differ in the last bits (≤ 1.2e-9 relative on the checked shards), so cross-hardware reproducibility
-is stated at that tolerance, not bitwise.
-
-## Metrics caveat
-
-The domain-level metrics (top-q % high-flow IoU, pinch-point recall, corridor Dice) use thresholds
-that are **not validated against ecological outcomes**; we report them as comparative scores between
-models and make no claim that any level is sufficient for conservation practice.
-
-## Leaderboard and submissions
-
-The leaderboard is part of this repository: `aux/leaderboard/results.jsonl` (append-only, one JSON entry per line)
-and `aux/leaderboard/README.md` (rendered tables per task × tier × split, sorted by rel-L2). The official baselines
-(U-Net, FNO, ViT, GNN, MgNO; three seeds unless stated; one official configuration per model × task × tier selected on
-validation loss) are the first entries; XL/XXL rows of L-trained models are zero-shot; T4 at M and L is reported against
-the production target and, on the reference subset, against the exact block-1 map (`aux/t4_bs1_reference`).
-
-A submission uses the evaluation harness's own format, nothing more: one directory per (task, tier, split) with
-`predictions.h5` — one group per sample id, one subgroup per configuration (`points`, `wall_to_wall_NS`/`_EW`,
-`regions`, `advanced`, `omniscape`) holding the task's dataset (`cum_current`, `current`, `reff`; float32, index shape),
-every configuration group carrying an `inference_time_s` attribute — and `meta.json` (model, task, tier, split, seed,
-`params_M`, `train_data`, `train_tiers`, hardware, `inference_batch`, `code_url`, `code_commit`, contact). Every
-`qc_pass` sample of the declared split must be present and nothing else; predictions must be finite everywhere.
-Rules: an XL/XXL entry is zero-shot unless `train_tiers` includes the tier; inference batch 1 at XL/XXL; seeds of one
-model are aggregated into one entry (mean ± std over seeds); every number comes from the harness `results.json` —
-nothing is recomputed.
-
-Procedure: `python scripts/submit_results.py validate --predictions <dir> --root <data root> --tier <tier> --split
-<split>` (schema → coverage → harness), `make-entry` to build the entry JSON, then an issue titled
-`Leaderboard: <model> <task> <tier> <split>` in the code repository (https://github.com/Xyrro/AmpScape) with the
-entry, a link to the predictions and the validator output; a maintainer re-validates, appends and pushes. Entries are
-never edited or removed; a correction is a new entry naming the superseded id. Full specification:
-`docs/submission.md` in the code repository.
-
-## Redistribution terms and attributions
-
-AmpScape data are released under **CC BY 4.0**. The covariate channels and the published-resistance
-evaluation set are *derived* from the sources below; the sources themselves are not redistributed
-except where their licence permits and the derived channel is the source itself (the three published
-resistance rasters, re-tiled). Required attributions:
+AmpScape data are released under **CC BY 4.0**; code and the solver wrapper under MIT. The covariate channels and the
+published-resistance evaluation set are derived from the sources below; the sources themselves are not redistributed
+except where their licence permits and the derived channel is the source itself (the three published resistance
+rasters, re-tiled). Required attributions:
 
 | Source | Licence | Attribution / notice |
 |---|---|---|
 | ESA WorldCover 10 m 2021 v200 (land cover) | CC BY 4.0 | © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium |
 | Copernicus DEM GLO-30 (elevation, slope) | Copernicus WorldDEM-30 licence | "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved". "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30". |
-| GRIP4 global roads (distance, class) | stated as CC0 by PBL; catalogued as CC BY 4.0 elsewhere — attributed | Meijer et al. 2018, Environ. Res. Lett. 13:064006; PBL Netherlands Environmental Assessment Agency (GRIP4) |
+| GRIP4 global roads (distance, class) | CC0 by the publisher; CC BY 4.0 in secondary catalogues — attributed | Meijer et al. 2018, Environ. Res. Lett. 13:064006; PBL Netherlands Environmental Assessment Agency (GRIP4) |
 | HydroRIVERS v1.0 (river distance, order) | CC BY 4.0 (HydroSHEDS licence) | Lehner & Grill 2013, Hydrol. Process. 27:2171–2186; www.hydrosheds.org |
 | gHM v1 (human modification) | CC BY 4.0 | Kennedy et al. 2019, Glob. Change Biol. 25:811–826; figshare 10.6084/m9.figshare.7283087 |
 | RESOLVE Ecoregions 2017 (stratification only; no raster stored) | CC BY 4.0 | Dinerstein et al. 2017, BioScience 67:534–545 |
@@ -192,20 +160,23 @@ resistance rasters, re-tiled). Required attributions:
 | Northern raccoon resistance, Europe (`test_ood_published`) | CC BY 4.0 | figshare 10.6084/m9.figshare.27311484.v1 |
 | Hawaiian gallinule resistance layers (`test_ood_published`) | CC0 1.0 | Dryad 10.5061/dryad.p90b87p; paper 10.1002/ece3.4296 |
 
-Not used and not redistributed: WDPA (restrictive terms), OpenStreetMap (ODbL). Synthetic landscapes
-are generated by AmpScape code (MIT). Solver outputs are produced by Circuitscape.jl 5.17.1 and
-Omniscape.jl 0.6.2 (MIT). The one unresolved point is the exact GRIP4 licence statement (CC0 vs
-CC BY 4.0 across catalogues); AmpScape attributes it and stores only non-reversible distance/class
-rasters. See `docs/licenses.md` in the code repository for the full verification log.
-
-## Collection process, preprocessing, uses, limitations, ethics, maintenance
-
-To be completed for the full release from `docs/dataset_plan.md`, `docs/licenses.md` (upstream
-attributions and the Copernicus WorldDEM-30 notices, which are reproduced verbatim in `LICENSE-DATA`)
-and the generation statistics. Protected-area (WDPA) data are **not** used. Locations of real tiles
-are public land-cover/terrain products at ≥ 100 m; no personal data.
+Not used and not redistributed: WDPA (restrictive terms), OpenStreetMap (ODbL). Synthetic landscapes are generated by
+AmpScape code (MIT); solver outputs by Circuitscape.jl 5.17.1 and Omniscape.jl 0.6.2 (MIT). Real tiles derive from
+public products at ≥ 100 m resolution; no personal data. Full verification log: `docs/licenses.md`; the Copernicus
+notices are reproduced verbatim in `LICENSE-DATA`.
 
 ## Citation
 
-See `CITATION.cff`. Code: https://github.com/Xyrro/AmpScape (MIT). Data: CC BY 4.0 with upstream
-attributions.
+```bibtex
+@dataset{ampscape2026,
+  title   = {AmpScape: a benchmark for learned surrogates of circuit-theoretic landscape connectivity},
+  author  = {Xiao, Yao},
+  year    = {2026},
+  version = {1.0.2},
+  url     = {https://huggingface.co/datasets/Xirro/AmpScape},
+  note    = {Data CC BY 4.0, code MIT; see CITATION.cff for the upstream sources to cite alongside}
+}
+```
+
+Please also cite Circuitscape.jl (Anantharaman et al. 2020) and Omniscape.jl (Landau et al. 2021), and the upstream
+data sources listed above when their derived channels are used.
