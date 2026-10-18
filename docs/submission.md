@@ -1,7 +1,8 @@
 # Submitting results to the AmpScape leaderboard
 
-Status (2026-10-15): the leaderboard is live on the Hub at `Xirro/AmpScape` under `aux/leaderboard/` (owner approval
-2026-10-15), seeded with the official Phase 10-full baselines (official configurations per model × task × tier,
+Status (2026-10-18): the leaderboard is live on the Hub at `Xirro/AmpScape` under `aux/leaderboard/` (owner approval
+2026-10-15; re-seeded and re-pushed 2026-10-18 after review round 2: MgNO three seeds, U-Net T4 trained at XL; 168
+entries), seeded with the official Phase 10-full baselines (official configurations per model × task × tier,
 `docs/tables/tuning_decisions.md`): in-tier rows at S/M/L, zero-shot XL/XXL rows of the L-trained models and the T4
 block-1 reference rows at M and L. The dataset card carries a condensed version of this document.
 

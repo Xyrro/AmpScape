@@ -3293,7 +3293,7 @@ Offloader loop and keepalive running. GitHub main = origin after this push.
 
 ---
 
-# Status — 2026-10-18 05:30Z: review round 2 applied — like-for-like costs, cheap baselines, MgNO/scale-aware seeds, XL-trained run; paper rebuilt at nine pages
+# Status — 2026-10-18 06:00Z: review round 2 applied — like-for-like costs, cheap baselines, MgNO/scale-aware seeds, XL-trained run; paper rebuilt at nine pages
 
 ## Done (owner: "fix the ones you agreed with … up to 16 GPU-hours … check the correctness")
 1. **Like-for-like speed-ups (point 1).** Production Omniscape re-timed with its own parallelisation on one CPU node
@@ -3326,10 +3326,11 @@ Converged (non-budget-limited) retraining of every configuration, new operator f
 surfaces at M/L, an exact T4 reference at XL/XXL, FNO scale-aware seeds at XXL (budget).
 
 ## Open for the owner
-- The new runs are offloaded to the Hub by the running offloader loop; the **leaderboard** (`aux/leaderboard/`) still
-  holds the pre-round-2 baselines — re-seeding and pushing it needs your approval (Hub push gate).
-- Scratch deletion rows: still waiting for your choice; nothing deleted. `aux/review_round2/` holds 1.3 GB of fetched
-  shards and coarse builds that can go once the paper is final.
+- **Leaderboard re-seeded and pushed (your approval 2026-10-18 05:56Z):** 168 entries on the Hub, sha256-verified;
+  all 34 Table 2 cells present with rel-L2 agreeing to the third decimal; the four block-1 rows at L equal the four
+  official learned rows of Table 7 (scale-aware variants are not leaderboard entries, as before).
+- Scratch deletion rows: still waiting for your choice; nothing deleted. `aux/review_round2/` stays until submission,
+  as you asked.
 
 ## Operations
 GPU use for this step: 14.64 GPU-h (`scripts/review/gpu_budget.sh`). CPU: two Slurm jobs (≈ 1.5 node-hours).
