@@ -12,13 +12,13 @@
 | test_id | block 5 (correct_artifacts=0) | 24 | 638 | 0.1011 | – | 0.1141 | 0.0217 | 0.7710 | 0.9767 | 0.9870 |
 | test_id | production block 5 (correct_artifacts=1) | 24 | 566 | 0.0315 | – | 0.0359 | 0.0135 | 0.9344 | 0.9319 | 0.9979 |
 | test_id | block 11 (correct_artifacts=1) | 24 | 164 | 0.0854 | – | 0.0954 | 0.0409 | 0.8317 | 0.8183 | 0.9895 |
-| test_id | gnn_T4_L_s1_t2_scalenorm (learned, 1 seed) | 24 | 0.0446 | 0.1487 | 0.1487 | – | 0.0837 | 0.6171 | 0.6415 | 0.9522 |
+| test_id | gnn_T4_L_scalenorm (tuned) (learned, 1 seed) | 24 | 0.0446 | 0.1487 | 0.1487 | – | 0.0837 | 0.6171 | 0.6415 | 0.9522 |
 | test_id | gnn_T4_L (tuned) (learned, 3 seeds) | 24 | 0.0445 | 0.1475 | 0.1475 | – | 0.0848 | 0.6170 | 0.6341 | 0.9538 |
 | test_id | vit_T4_L (learned, 3 seeds) | 24 | 0.0153 | 0.1603 | 0.1613 | – | 0.1027 | 0.6044 | 0.6715 | 0.9490 |
-| test_id | vit_T4_L_s1_scalenorm (learned, 1 seed) | 24 | 0.0126 | 0.1658 | 0.1658 | – | 0.1041 | 0.5979 | 0.6740 | 0.9430 |
+| test_id | vit_T4_L_scalenorm (learned, 1 seed) | 24 | 0.0126 | 0.1658 | 0.1658 | – | 0.1041 | 0.5979 | 0.6740 | 0.9430 |
 | test_id | unet_T4_L (learned, 3 seeds) | 24 | 0.00652 | 0.0903 | 0.0905 | – | 0.0450 | 0.7930 | 0.7803 | 0.9894 |
-| test_id | unet_T4_L_s1_scalenorm (learned, 1 seed) | 24 | 0.00537 | 0.0910 | 0.0910 | – | 0.0457 | 0.7844 | 0.7821 | 0.9884 |
-| test_id | fno_T4_L_s1_t2_scalenorm (learned, 1 seed) | 24 | 0.00282 | 0.1186 | 0.1186 | – | 0.0814 | 0.7234 | 0.5344 | 0.9745 |
+| test_id | unet_T4_L_scalenorm (learned, 3 seeds) | 24 | 0.00447 | 0.0924 | 0.0920 | – | 0.0463 | 0.7880 | 0.7720 | 0.9887 |
+| test_id | fno_T4_L_scalenorm (tuned) (learned, 3 seeds) | 24 | 0.00315 | 0.1196 | 0.1190 | – | 0.0802 | 0.7197 | 0.5269 | 0.9746 |
 | test_id | fno_T4_L (tuned) (learned, 3 seeds) | 24 | 0.00281 | 0.1199 | 0.1197 | – | 0.0801 | 0.7200 | 0.5272 | 0.9746 |
 | test_ood | block 1 (exact, reference) | 16 | 1.4e+04 | 0.0000 | – | 0.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 |
 | test_ood | block 3 (correct_artifacts=1) | 16 | 2.02e+03 | 0.0175 | – | 0.0267 | 0.0065 | 0.9388 | 0.9503 | 0.9978 |

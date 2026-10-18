@@ -1,0 +1,332 @@
+{
+ "per_solve": [
+  {
+   "at": "2026-10-18T02:41:29.199",
+   "block": 3,
+   "cum_max": 10.221665,
+   "cum_sum": 12575.955732686807,
+   "host": "atl1-1-01-005-4-2.pace.gatech.edu",
+   "parallelize": false,
+   "radius": 32,
+   "sample_id": "0e161771-e822-55b3-bd78-c17fd660f0e5",
+   "threads": 1,
+   "tier": "M",
+   "wall_s": 103.40750113
+  },
+  {
+   "at": "2026-10-18T02:42:38.821",
+   "block": 3,
+   "cum_max": 13.999872,
+   "cum_sum": 134317.2021365799,
+   "host": "atl1-1-01-005-4-2.pace.gatech.edu",
+   "parallelize": false,
+   "radius": 32,
+   "sample_id": "10d637e5-e981-5126-bbf3-8cad71b0bacf",
+   "threads": 1,
+   "tier": "M",
+   "wall_s": 68.470768145
+  },
+  {
+   "at": "2026-10-18T02:44:01.828",
+   "block": 3,
+   "cum_max": 10.352931,
+   "cum_sum": 36684.1722314246,
+   "host": "atl1-1-01-005-4-2.pace.gatech.edu",
+   "parallelize": false,
+   "radius": 32,
+   "sample_id": "1eb46033-bd15-5ae7-9c8e-6dbf25133cb6",
+   "threads": 1,
+   "tier": "M",
+   "wall_s": 82.77994653
+  },
+  {
+   "at": "2026-10-18T02:45:02.280",
+   "block": 3,
+   "cum_max": 21.577723,
+   "cum_sum": 323438.55182936357,
+   "host": "atl1-1-01-005-4-2.pace.gatech.edu",
+   "parallelize": false,
+   "radius": 32,
+   "sample_id": "4b69d1b9-f814-5ba1-81a2-b77b86ee0357",
+   "threads": 1,
+   "tier": "M",
+   "wall_s": 60.226231689
+  },
+  {
+   "at": "2026-10-18T02:51:01.942",
+   "block": 5,
+   "cum_max": 187.20323,
+   "cum_sum": 2767848.319741532,
+   "host": "atl1-1-01-005-4-2.pace.gatech.edu",
+   "parallelize": false,
+   "radius": 64,
+   "sample_id": "4322e8a0-e862-5050-bb22-5e961e323f91",
+   "threads": 1,
+   "tier": "L",
+   "wall_s": 359.3523465
+  },
+  {
+   "at": "2026-10-18T02:54:17.424",
+   "block": 5,
+   "cum_max": 263.4615,
+   "cum_sum": 1603156.7207782709,
+   "host": "atl1-1-01-005-4-2.pace.gatech.edu",
+   "parallelize": false,
+   "radius": 64,
+   "sample_id": "a3650f09-0345-5051-b257-12752ff54c89",
+   "threads": 1,
+   "tier": "L",
+   "wall_s": 194.674342586
+  },
+  {
+   "at": "2026-10-18T02:41:07.434",
+   "block": 3,
+   "cum_max": 10.221665,
+   "cum_sum": 12575.955732686807,
+   "host": "atl1-1-02-010-6-2.pace.gatech.edu",
+   "parallelize": true,
+   "radius": 32,
+   "sample_id": "0e161771-e822-55b3-bd78-c17fd660f0e5",
+   "threads": 24,
+   "tier": "M",
+   "wall_s": 80.494115277
+  },
+  {
+   "at": "2026-10-18T02:41:51.587",
+   "block": 3,
+   "cum_max": 13.999872,
+   "cum_sum": 134317.2021365799,
+   "host": "atl1-1-02-010-6-2.pace.gatech.edu",
+   "parallelize": true,
+   "radius": 32,
+   "sample_id": "10d637e5-e981-5126-bbf3-8cad71b0bacf",
+   "threads": 24,
+   "tier": "M",
+   "wall_s": 42.812593793
+  },
+  {
+   "at": "2026-10-18T02:42:42.246",
+   "block": 3,
+   "cum_max": 10.352931,
+   "cum_sum": 36684.1722314246,
+   "host": "atl1-1-02-010-6-2.pace.gatech.edu",
+   "parallelize": true,
+   "radius": 32,
+   "sample_id": "1eb46033-bd15-5ae7-9c8e-6dbf25133cb6",
+   "threads": 24,
+   "tier": "M",
+   "wall_s": 50.569545757
+  },
+  {
+   "at": "2026-10-18T02:43:19.278",
+   "block": 3,
+   "cum_max": 21.577723,
+   "cum_sum": 323438.55182936357,
+   "host": "atl1-1-02-010-6-2.pace.gatech.edu",
+   "parallelize": true,
+   "radius": 32,
+   "sample_id": "4b69d1b9-f814-5ba1-81a2-b77b86ee0357",
+   "threads": 24,
+   "tier": "M",
+   "wall_s": 36.937845563
+  },
+  {
+   "at": "2026-10-18T02:46:34.236",
+   "block": 5,
+   "cum_max": 187.20323,
+   "cum_sum": 2767848.319742486,
+   "host": "atl1-1-02-010-6-2.pace.gatech.edu",
+   "parallelize": true,
+   "radius": 64,
+   "sample_id": "4322e8a0-e862-5050-bb22-5e961e323f91",
+   "threads": 24,
+   "tier": "L",
+   "wall_s": 194.803681447
+  },
+  {
+   "at": "2026-10-18T02:48:18.373",
+   "block": 5,
+   "cum_max": 263.4615,
+   "cum_sum": 1603156.7207782709,
+   "host": "atl1-1-02-010-6-2.pace.gatech.edu",
+   "parallelize": true,
+   "radius": 64,
+   "sample_id": "a3650f09-0345-5051-b257-12752ff54c89",
+   "threads": 24,
+   "tier": "L",
+   "wall_s": 104.025147991
+  },
+  {
+   "at": "2026-10-18T02:41:06.774",
+   "block": 3,
+   "cum_max": 10.221665,
+   "cum_sum": 12575.955732686807,
+   "host": "atl1-1-02-003-20-1.pace.gatech.edu",
+   "parallelize": true,
+   "radius": 32,
+   "sample_id": "0e161771-e822-55b3-bd78-c17fd660f0e5",
+   "threads": 8,
+   "tier": "M",
+   "wall_s": 79.63120816
+  },
+  {
+   "at": "2026-10-18T02:41:50.698",
+   "block": 3,
+   "cum_max": 13.999872,
+   "cum_sum": 134317.2021365799,
+   "host": "atl1-1-02-003-20-1.pace.gatech.edu",
+   "parallelize": true,
+   "radius": 32,
+   "sample_id": "10d637e5-e981-5126-bbf3-8cad71b0bacf",
+   "threads": 8,
+   "tier": "M",
+   "wall_s": 42.494871748
+  },
+  {
+   "at": "2026-10-18T02:42:40.668",
+   "block": 3,
+   "cum_max": 10.352931,
+   "cum_sum": 36684.1722314246,
+   "host": "atl1-1-02-003-20-1.pace.gatech.edu",
+   "parallelize": true,
+   "radius": 32,
+   "sample_id": "1eb46033-bd15-5ae7-9c8e-6dbf25133cb6",
+   "threads": 8,
+   "tier": "M",
+   "wall_s": 49.83158899
+  },
+  {
+   "at": "2026-10-18T02:43:16.980",
+   "block": 3,
+   "cum_max": 21.577723,
+   "cum_sum": 323438.55182936357,
+   "host": "atl1-1-02-003-20-1.pace.gatech.edu",
+   "parallelize": true,
+   "radius": 32,
+   "sample_id": "4b69d1b9-f814-5ba1-81a2-b77b86ee0357",
+   "threads": 8,
+   "tier": "M",
+   "wall_s": 36.172641192
+  },
+  {
+   "at": "2026-10-18T02:46:33.807",
+   "block": 5,
+   "cum_max": 187.20323,
+   "cum_sum": 2767848.319742486,
+   "host": "atl1-1-02-003-20-1.pace.gatech.edu",
+   "parallelize": true,
+   "radius": 64,
+   "sample_id": "4322e8a0-e862-5050-bb22-5e961e323f91",
+   "threads": 8,
+   "tier": "L",
+   "wall_s": 196.542996834
+  },
+  {
+   "at": "2026-10-18T02:48:20.451",
+   "block": 5,
+   "cum_max": 263.4615,
+   "cum_sum": 1603156.7207782709,
+   "host": "atl1-1-02-003-20-1.pace.gatech.edu",
+   "parallelize": true,
+   "radius": 64,
+   "sample_id": "a3650f09-0345-5051-b257-12752ff54c89",
+   "threads": 8,
+   "tier": "L",
+   "wall_s": 106.492573225
+  }
+ ],
+ "summary": {
+  "M_1": {
+   "n": 4,
+   "median_s": 75.62535733749999,
+   "mean_s": 78.7211118735,
+   "speedup": 1.0,
+   "efficiency": 1.0
+  },
+  "M_8": {
+   "n": 4,
+   "median_s": 46.163230369000004,
+   "mean_s": 52.032577522500006,
+   "speedup": 1.638216319200328,
+   "efficiency": 0.204777039900041
+  },
+  "M_24": {
+   "n": 4,
+   "median_s": 46.691069775,
+   "mean_s": 52.703525097500005,
+   "speedup": 1.6196963938057465,
+   "efficiency": 0.06748734974190611
+  },
+  "L_1": {
+   "n": 2,
+   "median_s": 277.013344543,
+   "mean_s": 277.013344543,
+   "speedup": 1.0,
+   "efficiency": 1.0
+  },
+  "L_8": {
+   "n": 2,
+   "median_s": 151.5177850295,
+   "mean_s": 151.5177850295,
+   "speedup": 1.8282562967051454,
+   "efficiency": 0.22853203708814318
+  },
+  "L_24": {
+   "n": 2,
+   "median_s": 149.414414719,
+   "mean_s": 149.414414719,
+   "speedup": 1.8539934387453323,
+   "efficiency": 0.07724972661438885
+  }
+ },
+ "break_even": {
+  "M_unet": {
+   "rel_l2": 0.051,
+   "inference_s": 0.00328,
+   "train_gpu_h": 1.9741666666666668,
+   "solver_1": 75.62535733749999,
+   "speedup_1": 23056.511383384146,
+   "solver_max": 46.691069775,
+   "threads_max": 24,
+   "speedup_max": 14235.08224847561,
+   "break_even_1": 93.98049154721824,
+   "break_even_max": 152.2239547909719
+  },
+  "M_fno": {
+   "rel_l2": 0.0761,
+   "inference_s": 0.003,
+   "train_gpu_h": 3.1315666666666666,
+   "solver_1": 75.62535733749999,
+   "speedup_1": 25208.45244583333,
+   "solver_max": 46.691069775,
+   "threads_max": 24,
+   "speedup_max": 15563.689925,
+   "break_even_1": 149.07813505053974,
+   "break_even_max": 241.46725393296683
+  },
+  "L_unet": {
+   "rel_l2": 0.0903,
+   "inference_s": 0.00652,
+   "train_gpu_h": 1.5499333333333334,
+   "solver_1": 277.013344543,
+   "speedup_1": 42486.7092857362,
+   "solver_max": 149.414414719,
+   "threads_max": 24,
+   "speedup_max": 22916.321275920247,
+   "break_even_1": 20.143041635184876,
+   "break_even_max": 37.34581770591289
+  },
+  "L_fno": {
+   "rel_l2": 0.1199,
+   "inference_s": 0.00281,
+   "train_gpu_h": 0.9138666666666667,
+   "solver_1": 277.013344543,
+   "speedup_1": 98581.26140320285,
+   "solver_max": 149.414414719,
+   "threads_max": 24,
+   "speedup_max": 53172.3895797153,
+   "break_even_1": 11.876515835138067,
+   "break_even_max": 22.019173183953065
+  }
+ }
+}

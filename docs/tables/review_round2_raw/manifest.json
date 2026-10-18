@@ -1,0 +1,382 @@
+[
+ {
+  "tier": "S",
+  "task": "T1V",
+  "config": "points",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/S/T1/shard-00000.h5",
+  "sids": [
+   "01ce9fa8-a7cb-5a95-8096-7260e5e5112e",
+   "1a683536-8779-584e-8839-75d0769deaa3",
+   "2985c3aa-7704-51a8-9e70-32be8e12960b",
+   "2af3313f-4346-507a-af17-f37edddbaf82",
+   "3847b5d6-08a9-5148-93e5-72d10a004537",
+   "3c93438a-95dc-5e9f-9192-c531110a154c",
+   "57086a53-228f-51d3-a62d-0450d5847dfb",
+   "7350dc63-c006-5550-ab00-acb35b2d299f",
+   "85f681a0-50c1-5025-ae49-426f065095e9",
+   "98ff37cf-0d79-50c4-b458-fb0530bdece0",
+   "99a83065-8f67-5f63-8629-d34c3f4fa083",
+   "cf6d5840-ced7-567a-b145-1df4a33f8e93",
+   "d29dfec9-500c-50df-a185-0a6de4137864",
+   "da213c10-1a74-5792-966a-61bf477dfd81",
+   "e2297b2c-dcd6-5541-b5fc-30a64e08dad8",
+   "e489e7e0-3f52-5961-b0cb-d2b60959caef",
+   "eb6a6f7e-9fa6-521b-915a-88c9aa1d9698"
+  ]
+ },
+ {
+  "tier": "S",
+  "task": "T1V",
+  "config": "points",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/S/T1/shard-00001.h5",
+  "sids": [
+   "26ce150c-4bbf-5406-9cda-d45c26d1b21e",
+   "28a671f6-b47c-5a9b-8566-cff8d4095564",
+   "4238f8d5-c711-510d-ac2a-a06a068b4300",
+   "4e8d8990-9648-5cd8-9f84-88972314d457",
+   "526b4fdc-25c6-5907-89f9-bead637ab6b0",
+   "5cc279e6-b996-5766-9809-807b6a252cd4",
+   "6ff7fd4c-84e1-5ab2-90d6-82e1f7ccb4b1",
+   "716648b1-7430-56f1-8cf0-a6cda8776400",
+   "7575e24e-a991-565f-a103-e7e47e3fd56e",
+   "8bdf5e5b-01f4-581a-871d-0b58aa6d4e5a",
+   "8fd7b5cc-c6d6-5f24-8b76-f30afd757939",
+   "bada5a83-a2d1-563d-8bff-e3bb85c61c36",
+   "c24bf07e-0fc5-5303-99a1-c62cf3d8b2cf",
+   "c7d52ba9-9966-5a11-956c-418a90bea74a",
+   "d182719e-f511-53f3-b837-2bb73fcbd6d7",
+   "d67805b2-d970-5810-9513-d2fea73b8471",
+   "df3174c6-65c7-5b88-a8ab-e5579151ae67",
+   "ebd00cd9-261f-54f5-8773-68e6daabb523"
+  ]
+ },
+ {
+  "tier": "S",
+  "task": "T1V",
+  "config": "points",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/S/T1/shard-00002.h5",
+  "sids": [
+   "002ed884-5b33-52e9-807c-d9fce77b83ef",
+   "19863d9b-1781-5919-ad27-2ebe207265d5",
+   "3bc1af2b-72bf-51d1-9a42-05403429011d",
+   "3f306c03-ad18-5292-bd64-47ef11e28e6b",
+   "492d20ef-c4c1-5de6-81df-5ef105969413"
+  ]
+ },
+ {
+  "tier": "S",
+  "task": "T3",
+  "config": "advanced",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/S/T3/shard-00000.h5",
+  "sids": [
+   "01ce9fa8-a7cb-5a95-8096-7260e5e5112e",
+   "1a683536-8779-584e-8839-75d0769deaa3",
+   "2985c3aa-7704-51a8-9e70-32be8e12960b",
+   "2af3313f-4346-507a-af17-f37edddbaf82",
+   "3847b5d6-08a9-5148-93e5-72d10a004537",
+   "3c93438a-95dc-5e9f-9192-c531110a154c",
+   "57086a53-228f-51d3-a62d-0450d5847dfb",
+   "7350dc63-c006-5550-ab00-acb35b2d299f",
+   "85f681a0-50c1-5025-ae49-426f065095e9",
+   "98ff37cf-0d79-50c4-b458-fb0530bdece0",
+   "99a83065-8f67-5f63-8629-d34c3f4fa083",
+   "cf6d5840-ced7-567a-b145-1df4a33f8e93",
+   "d29dfec9-500c-50df-a185-0a6de4137864",
+   "da213c10-1a74-5792-966a-61bf477dfd81",
+   "e2297b2c-dcd6-5541-b5fc-30a64e08dad8",
+   "e489e7e0-3f52-5961-b0cb-d2b60959caef",
+   "eb6a6f7e-9fa6-521b-915a-88c9aa1d9698"
+  ]
+ },
+ {
+  "tier": "S",
+  "task": "T3",
+  "config": "advanced",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/S/T3/shard-00001.h5",
+  "sids": [
+   "26ce150c-4bbf-5406-9cda-d45c26d1b21e",
+   "28a671f6-b47c-5a9b-8566-cff8d4095564",
+   "4238f8d5-c711-510d-ac2a-a06a068b4300",
+   "4e8d8990-9648-5cd8-9f84-88972314d457",
+   "526b4fdc-25c6-5907-89f9-bead637ab6b0",
+   "5cc279e6-b996-5766-9809-807b6a252cd4",
+   "6ff7fd4c-84e1-5ab2-90d6-82e1f7ccb4b1",
+   "716648b1-7430-56f1-8cf0-a6cda8776400",
+   "7575e24e-a991-565f-a103-e7e47e3fd56e",
+   "8bdf5e5b-01f4-581a-871d-0b58aa6d4e5a",
+   "8fd7b5cc-c6d6-5f24-8b76-f30afd757939",
+   "bada5a83-a2d1-563d-8bff-e3bb85c61c36",
+   "c24bf07e-0fc5-5303-99a1-c62cf3d8b2cf",
+   "c7d52ba9-9966-5a11-956c-418a90bea74a",
+   "d182719e-f511-53f3-b837-2bb73fcbd6d7",
+   "d67805b2-d970-5810-9513-d2fea73b8471",
+   "df3174c6-65c7-5b88-a8ab-e5579151ae67",
+   "ebd00cd9-261f-54f5-8773-68e6daabb523"
+  ]
+ },
+ {
+  "tier": "S",
+  "task": "T3",
+  "config": "advanced",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/S/T3/shard-00002.h5",
+  "sids": [
+   "002ed884-5b33-52e9-807c-d9fce77b83ef",
+   "19863d9b-1781-5919-ad27-2ebe207265d5",
+   "3bc1af2b-72bf-51d1-9a42-05403429011d",
+   "3f306c03-ad18-5292-bd64-47ef11e28e6b",
+   "492d20ef-c4c1-5de6-81df-5ef105969413"
+  ]
+ },
+ {
+  "tier": "M",
+  "task": "T1V",
+  "config": "points",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/M/T1/shard-00000.h5",
+  "sids": [
+   "10d637e5-e981-5126-bbf3-8cad71b0bacf",
+   "5009bce4-84ce-508e-a42b-424ad0050c71",
+   "a942f647-f91b-5322-b395-a53e5b647abc",
+   "ca50b859-df38-5a1c-8feb-7546a07f3eb1",
+   "d3bcdea1-13f8-516e-96ad-14bcee6c6008",
+   "e70f98ac-03c4-5624-bf46-b6834105bdff",
+   "ec6eecb2-4e5b-5cbb-9124-0dd712845bf4",
+   "f7f59e45-1617-5ec2-81e6-cf4f75c193aa"
+  ]
+ },
+ {
+  "tier": "M",
+  "task": "T1V",
+  "config": "points",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/M/T1/shard-00001.h5",
+  "sids": [
+   "0e161771-e822-55b3-bd78-c17fd660f0e5",
+   "1eb46033-bd15-5ae7-9c8e-6dbf25133cb6",
+   "4b69d1b9-f814-5ba1-81a2-b77b86ee0357",
+   "7df72e8f-b9dd-5540-8798-0c2ea6dde689",
+   "89870ed6-dffe-5b49-bbb4-d995cb586432",
+   "d07ff60e-ab99-5341-860e-0b662803d2f7",
+   "d8c0ba3a-dbc7-5027-88f9-c37f1ea99f95"
+  ]
+ },
+ {
+  "tier": "M",
+  "task": "T1V",
+  "config": "points",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/M/T1/shard-00002.h5",
+  "sids": [
+   "02335ad9-34f2-5a4e-a20b-9b7e6d08f6d6",
+   "07a85cc3-0f61-52e1-bc24-a53f2a12d552",
+   "3677cb55-dea1-55b7-90c1-7a82ba494af8",
+   "388ec3e8-d7d2-5374-acfd-c5489d160828",
+   "55d57113-d45f-519d-a9f2-26487c130e22",
+   "5cdf88f7-1d92-5aff-8ce7-62d703a6ac54",
+   "92b0aed6-50a1-5c5a-ac2a-e5975318b19e",
+   "c9233fe9-1922-5b54-9580-446a882aeff0",
+   "ca42f799-08bd-5c5e-96a6-4fe107f9b9aa",
+   "e45c6378-00a3-581e-b555-3f05f54f7c9d",
+   "e58af940-142b-5351-a81a-64b6d7b81db6",
+   "ed505b6d-907e-5a08-9b98-7829957d7ba1",
+   "f937c32c-8257-5392-bfa3-1b001498c2c7"
+  ]
+ },
+ {
+  "tier": "M",
+  "task": "T1V",
+  "config": "points",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/M/T1/shard-00003.h5",
+  "sids": [
+   "0241aa5a-ded1-5865-b0a3-0f752f8fbd0b",
+   "152cbb39-1409-5984-9805-ddca9333a150"
+  ]
+ },
+ {
+  "tier": "M",
+  "task": "T3",
+  "config": "advanced",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/M/T3/shard-00000.h5",
+  "sids": [
+   "10d637e5-e981-5126-bbf3-8cad71b0bacf",
+   "5009bce4-84ce-508e-a42b-424ad0050c71",
+   "a942f647-f91b-5322-b395-a53e5b647abc",
+   "ca50b859-df38-5a1c-8feb-7546a07f3eb1",
+   "d3bcdea1-13f8-516e-96ad-14bcee6c6008",
+   "e70f98ac-03c4-5624-bf46-b6834105bdff",
+   "ec6eecb2-4e5b-5cbb-9124-0dd712845bf4",
+   "f7f59e45-1617-5ec2-81e6-cf4f75c193aa"
+  ]
+ },
+ {
+  "tier": "M",
+  "task": "T3",
+  "config": "advanced",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/M/T3/shard-00001.h5",
+  "sids": [
+   "0e161771-e822-55b3-bd78-c17fd660f0e5",
+   "1eb46033-bd15-5ae7-9c8e-6dbf25133cb6",
+   "4b69d1b9-f814-5ba1-81a2-b77b86ee0357",
+   "7df72e8f-b9dd-5540-8798-0c2ea6dde689",
+   "89870ed6-dffe-5b49-bbb4-d995cb586432",
+   "d07ff60e-ab99-5341-860e-0b662803d2f7",
+   "d8c0ba3a-dbc7-5027-88f9-c37f1ea99f95"
+  ]
+ },
+ {
+  "tier": "M",
+  "task": "T3",
+  "config": "advanced",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/M/T3/shard-00002.h5",
+  "sids": [
+   "02335ad9-34f2-5a4e-a20b-9b7e6d08f6d6",
+   "07a85cc3-0f61-52e1-bc24-a53f2a12d552",
+   "3677cb55-dea1-55b7-90c1-7a82ba494af8",
+   "388ec3e8-d7d2-5374-acfd-c5489d160828",
+   "55d57113-d45f-519d-a9f2-26487c130e22",
+   "5cdf88f7-1d92-5aff-8ce7-62d703a6ac54",
+   "92b0aed6-50a1-5c5a-ac2a-e5975318b19e",
+   "c9233fe9-1922-5b54-9580-446a882aeff0",
+   "ca42f799-08bd-5c5e-96a6-4fe107f9b9aa",
+   "e45c6378-00a3-581e-b555-3f05f54f7c9d",
+   "e58af940-142b-5351-a81a-64b6d7b81db6",
+   "ed505b6d-907e-5a08-9b98-7829957d7ba1",
+   "f937c32c-8257-5392-bfa3-1b001498c2c7"
+  ]
+ },
+ {
+  "tier": "M",
+  "task": "T3",
+  "config": "advanced",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/M/T3/shard-00003.h5",
+  "sids": [
+   "0241aa5a-ded1-5865-b0a3-0f752f8fbd0b",
+   "152cbb39-1409-5984-9805-ddca9333a150"
+  ]
+ },
+ {
+  "tier": "L",
+  "task": "T1V",
+  "config": "points",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/L/T1/shard-00000.h5",
+  "sids": [
+   "4322e8a0-e862-5050-bb22-5e961e323f91",
+   "a3650f09-0345-5051-b257-12752ff54c89",
+   "a71db511-2bdb-5e0b-9934-f80c04935e52",
+   "c8236421-ba1d-54eb-aa09-8313dadf6e2b"
+  ]
+ },
+ {
+  "tier": "L",
+  "task": "T1V",
+  "config": "points",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/L/T1/shard-00001.h5",
+  "sids": [
+   "c7983484-4244-5b19-bc71-bd2fd67b6d0e"
+  ]
+ },
+ {
+  "tier": "L",
+  "task": "T1V",
+  "config": "points",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/L/T1/shard-00002.h5",
+  "sids": [
+   "484f575c-58a0-59aa-ac69-e295754a4421",
+   "5b6bdd54-34ec-5d56-b982-8b7301b73ab3",
+   "6484b63f-e03d-5dae-af61-97f2db1710c7",
+   "68b92e09-a87f-5c89-996d-c2d9e0f0a67c",
+   "6a9e3285-0171-5880-938a-5748640cf71e"
+  ]
+ },
+ {
+  "tier": "L",
+  "task": "T1V",
+  "config": "points",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/L/T1/shard-00003.h5",
+  "sids": [
+   "655f6e13-62e3-588b-88ad-f5100a2a9757",
+   "aac61cc3-cb98-598f-a245-2b208671d66b",
+   "e07de9f9-8b63-588e-bfbb-bf5d0f0702d9"
+  ]
+ },
+ {
+  "tier": "L",
+  "task": "T1V",
+  "config": "points",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/L/T1/shard-00004.h5",
+  "sids": [
+   "0999e7e3-a465-5c13-9e73-56c7dee86c5c"
+  ]
+ },
+ {
+  "tier": "L",
+  "task": "T1V",
+  "config": "points",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/L/T1/shard-00005.h5",
+  "sids": [
+   "1d58fd30-3329-5d97-8832-67710b86422f",
+   "d7754b2a-9fb9-570f-b212-7b736b0e07d4"
+  ]
+ },
+ {
+  "tier": "L",
+  "task": "T3",
+  "config": "advanced",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/L/T3/shard-00000.h5",
+  "sids": [
+   "4322e8a0-e862-5050-bb22-5e961e323f91",
+   "a3650f09-0345-5051-b257-12752ff54c89",
+   "a71db511-2bdb-5e0b-9934-f80c04935e52",
+   "c8236421-ba1d-54eb-aa09-8313dadf6e2b"
+  ]
+ },
+ {
+  "tier": "L",
+  "task": "T3",
+  "config": "advanced",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/L/T3/shard-00001.h5",
+  "sids": [
+   "c7983484-4244-5b19-bc71-bd2fd67b6d0e"
+  ]
+ },
+ {
+  "tier": "L",
+  "task": "T3",
+  "config": "advanced",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/L/T3/shard-00002.h5",
+  "sids": [
+   "484f575c-58a0-59aa-ac69-e295754a4421",
+   "5b6bdd54-34ec-5d56-b982-8b7301b73ab3",
+   "6484b63f-e03d-5dae-af61-97f2db1710c7",
+   "68b92e09-a87f-5c89-996d-c2d9e0f0a67c",
+   "6a9e3285-0171-5880-938a-5748640cf71e"
+  ]
+ },
+ {
+  "tier": "L",
+  "task": "T3",
+  "config": "advanced",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/L/T3/shard-00003.h5",
+  "sids": [
+   "655f6e13-62e3-588b-88ad-f5100a2a9757",
+   "aac61cc3-cb98-598f-a245-2b208671d66b",
+   "e07de9f9-8b63-588e-bfbb-bf5d0f0702d9"
+  ]
+ },
+ {
+  "tier": "L",
+  "task": "T3",
+  "config": "advanced",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/L/T3/shard-00004.h5",
+  "sids": [
+   "0999e7e3-a465-5c13-9e73-56c7dee86c5c"
+  ]
+ },
+ {
+  "tier": "L",
+  "task": "T3",
+  "config": "advanced",
+  "shard": "/storage/ice1/1/8/yxiao413/EcoFlowBench/aux/review_round2/cheap_baselines/hf/data/L/T3/shard-00005.h5",
+  "sids": [
+   "1d58fd30-3329-5d97-8832-67710b86422f",
+   "d7754b2a-9fb9-570f-b212-7b736b0e07d4"
+  ]
+ }
+]

@@ -1,0 +1,80 @@
+[
+ {
+  "at": "2026-10-18T02:41:29.199",
+  "block": 3,
+  "cum_max": 10.221665,
+  "cum_sum": 12575.955732686807,
+  "host": "atl1-1-01-005-4-2.pace.gatech.edu",
+  "parallelize": false,
+  "radius": 32,
+  "sample_id": "0e161771-e822-55b3-bd78-c17fd660f0e5",
+  "threads": 1,
+  "tier": "M",
+  "wall_s": 103.40750113
+ },
+ {
+  "at": "2026-10-18T02:42:38.821",
+  "block": 3,
+  "cum_max": 13.999872,
+  "cum_sum": 134317.2021365799,
+  "host": "atl1-1-01-005-4-2.pace.gatech.edu",
+  "parallelize": false,
+  "radius": 32,
+  "sample_id": "10d637e5-e981-5126-bbf3-8cad71b0bacf",
+  "threads": 1,
+  "tier": "M",
+  "wall_s": 68.470768145
+ },
+ {
+  "at": "2026-10-18T02:44:01.828",
+  "block": 3,
+  "cum_max": 10.352931,
+  "cum_sum": 36684.1722314246,
+  "host": "atl1-1-01-005-4-2.pace.gatech.edu",
+  "parallelize": false,
+  "radius": 32,
+  "sample_id": "1eb46033-bd15-5ae7-9c8e-6dbf25133cb6",
+  "threads": 1,
+  "tier": "M",
+  "wall_s": 82.77994653
+ },
+ {
+  "at": "2026-10-18T02:45:02.280",
+  "block": 3,
+  "cum_max": 21.577723,
+  "cum_sum": 323438.55182936357,
+  "host": "atl1-1-01-005-4-2.pace.gatech.edu",
+  "parallelize": false,
+  "radius": 32,
+  "sample_id": "4b69d1b9-f814-5ba1-81a2-b77b86ee0357",
+  "threads": 1,
+  "tier": "M",
+  "wall_s": 60.226231689
+ },
+ {
+  "at": "2026-10-18T02:51:01.942",
+  "block": 5,
+  "cum_max": 187.20323,
+  "cum_sum": 2.767848319741532e6,
+  "host": "atl1-1-01-005-4-2.pace.gatech.edu",
+  "parallelize": false,
+  "radius": 64,
+  "sample_id": "4322e8a0-e862-5050-bb22-5e961e323f91",
+  "threads": 1,
+  "tier": "L",
+  "wall_s": 359.3523465
+ },
+ {
+  "at": "2026-10-18T02:54:17.424",
+  "block": 5,
+  "cum_max": 263.4615,
+  "cum_sum": 1.6031567207782709e6,
+  "host": "atl1-1-01-005-4-2.pace.gatech.edu",
+  "parallelize": false,
+  "radius": 64,
+  "sample_id": "a3650f09-0345-5051-b257-12752ff54c89",
+  "threads": 1,
+  "tier": "L",
+  "wall_s": 194.674342586
+ }
+]

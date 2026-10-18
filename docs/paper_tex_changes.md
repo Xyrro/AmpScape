@@ -85,6 +85,32 @@ the following was fixed:
   longer has a page with one small figure; appendix float pages are top-aligned (`\@fptop = 0pt`) instead of centred.
 - Figure 16 (precision pass): the "QC threshold" and "target" labels sat on the data lines; both are legend entries now.
 
+## Review round 2 (2026-10-18): ten external review points, the agreed ones fixed
+Owner forwarded ten review points; the assessment and the decisions are in `DECISIONS.md` (2026-10-18). What changed in
+the paper:
+- **Speed-ups are stated with their basis** (point 1). The production solver runs one solve per core with Omniscape's
+  parallelisation off; `scripts/review/omniscape_threads.*` re-time the production T4 solve with `parallelize = true`
+  on one CPU node (1.6× at M, 1.8× at L; no gain beyond 8 threads). New appendix "Like-for-like solver cost and cheap
+  numerical baselines": thread timings, like-for-like speed-ups, training cost and break-even maps
+  (`docs/tables/review_round2_threads.md`); the abstract, the introduction, the results and the many-query section
+  carry the like-for-like figure next to the single-core one.
+- **Tasks without baselines are declared** (point 3): T2, T1W, T1R.
+- **T1/T3 reframed as operator-learning stress tests** (point 4) with two cheap numerical competitors scored on
+  `test_id` subsets (`scripts/review/cheap_baselines.sbatch`, `pcg_truncated.jl`, `baseline_coarsen.py`): truncated
+  AMG-PCG after k iterations and coarsen-×4; Table and Figure in the new appendix; two PCG iterations beat every learned
+  T3 model at S and M and equal the best at L (`docs/tables/review_round2_cheap.md`).
+- **One primary metric** (point 6): rel-L2; log-MAE is the training-loss-space metric.
+- **Pinch-point precision beside the 11,077× figure** (point 9), including the abstract.
+- **Operator-learning framing and adoption evidence** (point 10): 1,936 Scopus citations of McRae et al. 2008 and the
+  459 applications reviewed by Dickson et al. 2019 (`paper/sections/related_work_sources.md` P43–P44).
+- **New runs within the 16 GPU-h cap** (points 2, 7, 8; `scripts/review/submit_round2_gpu.sh`, H100 on `ice-gpu`):
+  MgNO seeds 2–3 at S/M on T1/T4 (MgNO diverges in 4 of 6 T4 runs under the shared protocol — reported as an
+  instability, not patched), scale-aware seeds 2–3 for the U-Net and FNO w48 on T4 at L with XL/XXL transfers, and one
+  U-Net T4 run trained at XL on its 880 training landscapes. The ViT at L is not re-tuned: the tuning pass had already
+  tried patch-16 and patch-8 there (+47.8 % / +63.5 % validation loss); the text now says so.
+- Not done, stated as limitations: converged retraining of every configuration, new operator families, published
+  resistance surfaces at M/L, an exact T4 reference at XL/XXL.
+
 ## Open points for the owner
 - **Style file:** swap `neurips_2026.sty` for `neurips_2027.sty` and delete the preamble override as soon as NeurIPS
   publishes it; re-check the page limit, the track option name and the checklist wording against the 2027 call.

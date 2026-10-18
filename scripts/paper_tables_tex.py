@@ -127,15 +127,15 @@ def main() -> None:
                 bold.add((len(rows) + min(vals)[1], j))
         rows += block
     (out / "tab_results_main.tex").write_text(table(rows, ["task", "model", "S", "M", "L"], ["paper/tables/baselines_sml.md"],
-                                                     "Relative L2 on \\texttt{test\\_id} at the training tier, mean $\\pm$ std over three seeds with the median over seeds in brackets (official configuration per model $\\times$ task $\\times$ tier; MgNO: one seed, not ranked). Best three-seed model per task and tier in bold; lower is better. The complete metric set (MAE, top-5\\,\\% IoU, pinch recall, Spearman, speed-up, training cost) is Table~\\ref{tab:baselines_full}.",
-                                                     "tab:results", "llccc", size="\\small", bold=bold))
+                                                     "Relative L2 on \\texttt{test\\_id} at the training tier, mean $\\pm$ std over three seeds with the median over seeds in brackets (official configuration per model $\\times$ task $\\times$ tier; MgNO: three seeds at S and M, not ranked because 4 of its 6 T4 runs diverged, see text). Best three-seed model per task and tier in bold; lower is better. The complete metric set (MAE, top-5\\,\\% IoU, pinch recall, Spearman, speed-up, training cost) is Table~\\ref{tab:baselines_full}.",
+                                                     "tab:results", "llccc", size="\\scriptsize", bold=bold))
 
     # ---- appendix: full metric table on test_id
     rows = [[r["task"], r["tier"], r["model"], f"{r['rel-L2']} [{r['rel-L2 median']}]", r["MAE log10"], r["top-5 % IoU"], r["pinch recall"], r["Spearman"], r["speed-up (median)"], r["train GPU-h"]]
             for r in sorted(bs, key=lambda r: (r["task"], TIERS.index(r["tier"]), MODELS.index(r["model"])))]
     (out / "tab_baselines_full.tex").write_text(table(rows, ["task", "tier", "model", "rel-L2 [median]", "MAE log$_{10}$", "top-5\\,\\% IoU", "pinch recall", "Spearman", "speed-up", "GPU-h / run"],
                                                        ["paper/tables/baselines_sml.md"],
-                                                       "Learned baselines on \\texttt{test\\_id}, every metric (mean $\\pm$ std over three seeds, MgNO one seed; median speed-up = solver wall time / inference time per landscape; GPU-h = training cost per run).",
+                                                       "Learned baselines on \\texttt{test\\_id}, every metric (mean $\\pm$ std over three seeds; median speed-up = solver wall time / inference time per landscape; GPU-h = training cost per run).",
                                                        "tab:baselines_full", "llllllllrr", size="\\scriptsize", star=True))
 
     # ---- appendix: configuration decisions
@@ -226,6 +226,40 @@ def main() -> None:
     (out / "tab_licences.tex").write_text(table(rows, ["layer", "version", "licence", "derived rasters redistributed"], ["docs/licenses.md"],
                                                "Upstream data sources, their licences and what AmpScape stores (derived rasters only; never the source tiles). WDPA polygons (restrictive licence) and OpenStreetMap (ODbL) are not used. The dataset is released under CC BY 4.0, code and solver wrapper under MIT.",
                                                "tab:licences", "p{2.9cm}p{2.9cm}p{4.6cm}p{2.7cm}", size="\\scriptsize", star=True, placement="htbp"))
+    # ---- appendix (review round 2): Omniscape wall time vs threads, like-for-like speed-up and break-even
+    thr = ROOT / "docs" / "tables" / "review_round2_threads.md"
+    if thr.exists():
+        rows_t = [[r["tier"], r["threads"], r["n landscapes"], r["wall s per landscape (median)"], r["speed-up vs 1 thread"], r["parallel efficiency"]] for r in md_rows(thr) if "threads" in r]
+        (out / "tab_threads.tex").write_text(table(rows_t, ["tier", "Julia threads", "landscapes", "wall s / landscape (median)", "speed-up vs 1 thread", "parallel efficiency"], ["docs/tables/review_round2_threads.md"],
+                                               "Production Omniscape solve (radius / block: M 32 / 3, L 64 / 5; CHOLMOD window solver; artefact correction on) on the first \\texttt{test\\_id} reference landscapes with Omniscape's own parallelisation (\\texttt{parallelize = true}) on one CPU node; 1 thread is the production setting under which every solver time in this paper was measured.",
+                                               "tab:threads", "llrrrr", size="\\footnotesize"))
+        rows_b = [[r["tier"], r["model"], r["inference s / map (GPU)"], r["train GPU-h"], r["solver s / map, 1 thread"], r["speed-up, 1 thread"], r["solver s / map, max threads"].split(" (")[0], r["speed-up, max threads"], r["break-even maps (1 thread)"], r["break-even maps (max threads)"]] for r in md_rows(thr) if "break-even maps (1 thread)" in r]
+        (out / "tab_breakeven.tex").write_text(table(rows_b, ["tier", "model", "inference s", "train GPU-h", "solver s (1)", "speed-up (1)", "solver s (24)", "speed-up (24)", "break-even (1)", "break-even (24)"], ["docs/tables/review_round2_threads.md"],
+                                                 "Like-for-like cost of the T4 surrogates at M and L (rel-L2 against the exact block-1 map in Table~\\ref{tab:pareto_M} and \\ref{tab:pareto_L}): GPU inference seconds per landscape (batch-amortised, official runs, seed mean) and training GPU-hours of one run against the production solver's seconds per landscape on 1 and on 24 threads (Table~\\ref{tab:threads}); break-even = the number of maps from which training once plus inference costs less wall time than the solver, $N \\ge T_{\\mathrm{train}} / (t_{\\mathrm{solver}} - t_{\\mathrm{inference}})$. GPU and CPU-node hours are not priced equally; only wall time is compared.",
+                                                 "tab:breakeven", "llrrrrrrrr", size="\\scriptsize", star=True))
+    # ---- appendix (review round 2): truncated PCG and coarsen-x4 against the learned models on T3 and T1
+    ch = ROOT / "docs" / "tables" / "review_round2_cheap.md"
+    if ch.exists():
+        import json as _json
+        d = _json.loads((ROOT / "docs" / "tables" / "review_round2_cheap.json").read_text())
+        rows_c = []
+        for task, lt in (("T3", "T3"), ("T1V", "T1")):
+            for tier in ("S", "M", "L"):
+                cells = [lt if task == "T3" else "T1 (first pair)", tier]
+                for k in (1, 2, 4):
+                    v = d.get(f"{task}_{tier}_k{k}")
+                    cells.append(f"{v['rel_l2']:.4f} / {v['cost_s']:.4f}" if v else "--")
+                v = d.get(f"{task}_{tier}_conv")
+                cells.append(f"{v['iters']:.0f} / {v['time_s']:.4f}" if v else "--")
+                v = d.get(f"coarsen4_{lt}_{tier}")
+                cells.append(f"{v['rel_l2']:.4f} / {v['cost_s']:.4f}" if v else "--")
+                best = min((v for key, v in d.items() if key.startswith(f"learned_{lt}_{tier}_")), key=lambda v: v["rel_l2"], default=None)
+                name = next((key.split("_")[-1] for key, v in d.items() if key.startswith(f"learned_{lt}_{tier}_") and v is best), "")
+                cells.append(f"{best['rel_l2']:.3f} / {best['inference_s']:.5f} ({name})" if best else "--")
+                rows_c.append(cells)
+        (out / "tab_cheap.tex").write_text(table(rows_c, ["task", "tier", "PCG $k=1$", "PCG $k=2$", "PCG $k=4$", "PCG to $10^{-6}$: iters / s", "coarsen $\\times 4$", "best learned (GPU)"], ["docs/tables/review_round2_cheap.md"],
+                                             "Cheap numerical baselines on T3 and the first T1 pair, rel-L2 / cost in seconds per landscape on one CPU core (median over the \\texttt{test\\_id} subsets of Appendix~\\ref{app:cheap}): AMG-preconditioned CG from zero stopped after $k$ iterations (cost includes the AMG setup), the full PCG solve to relative residual $10^{-6}$, and coarsen-$\\times 4$-solve-upsample; the last column is the best learned model's rel-L2 on the whole split (seed mean; T1: the full cumulative map) with its GPU inference time per landscape.",
+                                             "tab:cheap", "llllllll", size="\\scriptsize", star=True))
     print("tables:", sorted(p.name for p in out.glob("*.tex")))
 
 

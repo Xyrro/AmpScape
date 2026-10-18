@@ -35,6 +35,7 @@ import sys
 import matplotlib
 
 matplotlib.use("Agg")
+import matplotlib.lines  # noqa: E402
 import matplotlib.patches  # noqa: E402
 import matplotlib.ticker  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
@@ -202,7 +203,7 @@ def error_vs_tier(out: pathlib.Path) -> None:
     df["base"] = [p[0] for p in parsed]
     df["seed"] = [p[3] for p in parsed]
     df["suffix"] = [p[4] for p in parsed]
-    learned = prefer_tuned(df[df.seed.notna() & (df.suffix == "")])
+    learned = prefer_tuned(df[df.seed.notna() & (df.suffix == "") & df.tier.isin(["S", "M", "L"])])  # in-tier training runs only (the XL-trained U-Net is quoted from baselines_full.md)
     metrics = ["rel_l2", "mae_log10eps", "top5_iou", "pinch_recall", "spearman"]
     agg = (
         learned.groupby(["task", "tier", "base"])[metrics + ["speed-up (median)", "train GPU-h"]]
@@ -565,7 +566,7 @@ def ood_degradation(out: pathlib.Path) -> None:
     df["base"] = [p[0] for p in parsed]
     df["seed"] = [p[3] for p in parsed]
     df["suffix"] = [p[4] for p in parsed]
-    df = prefer_tuned(df[df.seed.notna() & (df.suffix == "")].copy())
+    df = prefer_tuned(df[df.seed.notna() & (df.suffix == "") & df.tier.isin(["S", "M", "L"])].copy())  # in-tier training runs only
     df["split"] = df.split.replace({"published S": "published"})
     splits = ["test_id", "test_ood", "ood_region", "published"]
     df = df[df.split.isin(splits)]
@@ -809,7 +810,7 @@ def fig_overview() -> None:
     if cov is not None and (len(names) != len(cov) or any(len(n) <= 2 for n in names)):
         names = ["land cover", "elevation", "slope", "distance to road", "distance to river", "human modification"][: len(cov)]
     with plt.rc_context(PAPER_STYLE):
-        W, H = FULLW, 2.3
+        W, H = FULLW, 2.15
         fig = plt.figure(figsize=(W, H))
         side = 0.74 / W  # panel width in figure fraction (0.74 in)
         ph = 0.74 / H
@@ -878,7 +879,7 @@ def fig_gallery() -> None:
         return
     n = len(tiers)
     with plt.rc_context(PAPER_STYLE):
-        fig, axes = plt.subplots(3, 2 * n + 1, figsize=(FULLW, 1.95), gridspec_kw=dict(wspace=0.1, hspace=0.06, width_ratios=[1] * n + [0.3] + [1] * n))
+        fig, axes = plt.subplots(3, 2 * n + 1, figsize=(FULLW, 1.85), gridspec_kw=dict(wspace=0.1, hspace=0.06, width_ratios=[1] * n + [0.3] + [1] * n))
         for ax in axes[:, n]:
             ax.axis("off")
         rows = (("$\\log_{10} R$", "viridis"), ("T1\ncurrent", "magma"), ("T4\ncurrent", "magma"))
@@ -914,7 +915,7 @@ def fig_qualitative() -> None:
     with plt.rc_context(PAPER_STYLE):
         ratios = ([1, 1, 1, 1] + [0.18]) * nc
         ratios = ratios[:-1] + [0.08]  # last column: colour bar
-        fig, axes = plt.subplots(2, len(ratios), figsize=(FULLW, 1.85), gridspec_kw=dict(wspace=0.06, hspace=0.08, width_ratios=ratios))
+        fig, axes = plt.subplots(2, len(ratios), figsize=(FULLW, 1.75), gridspec_kw=dict(wspace=0.06, hspace=0.08, width_ratios=ratios))
         for i, task in enumerate(("T1", "T4")):
             cfg = "points" if task == "T1" else "omniscape"
             data = {c: _npz(f"qual_L_{c}") for c in cases}
@@ -966,7 +967,7 @@ def fig_error_vs_tier_tex() -> None:
         return
     with plt.rc_context(PAPER_STYLE):
         tasks = ["T1", "T3", "T4"]
-        fig, axes = plt.subplots(1, 3, figsize=(FULLW, 1.9), gridspec_kw=dict(wspace=0.35))
+        fig, axes = plt.subplots(1, 3, figsize=(FULLW, 1.65), gridspec_kw=dict(wspace=0.35))
         for ax, task in zip(axes, tasks, strict=False):
             for base in MODEL_ORDER:
                 lab = MODEL_LABEL[base]
@@ -978,7 +979,7 @@ def fig_error_vs_tier_tex() -> None:
                 ms = [_parse_ms(r["rel-L2"]) for r in g]
                 y = [m for m, _ in ms]
                 e = [0 if np.isnan(s) else s for _, s in ms]
-                ax.errorbar(x, y, yerr=e, marker="o", ms=3.5, capsize=2, lw=1.2, color=MODEL_COLOR[base], label=lab + (" (1 seed)" if base == "mgno" else ""))
+                ax.errorbar(x, y, yerr=e, marker="o", ms=3.5, capsize=2, lw=1.2, color=MODEL_COLOR[base], label=lab)
             ax.set_xticks([0, 1, 2])
             ax.set_xticklabels(["S\n128²", "M\n256²", "L\n512²"])
             ax.set_yscale("log")
@@ -998,7 +999,7 @@ def fig_pareto_L_tex() -> None:
     if not rows:
         return
     with plt.rc_context(PAPER_STYLE):
-        fig, ax = plt.subplots(figsize=(HALFW, 2.55))
+        fig, ax = plt.subplots(figsize=(HALFW, 2.35))
         seen = set()
         solver_pts = []
         for r in rows:
@@ -1057,7 +1058,7 @@ def fig_scale_transfer_tex() -> None:
     if not rows:
         return
     with plt.rc_context(PAPER_STYLE):
-        fig, axes = plt.subplots(1, 2, figsize=(FULLW, 2.0), gridspec_kw=dict(wspace=0.3))
+        fig, axes = plt.subplots(1, 2, figsize=(FULLW, 1.85), gridspec_kw=dict(wspace=0.3))
         for ax, task in zip(axes, ("T4", "T1"), strict=False):
             for base in MODEL_ORDER:
                 lab = MODEL_LABEL[base]
@@ -1120,7 +1121,7 @@ def fig_ood_tex(tasks=("T1", "T4"), name="fig7_ood", stacked=True) -> None:
         subs[task] = sorted(sub, key=lambda r: (TIER_ORDER.index(r["tier"]), MODEL_ORDER.index(inv[r["model"]])))
     with plt.rc_context(PAPER_STYLE):
         if stacked:
-            fig, axes = plt.subplots(len(tasks), 1, figsize=(HALFW, 1.25 * len(tasks) + 0.45), gridspec_kw=dict(hspace=0.12), sharex=True)
+            fig, axes = plt.subplots(len(tasks), 1, figsize=(HALFW, 1.15 * len(tasks) + 0.45), gridspec_kw=dict(hspace=0.12), sharex=True)
             axes = np.atleast_1d(axes)
             for ax, task in zip(axes, tasks, strict=False):
                 _ood_panel(ax, subs[task], ratios)
@@ -1181,7 +1182,7 @@ def figA_training_curves() -> None:
                     lo, hi = min(lo, float(v.min())), max(hi, float(v.max()))
             ax.set_yscale("log")
             if np.isfinite(lo) and hi > 0:
-                ax.set_ylim(lo * 0.5, hi * 1.5)
+                ax.set_ylim(lo * 0.5, min(hi * 1.5, 10.0))  # exploded MgNO seeds leave the frame instead of flattening the others
             ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
             ax.yaxis.set_major_locator(matplotlib.ticker.LogLocator(numticks=4))
             seeds = len(groups[key])
@@ -1190,7 +1191,7 @@ def figA_training_curves() -> None:
             ax.grid(alpha=0.25, which="both", lw=0.4)
         for ax in axes[len(keys):]:
             ax.axis("off")
-        fig.text(0.5, 0.0, "epoch — solid: validation loss (masked MSE, log target); dotted: training loss; one line per seed (MgNO: one seed)", ha="center", va="bottom", fontsize=7)
+        fig.text(0.5, 0.0, "epoch — solid: validation loss (masked MSE, log target); dotted: training loss; one line per seed (MgNO: diverged seeds included)", ha="center", va="bottom", fontsize=7)
         _save(fig, "figA_training_curves")
 
 
@@ -1435,7 +1436,7 @@ def tex_figures(only: set[str] | None = None) -> None:
     """All figures of the LaTeX paper (paper/neurips/figures/)."""
     fns = [fig_overview, fig_gallery, fig_qualitative, fig_error_vs_tier_tex, fig_pareto_L_tex, fig_scale_transfer_tex,
            fig_ood_tex, lambda: fig_ood_tex(("T1", "T3", "T4"), "figA_ood_all", stacked=False),
-           figA_training_curves, figA_data_scaling, figA_fidelity, figA_precision, figA_wp7, figA_stats]
+           figA_training_curves, figA_data_scaling, figA_fidelity, figA_precision, figA_wp7, figA_stats, figA_cheap_baselines]
     for fn in fns:
         name = getattr(fn, "__name__", "fig_ood_all")
         if only and not any(o in name for o in only):
@@ -1474,6 +1475,53 @@ def main() -> None:
     if a.tex:
         tex_figures(set(a.only) if a.only else None)
     log("done")
+
+
+
+def figA_cheap_baselines() -> None:
+    """Appendix (review round 2): error versus cost on T3 and the first T1 pair — truncated AMG-PCG (k iterations, one
+    CPU core), coarsen-×4 (one core) and the learned models (GPU inference per landscape, seed mean on the whole split)."""
+    p = ROOT / "docs" / "tables" / "review_round2_cheap.json"
+    if not p.exists():
+        return
+    d = json.loads(p.read_text())
+    tier_color = {"S": "#1f77b4", "M": "#ff7f0e", "L": "#2ca02c"}
+    with plt.rc_context(PAPER_STYLE):
+        fig, axes = plt.subplots(1, 2, figsize=(FULLW, 2.3), gridspec_kw=dict(wspace=0.3))
+        for ax, task, lt in zip(axes, ("T3", "T1V"), ("T3", "T1")):
+            for tier in ("S", "M", "L"):
+                ks = sorted(int(k.split("_k")[1]) for k in d if k.startswith(f"{task}_{tier}_k"))
+                if not ks:
+                    continue
+                pts = []
+                for k in ks:  # stop the curve at the first point below the plotted floor
+                    v = d[f"{task}_{tier}_k{k}"]
+                    pts.append((v["cost_s"], max(v["rel_l2"], 1e-4), k))
+                    if v["rel_l2"] < 1e-4:
+                        break
+                ax.plot([x for x, _, _ in pts], [y for _, y, _ in pts], "-", color=tier_color[tier], lw=1.0, marker=".", ms=4, label=f"PCG, {tier}")
+                for x, y, k in pts:
+                    if k in (1, 2, 4):
+                        ax.annotate(f"k={k}", (x, y), textcoords="offset points", xytext=(4, -2 if k == 1 else 2), fontsize=5.5, color=tier_color[tier], va="top" if k == 1 else "bottom")
+                c = d.get(f"coarsen4_{lt}_{tier}")
+                if c:
+                    ax.scatter([c["cost_s"]], [max(c["rel_l2"], 1e-4)], marker="s", s=28, facecolor="w", edgecolor=tier_color[tier], lw=1.1, zorder=3, label=f"coarsen ×4, {tier}")
+                for key, v in d.items():
+                    if key.startswith(f"learned_{lt}_{tier}_"):
+                        base = {"U-Net": "unet", "FNO": "fno", "ViT": "vit", "GNN": "gnn", "MgNO": "mgno"}[key.split("_")[-1]]
+                        ax.scatter([v["inference_s"]], [v["rel_l2"]], marker="^", s=30, color=MODEL_COLOR[base], edgecolor=tier_color[tier], lw=0.8, zorder=4)
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.set_ylim(5e-5, 1.5)
+            ax.set_xlabel("cost per landscape (s)")
+            ax.set_title({"T3": "T3 advanced mode", "T1V": "T1 (PCG, coarsen: first pair; learned: full map)"}[task], fontsize=7.5)
+            ax.grid(alpha=0.3, which="both", lw=0.5)
+        axes[0].set_ylabel("rel-L2 on test_id (median; learned: mean)")
+        h, l = axes[0].get_legend_handles_labels()
+        for base in ("unet", "fno", "vit", "gnn", "mgno"):
+            h.append(matplotlib.lines.Line2D([], [], marker="^", ls="", color=MODEL_COLOR[base], ms=5)); l.append(f"{MODEL_LABEL[base]} (GPU)")
+        fig.legend(h, l, frameon=False, loc="upper center", ncol=6, bbox_to_anchor=(0.5, 1.12), fontsize=6, columnspacing=0.8, handlelength=1.4)
+        _save(fig, "figA_cheap_baselines")
 
 
 if __name__ == "__main__":

@@ -79,8 +79,8 @@ def model_rows(runs: list[pathlib.Path], tier: str) -> pd.DataFrame:
             rows.append(
                 {
                     "split": rr["splits"][0],
-                    "method": re.sub(
-                        r"_s\d+(_t2)?$", lambda m_: " (tuned)" if m_.group(1) else "", r.name
+                    "method": re.sub(  # seeds of one configuration share a row; the scale-aware suffix is kept (2026-10-18)
+                        r"_s\d+(_t2)?(_scalenorm)?$", lambda m_: (m_.group(2) or "") + (" (tuned)" if m_.group(1) else ""), r.name
                     ),
                     "seed": r.name,
                     "n": rr["n_rows"],
@@ -110,8 +110,8 @@ def model_rows(runs: list[pathlib.Path], tier: str) -> pd.DataFrame:
             rows.append(
                 {
                     "split": split,
-                    "method": re.sub(
-                        r"_s\d+(_t2)?$", lambda m_: " (tuned)" if m_.group(1) else "", r.name
+                    "method": re.sub(  # seeds of one configuration share a row; the scale-aware suffix is kept (2026-10-18)
+                        r"_s\d+(_t2)?(_scalenorm)?$", lambda m_: (m_.group(2) or "") + (" (tuned)" if m_.group(1) else ""), r.name
                     ),
                     "seed": r.name,
                     "n": e.get("n_rows"),

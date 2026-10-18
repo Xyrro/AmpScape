@@ -3290,3 +3290,47 @@ they combined together, it's too small to read")
 ## Operations
 GPU use for this step: none. Login-node work: figure regeneration (≈ 4 min, 1.2 GB peak) and Tectonic builds.
 Offloader loop and keepalive running. GitHub main = origin after this push.
+
+---
+
+# Status — 2026-10-18 05:30Z: review round 2 applied — like-for-like costs, cheap baselines, MgNO/scale-aware seeds, XL-trained run; paper rebuilt at nine pages
+
+## Done (owner: "fix the ones you agreed with … up to 16 GPU-hours … check the correctness")
+1. **Like-for-like speed-ups (point 1).** Production Omniscape re-timed with its own parallelisation on one CPU node
+   (`scripts/review/omniscape_threads.*`): 1.64× at M and 1.85× at L on 8 threads, nothing more at 24. The paper
+   now states every speed-up's basis, the like-for-like figures (14,235× / 22,916× at M / L for the U-Net; 5,955× for
+   the demonstration), the training cost and the break-even number of maps (37 maps at L; 13 for the demo). New
+   Appendix C with `tab_threads`, `tab_breakeven` (`docs/tables/review_round2_threads.md`).
+2. **Cheap numerical baselines (point 4).** Truncated AMG-PCG after k iterations and coarsen-×4 on `test_id` subsets
+   (`scripts/review/cheap_baselines.sbatch`): two PCG iterations reach rel-L2 0.038 / 0.048 / 0.324 on T3 at S / M / L
+   against 0.111 / 0.202 / 0.323 for the best learned model, at 0.02–0.65 s per landscape on one core. T1/T3 are
+   reframed as operator-learning stress tests; table + figure in Appendix C (`docs/tables/review_round2_cheap.md`).
+3. **Text fixes (points 3, 6, 9, 10):** T2/T1W/T1R declared released without learned baselines; rel-L2 the single
+   primary metric; pinch-point precision 0.657 in the same sentence as 11,077× (abstract included); abstract and
+   introduction lead with the operator-learning framing and cite adoption (1,936 Scopus citations of McRae et al.
+   2008; 459 applications reviewed by Dickson et al. 2019).
+4. **New runs (points 2, 7, 8; 14.64 of the 16 GPU-h cap, H100 on `ice-gpu`/`coc-ice`; three legs lost to a known bad
+   node and resubmitted):** MgNO seeds 2–3 at S/M on T1/T4 — MgNO **diverges in 4 of 6 T4 runs and 2 of 6 T1 runs**
+   under the shared protocol (training loss → 1e6–1e21 in the first epochs); reported as an instability, not patched
+   (`docs/tables/review_round2_mgno.md`). Scale-aware seeds 2–3 for U-Net and FNO w48 on T4 at L: U-Net 0.194 ± 0.008
+   at XL and 0.321 ± 0.015 at XXL (was seed-1 0.189 / 0.312), FNO 0.158 ± 0.001 at XL. One U-Net T4 run trained at XL
+   on its 880 landscapes: rel-L2 0.249 on XL test_id, between zero-shot (0.515) and scale-aware (0.194) from L. The
+   ViT at L was *not* re-tuned: the tuning pass had tried patch-16/patch-8 there (+47.8 % / +63.5 %); now stated.
+5. **Correctness checks:** every table and figure regenerated from `runs/full` (Pareto rows pool the scale-aware
+   seeds; in-tier tables exclude the XL-trained run), `main.pdf` rebuilt (29 pages; **nine content pages**, references
+   start at the top of page 10), build log 0 overfull / 0 missing glyphs, `check_draft_numbers.py --tex` 2,268 tokens
+   / 0 untraceable / 0 untagged, every changed page inspected at print size, `tests/test_no_pattern_kills.py` passes.
+
+## Not done, by design (stated as limitations in the paper)
+Converged (non-budget-limited) retraining of every configuration, new operator families, published resistance
+surfaces at M/L, an exact T4 reference at XL/XXL, FNO scale-aware seeds at XXL (budget).
+
+## Open for the owner
+- The new runs are offloaded to the Hub by the running offloader loop; the **leaderboard** (`aux/leaderboard/`) still
+  holds the pre-round-2 baselines — re-seeding and pushing it needs your approval (Hub push gate).
+- Scratch deletion rows: still waiting for your choice; nothing deleted. `aux/review_round2/` holds 1.3 GB of fetched
+  shards and coarse builds that can go once the paper is final.
+
+## Operations
+GPU use for this step: 14.64 GPU-h (`scripts/review/gpu_budget.sh`). CPU: two Slurm jobs (≈ 1.5 node-hours).
+Offloader loop and keepalive running. GitHub main = origin after this push.

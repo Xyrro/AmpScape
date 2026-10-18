@@ -1,0 +1,21 @@
+% src: docs/tables/review_round2_cheap.md
+\begin{table*}[tb]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{Cheap numerical baselines on T3 and the first T1 pair, rel-L2 / cost in seconds per landscape on one CPU core (median over the \texttt{test\_id} subsets of Appendix~\ref{app:cheap}): AMG-preconditioned CG from zero stopped after $k$ iterations (cost includes the AMG setup), the full PCG solve to relative residual $10^{-6}$, and coarsen-$\times 4$-solve-upsample; the last column is the best learned model's rel-L2 on the whole split (seed mean; T1: the full cumulative map) with its GPU inference time per landscape.}
+\label{tab:cheap}
+\setlength{\tabcolsep}{2.2pt}
+\begin{tabular}{llllllll}
+\toprule
+task & tier & PCG $k=1$ & PCG $k=2$ & PCG $k=4$ & PCG to $10^{-6}$: iters / s & coarsen $\times 4$ & best learned (GPU) \\
+\midrule
+T3 & S & 0.2177 / 0.0190 & 0.0380 / 0.0214 & 0.0011 / 0.0263 & 10 / 0.0404 & 0.2856 / 0.0246 & 0.111 / 0.00031 (U-Net) \\
+T3 & M & 0.2283 / 0.0806 & 0.0480 / 0.0910 & 0.0021 / 0.1118 & 12 / 0.1943 & 0.3042 / 0.0665 & 0.202 / 0.00300 (U-Net) \\
+T3 & L & 0.5581 / 0.6019 & 0.3235 / 0.6480 & 0.0540 / 0.7404 & 17 / 1.1828 & 0.2932 / 0.2460 & 0.323 / 0.00299 (FNO) \\
+T1 (first pair) & S & 0.3328 / 0.0205 & 0.0859 / 0.0230 & 0.0066 / 0.0284 & 10 / 0.0476 & 0.4204 / 0.0361 & 0.114 / 0.00061 (U-Net) \\
+T1 (first pair) & M & 0.6460 / 0.0897 & 0.1972 / 0.1007 & 0.0156 / 0.1227 & 12 / 0.2626 & 0.5699 / 0.0967 & 0.187 / 0.00237 (U-Net) \\
+T1 (first pair) & L & 0.6644 / 0.3873 & 0.2425 / 0.4330 & 0.1058 / 0.5138 & 16 / 0.9643 & 0.5261 / 0.4217 & 0.299 / 0.00648 (FNO) \\
+\bottomrule
+\end{tabular}
+\end{table*}

@@ -104,3 +104,5 @@ P8, P27, P32); 0 items fail to resolve. `related_work.md` cites only verified cl
 - [32] does not support the effective-resistance-PE claim; replace by Velingker et al. 2023 / Black et al. 2024 if the claim is kept.
 - [39] authors Trifonov, Rudikov, Iliev, Laevsky, Oseledets, Muravleva.
 - HANO is now *J. Comput. Phys.* 506:112944 (2024); MgNO is ICLR 2024.
+| P43 | Dickson et al. 2019 | https://doi.org/10.1111/cobi.13230 | Y | *Conservation Biology* 33(2):239–249 (online 2018-11-27). "we reviewed 459 papers identified by either Web of Science or Google Scholar" (main text, applications section; PMC6727660, accessed 2026-10-17). | (review of circuit-theory applications) |
+| P44 | McRae et al. 2008, Scopus count | https://experts.nau.edu/en/publications/using-circuit-theory-to-model-connectivity-in-ecology-evolution-a/ | Y | NAU research portal shows "1936 Scopus citations" for McRae, Dickson, Keitt & Shah (2008), *Ecology* 89(10):2712–2724 (accessed 2026-10-17). | (adoption evidence) |

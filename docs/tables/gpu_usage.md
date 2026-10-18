@@ -22,3 +22,14 @@ allocation, summing `ElapsedRaw × gres/gpu`.
 Query: `sacct -u $USER -S 2026-09-24 -E now -X -P -o JobID,JobName,ElapsedRaw,AllocTRES`, every job with a `gres/gpu`
 allocation, summing `ElapsedRaw × gres/gpu` (CPU-only backfills excluded). Breakdown of the tuning phases:
 `docs/tables/gpu_usage_tuning.md`.
+
+## Total after review round 2 (queried 2026-10-18 04:50Z)
+
+| item | value |
+|---|---|
+| GPU jobs 2026-09-24 → 2026-10-18 (everything above + review round 2; the owner's unrelated `pgu-*` jobs on the same account excluded) | 797 |
+| GPU-hours consumed, review round 2 included (sum of elapsed × allocated GPUs) | 717.2 |
+| of which review round 2 (`r2-*`: MgNO seeds 2–3 at S/M on T1/T4, scale-aware seeds 2–3 of U-Net and FNO w48 on T4 at L with XL/XXL (U-Net) and XL (FNO) transfers, U-Net T4 trained at XL; three legs lost to a known bad node) | 14.64 (22 jobs; cap 16) |
+
+Query: `sacct -u $USER -S 2026-09-24 -E now -X -P -o JobID,JobName,ElapsedRaw,AllocTRES`, every job with a `gres/gpu`
+allocation whose name does not start with `pgu-`, summing `ElapsedRaw × gres/gpu`.
