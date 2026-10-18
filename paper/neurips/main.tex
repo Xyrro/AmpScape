@@ -154,7 +154,7 @@ Results are reported on \code{test\_id} and every OOD split, three seeds per con
   \label{fig:qualitative}
 \end{figure}
 
-The families fail in different places. The U-Net is strongest on T1 and T4 at S and M but loses its T1 lead to the FNO at L (0.397 vs 0.299); the FNO has the best T1 result at L and the best transfer; the ViT is competitive at S (T1 0.218, T4 0.052) and resolution-inappropriate at L even after tuning (T1 0.648, top-5\,\% IoU 0.146); the GNN is far behind on T1 (0.561~/ 0.607~/ 0.941) but competitive on the locally windowed T4 (0.066~/ 0.099~/ 0.142) at 5.06--9.44 GPU-h per run against 0.79--1.97 for the U-Net; MgNO's surviving seeds match the U-Net on T4 at S (median 0.045 vs 0.041) and reach 0.184 at M and 0.444~/ 0.376 on T1, but under the shared protocol (AdamW $10^{-3}$, bf16 autocast) its training loss explodes within the first three epochs in 4 of 6 T4 runs and 1 of 6 T1 runs, so its seed means carry that instability (T4 S 0.359). No family wins on accuracy, scale robustness, OOD robustness and cost at once; that trade-off is the result.
+The families fail in different places. The U-Net is strongest on T1 and T4 at S and M but loses its T1 lead to the FNO at L (0.397 vs 0.299); the FNO has the best T1 result at L and the best transfer; the ViT is competitive at S (T1 0.218, T4 0.052) and resolution-inappropriate at L even after tuning (T1 0.648, top-5\,\% IoU 0.146); the GNN is far behind on T1 (0.561~/ 0.607~/ 0.941) but competitive on the locally windowed T4 (0.066~/ 0.099~/ 0.142) at 5.06--9.44 GPU-h per run against 0.79--1.97 for the U-Net; MgNO's surviving seeds match the U-Net on T4 at S (median 0.045 vs 0.041) and reach 0.184 at M and 0.444~/ 0.376 on T1, but under the shared protocol (AdamW $10^{-3}$, bf16 autocast) its training loss explodes within the first four epochs in 4 of 6 T4 runs and 2 of 6 T1 runs, so its seed means carry that instability (T4 S 0.359). No family wins on accuracy, scale robustness, OOD robustness and cost at once; that trade-off is the result.
 % src: paper/tables/baselines_sml.md; docs/tables/review_round2_mgno.md
 
 \begin{figure}[b]
@@ -299,7 +299,7 @@ For T1 and T3 the natural competitors are not learned at all: the reference solv
   \label{fig:cheap}
 \end{figure}
 
-\FloatBarrier
+\clearpage
 \section{Training and validation curves}
 \label{app:curves}
 

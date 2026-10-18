@@ -3293,7 +3293,7 @@ Offloader loop and keepalive running. GitHub main = origin after this push.
 
 ---
 
-# Status — 2026-10-18 06:00Z: review round 2 applied — like-for-like costs, cheap baselines, MgNO/scale-aware seeds, XL-trained run; paper rebuilt at nine pages
+# Status — 2026-10-18 06:30Z: review round 2 applied — like-for-like costs, cheap baselines, MgNO/scale-aware seeds, XL-trained run; paper rebuilt at nine pages
 
 ## Done (owner: "fix the ones you agreed with … up to 16 GPU-hours … check the correctness")
 1. **Like-for-like speed-ups (point 1).** Production Omniscape re-timed with its own parallelisation on one CPU node
@@ -3320,6 +3320,14 @@ Offloader loop and keepalive running. GitHub main = origin after this push.
    seeds; in-tier tables exclude the XL-trained run), `main.pdf` rebuilt (29 pages; **nine content pages**, references
    start at the top of page 10), build log 0 overfull / 0 missing glyphs, `check_draft_numbers.py --tex` 2,268 tokens
    / 0 untraceable / 0 untagged, every changed page inspected at print size, `tests/test_no_pattern_kills.py` passes.
+
+## Full recheck (owner: "check everything again")
+Clean rebuild (0 overfull boxes, 0 missing glyphs, 0 undefined references or citations, all 52 cited keys in the
+bibliography, every `\ref` label present, no hard-coded appendix letters), every generated table and figure
+regenerated and byte-identical to the committed ones, 2,268 numeric tokens all traceable, all 29 pages viewed at print
+size. Two defects found and fixed: the MgNO divergence count in the text said 1 of 6 T1 runs (the table says 2 of 6,
+first exploding epoch up to 4, not 3) — corrected; the Appendix D heading sat alone at the foot of page 21 below the
+Appendix C tables — now starts its own page.
 
 ## Not done, by design (stated as limitations in the paper)
 Converged (non-budget-limited) retraining of every configuration, new operator families, published resistance

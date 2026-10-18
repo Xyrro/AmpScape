@@ -88,7 +88,7 @@ def main() -> None:
     # families paragraph: MgNO three seeds
     mgmed = {k: r["rel-L2 median"] for k, r in mg.items()}
     rep("MgNO (seed 1) matches the U-Net on T4 at S (0.044 vs 0.041) but falls to 0.189 at M and 0.220~/ 0.412 on T1.",
-        f"MgNO's surviving seeds match the U-Net on T4 at S (median {mgmed[('T4', 'S')]} vs 0.041) and reach {mgv('T4', 'M')} at M and {mgv('T1', 'S')}~/ {mgv('T1', 'M')} on T1, but under the shared protocol (AdamW $10^{{-3}}$, bf16 autocast) its training loss explodes within the first three epochs in 4 of 6 T4 runs and 1 of 6 T1 runs, so its seed means carry that instability (T4 S {mgv('T4', 'S')}).")
+        f"MgNO's surviving seeds match the U-Net on T4 at S (median {mgmed[('T4', 'S')]} vs 0.041) and reach {mgv('T4', 'M')} at M and {mgv('T1', 'S')}~/ {mgv('T1', 'M')} on T1, but under the shared protocol (AdamW $10^{{-3}}$, bf16 autocast) its training loss explodes within the first four epochs in 4 of 6 T4 runs and 2 of 6 T1 runs, so its seed means carry that instability (T4 S {mgv('T4', 'S')}).")
     # scale transfer: seeds and the XL-trained run
     rep("$\\sqrt{N_{\\mathrm{valid}}/512^2}$ for T1 (scale-aware, seed 1);",
         "$\\sqrt{N_{\\mathrm{valid}}/512^2}$ for T1 (scale-aware; three seeds for the U-Net on T4 and for the FNO on T4 at XL, seed 1 otherwise);")
