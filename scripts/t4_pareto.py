@@ -153,6 +153,20 @@ def short_label(method: str) -> str:
     return name + (" (scale-aware)" if mm.group(3) else "")
 
 
+def heuristic_rows(path: pathlib.Path, tier: str) -> pd.DataFrame:
+    """Review round 3: the solver-free radius-law baseline (scripts/review/r3_t4_eval.py heuristic), one row per method
+    and split; cost = median CPU seconds per landscape (one core); no non-source or pinch metrics."""
+    if not path.exists():
+        return pd.DataFrame()
+    h = pd.read_parquet(path)
+    h = h[h.tier == tier]
+    rows = []
+    for (split, method), g in h.groupby(["split", "method"]):
+        rows.append({"split": split, "method": f"{method} (no solver, 1 core)", "n": len(g), "cost_s": g.time_s.median(),
+                     **{k: (g[k].mean() if k in g else None) for k in KEYS}})
+    return pd.DataFrame(rows)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--reference", required=True)
@@ -161,11 +175,13 @@ def main():
     ap.add_argument("--tier", default="M")
     ap.add_argument("--out", required=True)
     ap.add_argument("--fig", default=None)
+    ap.add_argument("--heuristic", default=None, help="aux/review_round3/heuristic/heuristic.parquet (review round 3)")
     a = ap.parse_args()
     df = pd.concat(
         [
             block_rows(pathlib.Path(a.reference), [pathlib.Path(b) for b in a.blocks]),
             model_rows([pathlib.Path(r) for r in a.runs], a.tier),
+            heuristic_rows(pathlib.Path(a.heuristic), a.tier) if a.heuristic else pd.DataFrame(),
         ],
         ignore_index=True,
     )

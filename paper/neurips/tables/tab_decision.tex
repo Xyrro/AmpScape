@@ -1,0 +1,23 @@
+% src: docs/tables/review_round3_decision_bf16.md; docs/tables/review_round3_decision_fp32.md
+\begin{table}[htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{Persistent pinch points of the surrogate route against the solver route in the many-query demonstration (20 real L tiles $\times$ 8 tables, U-Net seed 1), over the decision parameters: a pinch point is a local maximum in the top-$q$\,\% of a map; persistent = present (within 3~px) in at least the given share of the tables; matching tolerance 3~px; precision, recall and points per tile averaged over tiles. Left block: inference under bf16 autocast (the setting of Section~\ref{sec:wp7}); right block: fp32 inference of the same model. The demonstration's setting is $q=5$, persistence 0.5.}
+\label{tab:decision}
+\begin{tabular}{rrrrrrrrr}
+\toprule
+top \% & persistence & bf16 precision & bf16 recall & bf16 points & fp32 precision & fp32 recall & fp32 points & solver points \\
+\midrule
+1 & 0.375 & 0.708 & 0.903 & 4588 & 0.807 & 0.838 & 2478 & 2440 \\
+1 & 0.5 & 0.670 & 0.897 & 3806 & 0.769 & 0.817 & 1982 & 1875 \\
+1 & 0.75 & 0.488 & 0.862 & 1743 & 0.652 & 0.738 & 702 & 640 \\
+5 & 0.375 & 0.693 & 0.951 & 14979 & 0.823 & 0.880 & 7502 & 6960 \\
+5 & 0.5 & 0.657 & 0.941 & 12840 & 0.791 & 0.858 & 6053 & 5587 \\
+5 & 0.75 & 0.520 & 0.911 & 7517 & 0.715 & 0.764 & 2546 & 2364 \\
+10 & 0.375 & 0.693 & 0.965 & 25129 & 0.827 & 0.895 & 12301 & 11212 \\
+10 & 0.5 & 0.654 & 0.955 & 21752 & 0.798 & 0.872 & 9956 & 9106 \\
+10 & 0.75 & 0.537 & 0.929 & 13542 & 0.727 & 0.803 & 4704 & 4461 \\
+\bottomrule
+\end{tabular}
+\end{table}

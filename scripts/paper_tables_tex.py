@@ -80,6 +80,8 @@ def pareto_method(m: str) -> str:
     if r:
         base = {"unet": "U-Net", "fno": "FNO", "vit": "ViT", "gnn": "GNN", "mgno": "MgNO"}[r.group(1)]
         return base + (" tuned" if (r.group(2) or r.group(4)) else "") + (", scale-aware target" if r.group(3) else "") + f" ({r.group(5)})"
+    m = re.sub(r"radius law \+ conductance \(k=[\d.]+, beta=[\d.]+\) \(no solver, 1 core\)", "radius law, fitted (CPU)", m)
+    m = m.replace("radius law (k=2/3, no fit) (no solver, 1 core)", "radius law, $k=2/3$ (CPU)")
     return m.replace(" (learned, 3 seeds)", " (3 seeds)").replace(" (learned, 1 seed)", " (1 seed)")
 
 
@@ -237,29 +239,101 @@ def main() -> None:
         (out / "tab_breakeven.tex").write_text(table(rows_b, ["tier", "model", "inference s", "train GPU-h", "solver s (1)", "speed-up (1)", "solver s (24)", "speed-up (24)", "break-even (1)", "break-even (24)"], ["docs/tables/review_round2_threads.md"],
                                                  "Like-for-like cost of the T4 surrogates at M and L (rel-L2 against the exact block-1 map in Table~\\ref{tab:pareto_M} and \\ref{tab:pareto_L}): GPU inference seconds per landscape (batch-amortised, official runs, seed mean) and training GPU-hours of one run against the production solver's seconds per landscape on 1 and on 24 threads (Table~\\ref{tab:threads}); break-even = the number of maps from which training once plus inference costs less wall time than the solver, $N \\ge T_{\\mathrm{train}} / (t_{\\mathrm{solver}} - t_{\\mathrm{inference}})$. GPU and CPU-node hours are not priced equally; only wall time is compared.",
                                                  "tab:breakeven", "llrrrrrrrr", size="\\scriptsize", star=True))
-    # ---- appendix (review round 2): truncated PCG and coarsen-x4 against the learned models on T3 and T1
-    ch = ROOT / "docs" / "tables" / "review_round2_cheap.md"
-    if ch.exists():
+    # ---- appendix (review rounds 2-3): truncated PCG and coarsen-x4 against the learned models on T1 and T3, same
+    # landscapes and same targets (round 3: T1 over every pair; mean and median both reported)
+    pj = ROOT / "docs" / "tables" / "review_round3_pcg.json"
+    if pj.exists():
         import json as _json
-        d = _json.loads((ROOT / "docs" / "tables" / "review_round2_cheap.json").read_text())
+        d = _json.loads(pj.read_text())
         rows_c = []
-        for task, lt in (("T3", "T3"), ("T1V", "T1")):
+        for task in ("T1", "T3"):
             for tier in ("S", "M", "L"):
-                cells = [lt if task == "T3" else "T1 (first pair)", tier]
-                for k in (1, 2, 4):
-                    v = d.get(f"{task}_{tier}_k{k}")
-                    cells.append(f"{v['rel_l2']:.4f} / {v['cost_s']:.4f}" if v else "--")
-                v = d.get(f"{task}_{tier}_conv")
-                cells.append(f"{v['iters']:.0f} / {v['time_s']:.4f}" if v else "--")
-                v = d.get(f"coarsen4_{lt}_{tier}")
-                cells.append(f"{v['rel_l2']:.4f} / {v['cost_s']:.4f}" if v else "--")
-                best = min((v for key, v in d.items() if key.startswith(f"learned_{lt}_{tier}_")), key=lambda v: v["rel_l2"], default=None)
-                name = next((key.split("_")[-1] for key, v in d.items() if key.startswith(f"learned_{lt}_{tier}_") and v is best), "")
-                cells.append(f"{best['rel_l2']:.3f} / {best['inference_s']:.5f} ({name})" if best else "--")
-                rows_c.append(cells)
-        (out / "tab_cheap.tex").write_text(table(rows_c, ["task", "tier", "PCG $k=1$", "PCG $k=2$", "PCG $k=4$", "PCG to $10^{-6}$: iters / s", "coarsen $\\times 4$", "best learned (GPU)"], ["docs/tables/review_round2_cheap.md"],
-                                             "Cheap numerical baselines on T3 and the first T1 pair, rel-L2 / cost in seconds per landscape on one CPU core (median over the \\texttt{test\\_id} subsets of Appendix~\\ref{app:cheap}): AMG-preconditioned CG from zero stopped after $k$ iterations (cost includes the AMG setup), the full PCG solve to relative residual $10^{-6}$, and coarsen-$\\times 4$-solve-upsample; the last column is the best learned model's rel-L2 on the whole split (seed mean; T1: the full cumulative map) with its GPU inference time per landscape.",
-                                             "tab:cheap", "llllllll", size="\\scriptsize", star=True))
+                rs = {r["method"]: r for r in d.get(task, {}).get(tier, [])}
+                if not rs:
+                    continue
+                mm = lambda r: f"{r['rel_l2_mean']:.3f} / {r['rel_l2_median']:.3f}"  # noqa: E731
+                learned = [r for k, r in rs.items() if not k.startswith(("PCG", "coarsen")) and k != "MgNO"]
+                best = min(learned, key=lambda r: r["rel_l2_mean"])
+                rows_c.append([task, tier, str(rs["PCG k=2"]["n"]), mm(rs["PCG k=2"]), f"{rs['PCG k=2']['cost_s']:.3f}", mm(rs["PCG k=4"]), mm(rs["PCG k=8"]),
+                               f"{rs['PCG to 1e-6']['cost_s']:.3f}", mm(rs["coarsen x4"]) if "coarsen x4" in rs else "--",
+                               f"{mm(best)} ({best['method']})"])
+        (out / "tab_cheap.tex").write_text(table(rows_c, ["task", "tier", "$n$", "PCG $k=2$", "s", "PCG $k=4$", "PCG $k=8$", "PCG to $10^{-6}$: s", "coarsen $\\times 4$", "best learned"], ["docs/tables/review_round3_pcg.md"],
+                                             "Cheap numerical baselines against the learned models on the same \\texttt{test\\_id} landscapes and the same targets (T1: the cumulative map over all pairs; T3: the advanced-mode current): rel-L2 mean / median over the landscapes. AMG-preconditioned CG from zero stopped after $k$ iterations, with its cost in seconds per landscape on one CPU core (AMG setup included; T1: one setup per grounded node, all pairs), the cost of the full solve to relative residual $10^{-6}$, coarsen-$\\times 4$-solve-upsample, and the official learned model with the lowest mean (seed mean per landscape; MgNO excluded as in Table~\\ref{tab:results}).",
+                                             "tab:cheap", "llrlllllll", size="\\scriptsize", star=True))
+    # ---- appendix (review round 3): bootstrap intervals and strata of the headline rel-L2
+    bj = ROOT / "docs" / "tables" / "review_round3_bootstrap.json"
+    if bj.exists():
+        import json as _json
+
+        import pandas as _pd
+        bd = _pd.DataFrame(_json.loads(bj.read_text())["rows"])
+        strata = ["test_id synthetic", "test_id real", "test_ood contrast 1e6", "test_ood held-out table", "published (S)"]
+        rows_bs = []
+        for task in ("T1", "T3", "T4"):
+            for tier in ("S", "M", "L"):
+                for model in ("U-Net", "FNO", "ViT", "GNN", "MgNO"):
+                    g = bd[(bd.task == task) & (bd.tier == tier) & (bd.model == model)].set_index("stratum")
+                    if "test_id" not in g.index:
+                        continue
+                    r = g.loc["test_id"]
+                    cells = [task, tier, model, f"{r.rel_l2:.3f} [{r.ci_lo:.3f}, {r.ci_hi:.3f}]"]
+                    cells += [f"{g.loc[st].rel_l2:.3f}" if st in g.index else "--" for st in strata]
+                    rows_bs.append(cells)
+        (out / "tab_bootstrap.tex").write_text(table(rows_bs, ["task", "tier", "model", "test_id [95 % CI]", "synthetic", "real", "contrast $10^6$", "held-out table", "published"], ["docs/tables/review_round3_bootstrap.md"],
+                                                 "Relative L2 of the official runs by stratum (seed mean of per-seed means, as in Table~\\ref{tab:results}). The interval resamples landscapes (2,000 resamples, the same for every seed; percentile interval) and so reflects landscape sampling, not seed variance (the $\\pm$ of Table~\\ref{tab:results}). Synthetic and real: the two families of \\texttt{test\\_id}; contrast $10^6$ and held-out table: the two parts of \\texttt{test\\_ood}; published: \\texttt{test\\_ood\\_published} (S only). Intervals for every stratum are in the source file.",
+                                                 "tab:bootstrap", "lllllllll", size="\\scriptsize", star=True, placement="htbp"))
+    # ---- appendix (review round 3): decision-level evaluation of the many-query demonstration, bf16 vs fp32 inference
+    dj = {t: ROOT / "docs" / "tables" / f"review_round3_decision_{t}.json" for t in ("bf16", "fp32")}
+    if all(f.exists() for f in dj.values()):
+        import json as _json
+        dd = {t: _json.loads(f.read_text()) for t, f in dj.items()}
+        rows_d = []
+        for top in (1.0, 5.0, 10.0):
+            for frac in (0.375, 0.5, 0.75):
+                cells = [f"{top:g}", f"{frac:g}"]
+                for t in ("bf16", "fp32"):
+                    r = next(x for x in dd[t]["sweep"] if x["top_percent"] == top and x["persistence"] == frac and x["tolerance_px"] == 3)
+                    cells += [f"{r['precision']:.3f}", f"{r['recall']:.3f}", f"{r['n_model']:.0f}"]
+                cells.append(f"{r['n_solver']:.0f}")
+                rows_d.append(cells)
+        (out / "tab_decision.tex").write_text(table(rows_d, ["top \\%", "persistence", "bf16 precision", "bf16 recall", "bf16 points", "fp32 precision", "fp32 recall", "fp32 points", "solver points"], ["docs/tables/review_round3_decision_bf16.md", "docs/tables/review_round3_decision_fp32.md"],
+                                                 "Persistent pinch points of the surrogate route against the solver route in the many-query demonstration (20 real L tiles $\\times$ 8 tables, U-Net seed 1), over the decision parameters: a pinch point is a local maximum in the top-$q$\\,\\% of a map; persistent = present (within 3~px) in at least the given share of the tables; matching tolerance 3~px; precision, recall and points per tile averaged over tiles. Left block: inference under bf16 autocast (the setting of Section~\\ref{sec:wp7}); right block: fp32 inference of the same model. The demonstration's setting is $q=5$, persistence 0.5.",
+                                                 "tab:decision", "rrrrrrrrr", size="\\scriptsize", placement="htbp"))
+        rows_v = []
+        for m in (0, 2, 4, 5, 6, 7, 8):
+            cells = [str(m)]
+            for t in ("bf16", "fp32"):
+                r = next(x for x in dd[t]["budget"] if x["tables_solved"] == m)
+                cells += [f"{r['precision']:.3f}", f"{r['recall']:.3f}", f"{r['core_iou']:.3f}"]
+            cells.append(f"{r['solver_cpu_h_per_tile']:.2f}")
+            rows_v.append(cells)
+        (out / "tab_verify.tex").write_text(table(rows_v, ["tables solved", "bf16 precision", "bf16 recall", "bf16 core IoU", "fp32 precision", "fp32 recall", "fp32 core IoU", "solver CPU-h / tile"], ["docs/tables/review_round3_decision_bf16.md", "docs/tables/review_round3_decision_fp32.md"],
+                                               "Verification budget in the many-query demonstration: $m$ of the 8 tables per tile are solved exactly and the surrogate supplies the rest (tables in the surrogate's own order of influence, reference table first). Persistent-pinch-point precision and recall and the consensus-core IoU against the all-solver route, for bf16 (left) and fp32 (right) inference, and the solver cost per tile (one core).",
+                                               "tab:verify", "rrrrrrrr", size="\\scriptsize", placement="htbp"))
+    # ---- appendix (review round 3): T4 under source rules the models never saw
+    sj = ROOT / "docs" / "tables" / "review_round3_source_ood.json"
+    if sj.exists():
+        import json as _json
+        sd = _json.loads(sj.read_text())
+        rows_s = []
+        names = {"unet": "U-Net", "fno": "FNO", "vit": "ViT", "gnn": "GNN", "mgno": "MgNO", "unchanged": "production-rule map"}
+        for tier in ("S", "M"):
+            if tier not in sd:
+                continue
+            ag = {(r["model"], r["rule"], r["input"]): r["rel_l2"] for r in sd[tier]["rows"]}
+            for mk in ("unet", "fno", "vit", "gnn", "mgno", "unchanged"):
+                if mk == "unchanged":
+                    cells = [tier, names[mk], "0"]
+                    for rule in ("uniform", "random_field", "habitat_core"):
+                        cells += ["--", f"{ag[(mk, rule, '-')]:.3f}"]
+                else:
+                    cells = [tier, names[mk], f"{ag[(mk, 'default', 'true')]:.3f}"]
+                    for rule in ("uniform", "random_field", "habitat_core"):
+                        cells += [f"{ag[(mk, rule, 'true')]:.3f}", f"{ag[(mk, rule, 'production')]:.3f}"]
+                rows_s.append(cells)
+        (out / "tab_source.tex").write_text(table(rows_s, ["tier", "model", "production rule", "uniform: true", "swapped", "random field: true", "swapped", "habitat core: true", "swapped"], ["docs/tables/review_round3_source_ood.md"],
+                                                 "T4 under source rules the models never saw: rel-L2 against the exact Omniscape map of each rule on the same \\texttt{test\\_id} landscapes (200 at S, 100 at M) and Omniscape geometry. \\emph{true}: the rule's own source raster as input; \\emph{swapped}: the production source raster of the same landscape as input, so a model that ignored its source channel would score the same in both columns; production-rule map: the solver's map under the production rule used as the prediction. Rules: uniform sources on every valid pixel; a Gaussian random field independent of resistance, kept above its median; $(1/R)^2$ above its 0.8 quantile. Official runs, three seeds, fp32 inference on CPU.",
+                                                 "tab:source", "llrrrrrrr", size="\\scriptsize", star=True, placement="htbp"))
     print("tables:", sorted(p.name for p in out.glob("*.tex")))
 
 

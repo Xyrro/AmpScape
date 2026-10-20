@@ -5,6 +5,18 @@ Numbers below are rel-L2 on the training tier's splits for the official configur
 (`docs/tables/baselines_full.md`); ratios are relative to `test_id`. Scale transfer (XL/XXL) is treated separately in
 `paper/tables/scale_transfer.md` and `docs/status/latest.md`.
 
+## Update 2026-10-20 (review round 3) — read this first
+
+- **Full-precision ratios.** The numbers below were averaged from per-seed values already rounded to 3 decimals in
+  `docs/tables/baselines_full.md`; `scripts/paper_figures.py` now averages the full-precision values of each run's
+  `results.json`. Current ratios are in `paper/tables/ood_degradation.md` (e.g. `test_ood` 0.920–1.191 except the ViT
+  on T1 at L, 1.485; published surfaces, T4 at S: 1.300–1.530, MgNO 1.763; `ood_region` 0.652–0.982). The table at the
+  end of this file keeps the earlier rounded values.
+- **Finding 1 is incomplete.** Pooled `test_ood` hides two opposite effects (`docs/tables/review_round3_bootstrap.md`):
+  its held-out-table part (real tiles, 83–84 %) is *easier* than `test_id` (0.69–0.96), its contrast-10⁶ part is 1.23–4.17×
+  harder (T4: 1.82–3.29×) — the largest in-tier degradation measured.
+- **Finding 3 is superseded.** Published surfaces are the hardest *real* set for T4, but contrast 10⁶ is harder still.
+
 ## Findings
 
 1. **Held-out resistance table and held-out contrast (`test_ood`) cost little at the training tier.** Ratios are

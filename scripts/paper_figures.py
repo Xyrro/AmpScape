@@ -77,6 +77,9 @@ def dataset_stats(out: pathlib.Path) -> None:
 
 
 # ----------------------------------------------------------------------------------------------------------------- F2
+HEUR = ROOT / "aux" / "review_round3" / "heuristic" / "heuristic.parquet"
+
+
 def t4_pareto(out: pathlib.Path) -> None:
     for tier in ("M", "L"):
         ref = ROOT / "aux" / "t4_bs1_reference" / f"{tier}_bs1"
@@ -118,6 +121,7 @@ def t4_pareto(out: pathlib.Path) -> None:
                 str(out / "tables" / f"t4_pareto_{tier}.md"),
                 "--fig",
                 str(out / "figures" / f"t4_pareto_{tier}.png"),
+                *(["--heuristic", str(HEUR)] if HEUR.exists() else []),
             ],
             cwd=ROOT,
             capture_output=True,
@@ -192,6 +196,26 @@ def prefer_tuned(df: pd.DataFrame) -> pd.DataFrame:
     return df.drop(drop)
 
 
+def full_precision(df: pd.DataFrame, metrics: list[str]) -> pd.DataFrame:
+    """Replace the 3-decimal per-seed metrics read from docs/tables/baselines_full.md by the full-precision values in
+    each run's results.json (`eval[<root>_<tier>_<split>][<task>][<metric>]`); averaging rounded seeds shifted two
+    Table 2 cells by 0.001 (review round 3, 2026-10-20). Rows without a results file keep their table value."""
+    df = df.copy()
+    for i, r in df.iterrows():
+        rj = ROOT / "runs" / "full" / str(r["model"]) / "results.json"
+        if not rj.exists():
+            continue
+        ev = json.loads(rj.read_text()).get("eval", {})
+        split = str(r["split"]).replace("published S", "test_ood_published")
+        tag = next((k for k in ev if k.endswith(f"_{r['tier']}_{split}")), None)
+        vals = ev.get(tag, {}).get(r["task"], {}) if tag else {}
+        for m in metrics:
+            key = {"corridor_dice": "corridor_dice_q10"}.get(m, m)
+            if m in df.columns and isinstance(vals.get(key), (int, float)):
+                df.at[i, m] = float(vals[key])
+    return df
+
+
 def error_vs_tier(out: pathlib.Path) -> None:
     src = ROOT / "docs" / "tables" / "baselines_full.md"
     if not src.exists():
@@ -205,6 +229,7 @@ def error_vs_tier(out: pathlib.Path) -> None:
     df["suffix"] = [p[4] for p in parsed]
     learned = prefer_tuned(df[df.seed.notna() & (df.suffix == "") & df.tier.isin(["S", "M", "L"])])  # in-tier training runs only (the XL-trained U-Net is quoted from baselines_full.md)
     metrics = ["rel_l2", "mae_log10eps", "top5_iou", "pinch_recall", "spearman"]
+    learned = full_precision(learned, metrics)
     agg = (
         learned.groupby(["task", "tier", "base"])[metrics + ["speed-up (median)", "train GPU-h"]]
         .agg(["mean", "std", "count", "median"])
@@ -570,6 +595,7 @@ def ood_degradation(out: pathlib.Path) -> None:
     df["split"] = df.split.replace({"published S": "published"})
     splits = ["test_id", "test_ood", "ood_region", "published"]
     df = df[df.split.isin(splits)]
+    df = full_precision(df.assign(split=df.split.replace({"published": "published S"})), ["rel_l2", "spearman", "top5_iou", "pinch_recall"]).assign(split=df.split)
     g = df.groupby(["task", "tier", "base", "split"])[
         ["rel_l2", "spearman", "top5_iou", "pinch_recall"]
     ].mean()
@@ -646,7 +672,8 @@ def baselines_all_splits(out: pathlib.Path) -> None:
     df["base"] = [p[0] for p in parsed]
     df["seed"] = [p[3] for p in parsed]
     df["suffix"] = [p[4] for p in parsed]
-    learned = df[df.seed.notna() & (df.suffix == "")]
+    # official configuration only (the tier-tuned run where it is official; before 2026-10-20 both were pooled)
+    learned = prefer_tuned(df[df.seed.notna() & (df.suffix == "")])
     metrics = [
         "rel_l2",
         "mae_log10eps",
@@ -656,6 +683,7 @@ def baselines_all_splits(out: pathlib.Path) -> None:
         "corridor_dice",
         "ssim",
     ]
+    learned = full_precision(learned, metrics)
     agg = (
         learned.groupby(["task", "tier", "split", "base"])[metrics + ["speed-up (median)"]]
         .agg(["mean", "std", "count", "median"])
@@ -1008,6 +1036,11 @@ def fig_pareto_L_tex() -> None:
                 continue
             c, y = float(cost), float(r["rel_l2"])
             m = r["method"]
+            if "no solver" in m:  # review round 3: solver-free radius-law baseline (plot the fitted variant only)
+                if "conductance" in m:
+                    ax.scatter(c, y, s=30, marker="D", color="#8c564b", zorder=3, label="radius-law heuristic (CPU)")
+                    ax.annotate("radius law", (c, y), textcoords="offset points", xytext=(0, 5), ha="center", va="bottom", fontsize=6, color="#8c564b")
+                continue
             if "learned" in m:
                 base = m.split("_")[0]
                 sa = "scalenorm" in m
@@ -1479,50 +1512,55 @@ def main() -> None:
 
 
 def figA_cheap_baselines() -> None:
-    """Appendix (review round 2): error versus cost on T3 and the first T1 pair — truncated AMG-PCG (k iterations, one
-    CPU core), coarsen-×4 (one core) and the learned models (GPU inference per landscape, seed mean on the whole split)."""
-    p = ROOT / "docs" / "tables" / "review_round2_cheap.json"
+    """Appendix (review rounds 2-3): error versus cost on T1 (all pairs) and T3 on the same test_id landscapes and the
+    same targets — truncated AMG-PCG after k iterations (one CPU core; mean solid, median dashed), coarsen-x4 (one
+    core) and the learned models (GPU inference per landscape; mean filled, median hollow)."""
+    p = ROOT / "docs" / "tables" / "review_round3_pcg.json"
     if not p.exists():
         return
     d = json.loads(p.read_text())
     tier_color = {"S": "#1f77b4", "M": "#ff7f0e", "L": "#2ca02c"}
+    floor = 1e-4
     with plt.rc_context(PAPER_STYLE):
-        fig, axes = plt.subplots(1, 2, figsize=(FULLW, 2.3), gridspec_kw=dict(wspace=0.3))
-        for ax, task, lt in zip(axes, ("T3", "T1V"), ("T3", "T1")):
+        fig, axes = plt.subplots(1, 2, figsize=(FULLW, 2.4), gridspec_kw=dict(wspace=0.3))
+        for ax, task in zip(axes, ("T1", "T3"), strict=True):
             for tier in ("S", "M", "L"):
-                ks = sorted(int(k.split("_k")[1]) for k in d if k.startswith(f"{task}_{tier}_k"))
-                if not ks:
-                    continue
-                pts = []
-                for k in ks:  # stop the curve at the first point below the plotted floor
-                    v = d[f"{task}_{tier}_k{k}"]
-                    pts.append((v["cost_s"], max(v["rel_l2"], 1e-4), k))
-                    if v["rel_l2"] < 1e-4:
-                        break
-                ax.plot([x for x, _, _ in pts], [y for _, y, _ in pts], "-", color=tier_color[tier], lw=1.0, marker=".", ms=4, label=f"PCG, {tier}")
-                for x, y, k in pts:
-                    if k in (1, 2, 4):
-                        ax.annotate(f"k={k}", (x, y), textcoords="offset points", xytext=(4, -2 if k == 1 else 2), fontsize=5.5, color=tier_color[tier], va="top" if k == 1 else "bottom")
-                c = d.get(f"coarsen4_{lt}_{tier}")
-                if c:
-                    ax.scatter([c["cost_s"]], [max(c["rel_l2"], 1e-4)], marker="s", s=28, facecolor="w", edgecolor=tier_color[tier], lw=1.1, zorder=3, label=f"coarsen ×4, {tier}")
-                for key, v in d.items():
-                    if key.startswith(f"learned_{lt}_{tier}_"):
-                        base = {"U-Net": "unet", "FNO": "fno", "ViT": "vit", "GNN": "gnn", "MgNO": "mgno"}[key.split("_")[-1]]
-                        ax.scatter([v["inference_s"]], [v["rel_l2"]], marker="^", s=30, color=MODEL_COLOR[base], edgecolor=tier_color[tier], lw=0.8, zorder=4)
+                rows = d.get(task, {}).get(tier, [])
+                pcg = [r for r in rows if r["method"].startswith("PCG k=")]
+                pcg.sort(key=lambda r: int(r["method"].split("=")[1]))
+                for stat, ls in (("rel_l2_mean", "-"), ("rel_l2_median", "--")):
+                    xs = [r["cost_s"] for r in pcg]
+                    ys = [max(r[stat], floor) for r in pcg]
+                    ax.plot(xs, ys, ls, color=tier_color[tier], lw=1.0 if ls == "-" else 0.8, marker="." if ls == "-" else None, ms=3.5)
+                for r in pcg:
+                    k = int(r["method"].split("=")[1])
+                    if k in (2, 8):
+                        ax.annotate(f"k={k}", (r["cost_s"], max(r["rel_l2_mean"], floor)), textcoords="offset points", xytext=(4, 0), fontsize=5.5, color=tier_color[tier], va="center")
+                for r in rows:
+                    if r["method"] == "coarsen x4":
+                        ax.scatter([r["cost_s"]], [max(r["rel_l2_mean"], floor)], marker="s", s=24, facecolor="w", edgecolor=tier_color[tier], lw=1.1, zorder=3)
+                    base = {"U-Net": "unet", "FNO": "fno", "ViT": "vit", "GNN": "gnn", "MgNO": "mgno"}.get(r["method"])
+                    if base and np.isfinite(r.get("gpu_s", np.nan)):
+                        ax.scatter([r["gpu_s"]], [r["rel_l2_mean"]], marker="^", s=26, color=MODEL_COLOR[base], edgecolor=tier_color[tier], lw=0.8, zorder=4)
+                        ax.scatter([r["gpu_s"]], [r["rel_l2_median"]], marker="^", s=22, facecolor="w", edgecolor=MODEL_COLOR[base], lw=0.8, zorder=4)
             ax.set_xscale("log")
             ax.set_yscale("log")
-            ax.set_ylim(5e-5, 1.5)
+            ax.set_ylim(5e-5, 3)
             ax.set_xlabel("cost per landscape (s)")
-            ax.set_title({"T3": "T3 advanced mode", "T1V": "T1 (PCG, coarsen: first pair; learned: full map)"}[task], fontsize=7.5)
+            ax.set_title({"T1": "T1 pairwise (cumulative over all pairs)", "T3": "T3 advanced mode"}[task], fontsize=7.5)
             ax.grid(alpha=0.3, which="both", lw=0.5)
-        axes[0].set_ylabel("rel-L2 on test_id (median; learned: mean)")
-        h, l = axes[0].get_legend_handles_labels()
+        axes[0].set_ylabel("rel-L2 on test_id subset")
+        L2D = matplotlib.lines.Line2D
+        h = [L2D([], [], color=tier_color[t], lw=1.0) for t in ("S", "M", "L")]
+        lab = [f"PCG, {t}" for t in ("S", "M", "L")]
+        h += [L2D([], [], color="0.3", lw=1.0, marker="."), L2D([], [], color="0.3", lw=0.8, ls="--"),
+              L2D([], [], marker="s", ls="", mfc="w", mec="0.3", ms=4)]
+        lab += ["mean", "median", "coarsen ×4 (mean)"]
         for base in ("unet", "fno", "vit", "gnn", "mgno"):
-            h.append(matplotlib.lines.Line2D([], [], marker="^", ls="", color=MODEL_COLOR[base], ms=5)); l.append(f"{MODEL_LABEL[base]} (GPU)")
-        fig.legend(h, l, frameon=False, loc="upper center", ncol=6, bbox_to_anchor=(0.5, 1.12), fontsize=6, columnspacing=0.8, handlelength=1.4)
+            h.append(L2D([], [], marker="^", ls="", color=MODEL_COLOR[base], ms=5))
+            lab.append(f"{MODEL_LABEL[base]} (GPU)")
+        fig.legend(h, lab, frameon=False, loc="upper center", ncol=6, bbox_to_anchor=(0.5, 1.16), fontsize=6, columnspacing=0.8, handlelength=1.6)
         _save(fig, "figA_cheap_baselines")
-
 
 if __name__ == "__main__":
     main()

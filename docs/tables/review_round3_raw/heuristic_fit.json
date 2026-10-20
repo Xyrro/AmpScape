@@ -1,0 +1,7 @@
+{
+ "fit": "aux/review_round3/source_ood/S_default",
+ "fit_tier": "S",
+ "beta": 0.75,
+ "k": 0.7752966650182275,
+ "n_fit": 200
+}
