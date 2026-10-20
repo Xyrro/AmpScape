@@ -1,4 +1,4 @@
-# Status — 2026-10-20: review round 3 (second external review) — agreed points applied; L exact-reference top-up still solving
+# Status — 2026-10-20: review round 3 (second external review) complete — agreed points applied, L exact reference doubled to 120
 
 ## Assessment of the review (owner: "do the ones you agreed with, and can improve our work and no harms")
 Agreed and done: (1) independent T4 source-rule test; (2a) PCG on the same all-pair T1 target; (2b) a solver-free T4
@@ -33,14 +33,21 @@ Not done: learned baselines for T2/T1W/T1R (a deliberate round-2 decision), more
    0.253 → 0.252, MgNO T4 S 0.359 → 0.358, T4 U-Net Spearman at L 0.991 → 0.992, OOD ratio ranges shifted in the third
    decimal (T4 M U-Net 1.200 → 1.191). `paper/baselines.md` also pooled tuned and untuned runs; now official runs only.
 
-## Pending
-- **L exact-reference top-up 60 → 120** (block-1 Omniscape, ≈ 3.3 h per landscape, throttled to ≤ 30 of my jobs so your
-  other projects keep queue room): about half done. When finished: score models, production targets and the heuristic on
-  all 120 (`r3_t4_eval.py reference`) and update Appendix F; the Pareto L rows stay on the original 24 `test_id` maps.
-- The anonymity issue from earlier is unchanged: the paper names `Xirro/AmpScape`, and both that dataset and the GitHub repo are public.
+7. **L exact reference doubled (60 → 120, same stratification).** Production targets against the exact block-1 maps:
+   mean rel-L2 0.0303 (was 0.028 on 60), but a heavier tail — max 0.2032 (was 0.058), 6 of 120 above 5 %, all synthetic
+   and all at contrast ≥ 10⁴ or with large NoData. Paper updated (contributions, Section 5, limitation (3), Appendix F:
+   "0.028" → "0.030"). The models agree with the Pareto rows: U-Net 0.0895 on the original 24 test_id maps (published
+   0.0903) and 0.0844 [0.0698, 0.1041] on all 48 (`docs/tables/review_round3_reference.md`). The official evaluation
+   surface, Pareto rows and leaderboard at L stay on the original 60 maps.
+
+## Needs your decision
+- **Republish the L reference on the Hub with 120 maps?** That needs your approval because it is a Hub push. If you
+  approve, the leaderboard's T4 L rows and the Pareto L table would move to 48 test_id maps.
+- **The Hub dataset card still says 0.028 at L** and should say 0.030; updating it is also a Hub push.
+- **Anonymity:** the paper names `Xirro/AmpScape`, and both that dataset and the GitHub repo are public.
 
 ## Checks
 `main.pdf` 31 pages, nine content pages (cuts made to fit: details moved to appendices), 0 overfull / 0 undefined;
-`check_draft_numbers.py --tex` 2,719 tokens, 0 untraceable. Incident: the throttled submitter's queue update broke on
+`check_draft_numbers.py --tex` 2,730 tokens, 0 untraceable; `tests/test_no_pattern_kills.py` 407 passed. Incident: the throttled submitter's queue update broke on
 `/` in paths and re-submitted M shards; duplicates cancelled by job ID, the affected outputs set aside
-(`work/r3_discarded/`) and re-solved. Compute so far 146 CPU core-h, 0.19 GPU-h (projected ≈ 300 CPU core-h).
+(`work/r3_discarded/`) and re-solved. Compute for the round: 289.6 CPU core-h, 0.195 GPU-h (3 inference jobs); paper totals now 717.4 GPU-h / 800 jobs.

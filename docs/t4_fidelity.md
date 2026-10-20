@@ -84,3 +84,11 @@ iteratively (target 1e-8) or, for CG, the window is factorised with CHOLMOD and 
 in the row's `solver_params.rescued_solves`. Validated on the failing XXL landscape (one rescued window solve in a
 2 048² Omniscape map; 8 047 s). T4 rows that had failed before the change were re-run whole by the precision pass.
 
+
+## Addendum 2026-10-20 (review round 3): L reference doubled to 120
+60 more L landscapes with the same stratification (`aux/t4_bs1_reference/L_bs1_topup`, inputs taken from the production
+Hub files, block 1, ≈ 3.6 h median per exact solve on one core). Production (block 5) against block 1 on all 120: mean
+rel-L2 0.0303, median 0.0273, max 0.2032 (synthetic random_cluster at contrast 10⁶), 6 of 120 above 5 %, all synthetic and
+all at contrast ≥ 10⁴ or with large NoData. The official T4 models scored on all 120 (fp32, CPU) agree with the Pareto
+rows on the original 24 test_id maps (U-Net 0.0895 vs 0.0903). The official evaluation surface and the Pareto/leaderboard
+rows at L stay on the original 60 until the owner decides to republish the reference; `docs/tables/review_round3_reference.md`.
