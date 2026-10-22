@@ -86,7 +86,7 @@ the `train`/`val` splits or outside AmpScape was used. `train_tiers` drives the 
   output but are not leaderboard columns.
 - **T4 at M and L** is reported against the block-centred production target (`t4_target = "production"`, every sample
   of the split) **and** against the exact block-1 reference map on the reference subset (`t4_target =
-  "block1_reference"`, 1 000 samples at M, 60 at L; `docs/t4_fidelity.md`, owner decision 2026-09-18). The second row
+  "block1_reference"`, 1 000 samples at M, 120 at L (60 until 2026-10-22); `docs/t4_fidelity.md`, owner decision 2026-09-18). The second row
   needs the validator run with `--t4-reference aux/t4_bs1_reference/<tier>_bs1` and `make-entry --t4-target
   block1_reference`, which averages the per-sample harness rows the harness scored against the reference. The two
   targets are shown in separate tables and are not comparable with each other.

@@ -83,7 +83,7 @@ HEUR = ROOT / "aux" / "review_round3" / "heuristic" / "heuristic.parquet"
 def t4_pareto(out: pathlib.Path) -> None:
     for tier in ("M", "L"):
         ref = ROOT / "aux" / "t4_bs1_reference" / f"{tier}_bs1"
-        blocks = sorted(glob.glob(str(ROOT / "aux" / "t4_blocksize_baselines" / f"{tier}_*")))
+        blocks = sorted(b for b in glob.glob(str(ROOT / "aux" / "t4_blocksize_baselines" / f"{tier}_*")) if not b.endswith("_topup"))  # top-up builds are merged into their parent (2026-10-22)
         runs = sorted(
             p
             for p in glob.glob(str(ROOT / "runs" / "full" / f"*_T4_{tier}_s*"))

@@ -114,7 +114,7 @@ def cmd_build(a):
                 "solver_preset": "configs/solver/circuitscape_reference.yaml",
                 "dataset_version": f"aux-r3-{a.rule}-block{block}",
                 "aux": {"source": "hub", "rule": a.rule, "block_size": block, "radius": radius,
-                        "production_block": prod_block, "correct_artifacts": 1},
+                        "production_block": prod_block, "correct_artifacts": int(a.correct_artifacts)},
                 "shard_size": a.shard_size,
             },
             indent=1,
@@ -142,7 +142,7 @@ def cmd_build(a):
                         g2.attrs["tier"] = a.tier
                         g2.attrs["omni_radius"] = radius
                         g2.attrs["omni_block_size"] = int(block)
-                        g2.attrs["omni_correct_artifacts"] = 1
+                        g2.attrs["omni_correct_artifacts"] = int(a.correct_artifacts)
                         g2.attrs["cg_baseline"] = 0
                         meta = json.loads(gi.attrs["meta"])
                         meta["r3"] = {"rule": a.rule, "block_size": int(block), "production_block": int(pp.get("block_size", prod_block)),
@@ -175,6 +175,7 @@ def main():
     b.add_argument("--block", type=int, default=None, help="Omniscape block size (default: production)")
     b.add_argument("--rule", default="default", choices=RULES)
     b.add_argument("--shard-size", type=int, default=10)
+    b.add_argument("--correct-artifacts", type=int, default=1, help="Omniscape artefact correction (1 = production)")
     b.set_defaults(fn=cmd_build)
     a = ap.parse_args()
     a.fn(a)

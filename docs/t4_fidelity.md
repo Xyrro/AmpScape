@@ -71,7 +71,7 @@ block 1, solve times, and `tail_gt5pct` = rel-L2 > 0.05) are the **official T4 e
 T4 metrics at those tiers are computed against the exact block-1 map on the reference subset
 (`scripts/evaluate.py --t4-reference aux/t4_bs1_reference/<tier>`), with the same metrics against the block-centred
 production target reported as secondary (`bc_*`). Sizes: M ≈ 1 000 samples over test_id and every OOD split (synthetic
-and real), L 60 as a sanity set (both complete, 2026-09-20). S needs no reference (block 1 in production). XL/XXL T4 metrics are against the
+and real), L 60 as a sanity set (both complete, 2026-09-20; L enlarged to 120 and republished on 2026-10-22 with owner approval, see the addendum below). S needs no reference (block 1 in production). XL/XXL T4 metrics are against the
 production targets only, with the M/L measurements as the stated fidelity bound.
 
 ## Solver note (2026-09-22, incident (i)): Circuitscape's internal residual check and the rescue
@@ -88,7 +88,9 @@ in the row's `solver_params.rescued_solves`. Validated on the failing XXL landsc
 ## Addendum 2026-10-20 (review round 3): L reference doubled to 120
 60 more L landscapes with the same stratification (`aux/t4_bs1_reference/L_bs1_topup`, inputs taken from the production
 Hub files, block 1, ≈ 3.6 h median per exact solve on one core). Production (block 5) against block 1 on all 120: mean
-rel-L2 0.0303, median 0.0273, max 0.2032 (synthetic random_cluster at contrast 10⁶), 6 of 120 above 5 %, all synthetic and
-all at contrast ≥ 10⁴ or with large NoData. The official T4 models scored on all 120 (fp32, CPU) agree with the Pareto
-rows on the original 24 test_id maps (U-Net 0.0895 vs 0.0903). The official evaluation surface and the Pareto/leaderboard
-rows at L stay on the original 60 until the owner decides to republish the reference; `docs/tables/review_round3_reference.md`.
+rel-L2 0.0303, median 0.0273, max 0.2032 (synthetic random_cluster at contrast 10⁶), 6 of 120 above 5 %, all synthetic, the
+three largest (0.203, 0.143, 0.126) at contrast ≥ 10⁴. The official T4 models scored on all 120 (fp32, CPU) agree with the Pareto
+rows on the original 24 test_id maps (U-Net 0.0895 vs 0.0903). Owner-approved on 2026-10-22: the 120-map reference is now the official evaluation surface at L (republished on the
+Hub with the three block-size builds extended to the same 120 landscapes; all 28 L T4 runs re-scored; leaderboard re-seeded);
+`docs/tables/review_round3_reference.md`.
+Exact-solve cost relative to the production solve, median of the per-landscape ratio (Appendix F figure): 7.2× at M (1,000 landscapes) and 19.8× at L (120); the earlier 6.7× (M, 200-landscape WP1 study, ratio of medians) and 22× (L, first 60) are superseded.

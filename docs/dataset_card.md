@@ -120,7 +120,8 @@ sets are described in `aux/README.md`.
   8-neighbour graphs; every sample stores the solver version, parameters, timing and residual.
 - T4 targets at M and above use Omniscape's `block_size` (largest odd integer ≤ radius / 10) with artefact correction;
   against the exact block-1 map the production target deviates by mean relative L2 0.029 at M (1,000-landscape
-  reference, 4.7 % of landscapes above 5 %) and 0.028 at L (60 landscapes, 2 above 5 %), and block 1 is exact at S.
+  reference, 4.7 % of landscapes above 5 %) and 0.030 at L (120-landscape reference, 6 above 5 %, all synthetic; the
+  largest, 0.203, at contrast 10⁶), and block 1 is exact at S.
 - Every T1/T1W/T1R/T3 row carries its measured relative Kirchhoff residual (`residual_rel`); a post-run precision pass
   re-solved 129,722 rows with CHOLMOD plus refinement so that 3,861 rows lie between 10⁻⁹ and 10⁻⁶ and only 20 rows,
   all synthetic at contrast ≥ 10⁴, remain above 10⁻⁶.

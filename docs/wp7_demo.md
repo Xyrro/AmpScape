@@ -1,6 +1,6 @@
 # WP7 — many-query demonstration (2026-09-25)
 
-Best T4 model at L: `unet_T4_L_s1` (rel-L2 0.080 vs the exact block-1 map on test_id). 20 held-out real L tiles × 8 resistance tables (4 expert tables, the v1.0 `random_lm` draw, 3 extra draws `random_lm2..4` solved with the production pipeline, QC 100 %). Question: do the conclusions of a many-table screening study drawn from the surrogate match those drawn from the solver? Produced by `scripts/wp7_demo.py run` (GPU job 5934206, 79 s); per-tile rows on the Hub under `aux/wp7/demo_results.parquet`.
+Best T4 model at L: `unet_T4_L_s1` (rel-L2 0.080 on test_id against the production target — 2026-10-22 correction: this was labelled 'vs the exact block-1 map'; against the exact map it is 0.085 on the 48-map L reference). 20 held-out real L tiles × 8 resistance tables (4 expert tables, the v1.0 `random_lm` draw, 3 extra draws `random_lm2..4` solved with the production pipeline, QC 100 %). Question: do the conclusions of a many-table screening study drawn from the surrogate match those drawn from the solver? Produced by `scripts/wp7_demo.py run` (GPU job 5934206, 79 s); per-tile rows on the Hub under `aux/wp7/demo_results.parquet`.
 
 
 | conclusion | solver route | model route | agreement |
