@@ -41,6 +41,7 @@ def main() -> int:
     )
     ap.add_argument("--repo", default="Xirro/AmpScape")
     ap.add_argument("--commit-gb", type=float, default=3.0)
+    ap.add_argument("--message", help="commit message (default: aux: <dest> (<n> files, batch i/n))")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     # login-node 4 GB memory cgroup, anonymous side (2026-10-13 06:50Z): the xet upload pipeline peaked at ≈ 1 GB RSS
@@ -102,7 +103,8 @@ def _push(a, src: pathlib.Path, rec_f: pathlib.Path, rec: dict, files: list[path
                     a.repo,
                     operations=ops,
                     repo_type="dataset",
-                    commit_message=f"aux: {a.dest} ({len(b)} files, batch {i}/{len(batches)})",
+                    commit_message=(f"{a.message} (batch {i}/{len(batches)})" if a.message
+                                    else f"aux: {a.dest} ({len(b)} files, batch {i}/{len(batches)})"),
                 )
                 break
             except Exception as e:  # noqa: BLE001
