@@ -33,12 +33,13 @@ import pandas as pd
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from ampscape import cluster  # noqa: E402
 from ampscape.io.hf_layout import CONFIG_TO_GROUP  # noqa: E402
 from ampscape.io.sync import remote_sha256, sha256  # noqa: E402
 
 REPO = f"{os.environ.get('HF_ORG', 'Xirro')}/AmpScape"
 JULIA = "julia --project=julia/AmpScapeSolve.jl julia/AmpScapeSolve.jl/scripts/resolve_rows.jl"
-SB = ["sbatch", "--parsable", "-A", "<account>", "-q", "<qos-a>", "-p", "<cpu-partition>", "-N1", "-n1"]
+SB = ["sbatch", "--parsable", *cluster.sbatch_args("cpu"), "-N1", "-n1"]
 PAIR_CONFIGS = ("points", "wall_to_wall_NS", "wall_to_wall_EW", "regions", "advanced")
 
 
@@ -120,7 +121,7 @@ def rebuild_rows(h5: pathlib.Path, shard: str, touched: set[tuple[str, str]]) ->
     from ampscape.solve.finalize import index_rows_from_final
 
     df = index_rows_from_final(str(h5), f"{shard}.h5")  # same spelling as the production rows
-    df = df[[(s, c) in touched for s, c in zip(df.sample_id, df.config)]].copy()
+    df = df[[(s, c) in touched for s, c in zip(df.sample_id, df.config, strict=False)]].copy()
     orig, flags = [], []
     with h5py.File(h5, "r") as f:
         for r in df.itertuples():
@@ -191,8 +192,8 @@ def cmd_run(a):
     old = pd.read_parquet(f"data/v1/{a.tier}/index/{shard}.parquet")
     if "solver_original" not in old:
         old["solver_original"] = None
-    key = set(zip(upd.sample_id, upd.config))
-    keep = old[[(s, c) not in key for s, c in zip(old.sample_id, old.config)]]
+    key = set(zip(upd.sample_id, upd.config, strict=False))
+    keep = old[[(s, c) not in key for s, c in zip(old.sample_id, old.config, strict=False)]]
     merged = pd.concat([keep, upd[[c for c in old.columns if c in upd.columns]]], ignore_index=True)
     merged.to_parquet(work / "index" / f"{shard}.parquet", index=False)
     result["finished"] = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")

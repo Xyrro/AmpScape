@@ -25,13 +25,14 @@ import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
+from ampscape import cluster  # noqa: E402  (site settings: scripts/env.local.sh)
 os.chdir(ROOT)
 LOGS = ROOT / "logs"
 CACHE = ROOT / "data" / "hfcache"
 RUNS = ROOT / "runs" / "full"
 STATE = LOGS / "gpu_driver_state.json"
 
-MAX_GPU = 18  # concurrent jobs of ours on <gpu-partition-a> (16 healthy L40S + A100 spill-over; 1 920 GPU-run-minutes per user)
+MAX_GPU = 32  # concurrent GPU jobs of ours: 16 two-hour legs per QoS × 2 QoS (<qos-a>, <qos-b>), see QOS_LEGS
 MAX_QUEUED_TOTAL = 45  # QoS MaxSubmitPU = 50
 SCRATCH_LIMIT_GB = 280.0  # 2026-09-24 10:30Z: 265 → 275 → 280 (M/T4 missed the 275 guard by 1 GB; offloader every 10 min keeps runs/full small; submissions hold above 290). total quota guard (300 GB): base ≈ 117 GB, so ≈ 150 GB of staged groups at most
 LOOKAHEAD = 12  # pending jobs whose data is staged ahead
@@ -56,14 +57,29 @@ GROUP_GB = {
 GRES = "gpu:l40s:1"
 GRES_ALT = "gpu:a100:1"  # used when ≥ ALT_AFTER of our jobs are already pending on L40S
 ALT_AFTER = 4
-PARTITION = "<gpu-partition-a>"
+# GPU pools (2026-10-13, owner): training legs go to the first pool with fewer than SPILL_AFTER of our jobs pending on
+# its GPU type and spill down the list. Pools are (partition, qos, gres) in priority order (H200 first: the packed
+# FNO w48 L epoch takes 103 s on H200 vs 188 s on H100, probes of 2026-10-13); the site's partitions and QoS names
+# come from AMPSCAPE_GPU_POOLS (scripts/env.local.sh, not in git). PACK=1: node-local packed training items.
+POOLS = cluster.gpu_pools()
+SPILL_AFTER = 3
+# 2026-10-13 (owner): MaxTRESRunMinsPU gres/gpu = 1 920 min and MaxSubmitPU = 50 are per user *per QoS* (verified in
+# `scontrol show assoc_mgr`), so each QoS is a pool of 16 two-hour legs; MAX_QUEUED_TOTAL keeps our total under 50.
+QOS_LEGS = cluster.qos_legs()  # {qos: legs}, AMPSCAPE_GPU_QOS_LEGS
+PACK = "1"
+PARTITION = cluster.partition("gpu")
 WALL = "02:00:00"  # 2026-09-24: QoS MaxTRESRunMinsPU gres/gpu=1920 → short jobs + self re-queue give ≈ 16 concurrent GPUs
 TIERS = ["S", "M", "L", "XL"]
 # 2026-09-24 22:40Z: XL is a held-out-scale tier (card: "XL/XXL for models trained ≤ L"; its v1.0 split has 228 train
 # landscapes and no val split), so nothing is trained at XL — the XL/XXL rows come from the L-trained models
 # (scale-transfer evaluation, docs/phase10_full_schedule.md §5)
 TRAIN_TIERS = ["S", "M", "L"]
-GROUP = {"T1": "T1", "T3": "T3", "T4": "T4"}
+GROUP = {
+    "T1": "T1",
+    "T3": "T3",
+    "T4": "T4",
+    "T1V": "T1",
+}  # T1V reads the T1 shards (+ aux/t1_pair1)
 # per-tier resources: (batch, cpus, mem)
 RES = {
     "S": {"batch": 16, "cpus": 6, "mem": "64G"},
@@ -211,6 +227,8 @@ XFER_EST = {"XL": 1.0, "XXL": 1.5}  # predictions at batch 1 + parallel metrics,
 
 
 def est_hours(j: dict) -> float:
+    if "est_h" in j:
+        return float(j["est_h"])
     if j.get("kind") == "transfer":
         return XFER_EST[j["tier"]] * (2.0 if j["model"] == "gnn" else 1.0)
     base = EST[(j["model"], j["task"])][j["tier"]]
@@ -236,7 +254,7 @@ def our_jobs() -> dict[str, str]:
     """{job name: state} for our phase10 jobs (queued/running) — names are phase10-<run name>."""
     out = {}
     for line in sh(
-        ["squeue", "-u", os.environ.get("USER", "<user>"), "-h", "-o", "%j|%t"]
+        ["squeue", "-u", cluster.user(), "-h", "-o", "%j|%t"]
     ).splitlines():
         name, _, state = line.partition("|")
         if name.startswith("phase10-"):
@@ -246,15 +264,51 @@ def our_jobs() -> dict[str, str]:
 
 def n_queued_total() -> int:
     return len(
-        sh(["squeue", "-u", os.environ.get("USER", "<user>"), "-h", "-o", "%i"]).splitlines()
+        sh(["squeue", "-u", cluster.user(), "-h", "-o", "%i"]).splitlines()
     )
 
 
 def quota_gb() -> float:
-    for line in sh(["<quota-tool>"]).splitlines():
+    for line in sh(cluster.quota_cmd()).splitlines():
         if line.startswith("Scratch:"):
             return float(line.split()[1])
     return 0.0
+
+
+# scratch a run still writes before the offloader frees it (predictions + last.pt; measured: S 2.6, M/T4 L 5.4,
+# FNO T1 L 6.5 GB) and the predictions.h5 an in-flight T4 reference backfill fetches from the Hub
+PRED_GB = {"S": 3.0, "M": 5.5, "L": 7.0, "XL": 13.0, "XXL": 13.0}
+QUOTA_SOFT_GB = 295.0  # the 300 GB quota minus the slack for logs/checkpoints
+RECENT_STAGE_S = 900.0
+
+
+def footprint_gb(active: dict[str, str], jobs: list[dict]) -> float:
+    """GB that queued/running work will still write to scratch: the predictions of every training leg whose run is
+    not yet offloaded (2026-10-13 22:50Z: with L/T3 and L/T4 staged (146 GB) the 7 GNN legs and 8 L legs would have
+    written ≈ 90 GB into 17 GB of quota)."""
+    by = {j["name"]: j for j in jobs}
+    tot = 0.0
+    for n in active:
+        if n.startswith(("stats-", "accel-", "t4ref-", "xfer_")):
+            continue  # transfer bursts have their own bound (XFER_QUOTA_GB, MAX_XFER); backfills fetch to the node
+        elif n in by and not (RUNS / n / ".offloaded").exists():
+            tot += PRED_GB.get(by[n]["tier"], 7.0)
+    return tot
+
+
+def committed_gb(st: dict, footprint: float) -> float:
+    """Scratch the driver must treat as used: the quota reading, plus the groups staged in the last 15 min (Lustre's
+    quota accounting lags writes by minutes — at 22:48Z L/T3 had just landed, the reading said it fitted, and L/T4 was
+    staged beside it), plus `footprint`."""
+    now = time.time()
+    q = quota_gb()
+    # each entry [ts, gb, q0]: the reading at the stage start plus the staged GB is what the reading must reach; the
+    # compensation decays to 0 as the accounting catches up (an eviction in between over-compensates for ≤ 15 min)
+    recent = max(
+        [min(gb, q0 + gb - q) for ts, gb, q0 in st.get("recent_stagings", []) if now - ts < RECENT_STAGE_S]
+        + [0.0]
+    )  # never more than the staged size (03:54Z: a stale q0 produced 328 GB "committed" against 242 GB used)
+    return q + recent + footprint
 
 
 def staged(tier: str, group: str) -> bool:
@@ -295,12 +349,7 @@ def submit_stats(tier: str, group: str, st: dict) -> None:
         [
             "sbatch",
             "--parsable",
-            "-A",
-            "<account>",
-            "-q",
-            "<qos-a>",
-            "-p",
-            "<cpu-partition>",
+            *cluster.sbatch_args("cpu"),
             "-N1",
             "-n1",
             "-c2",
@@ -322,9 +371,11 @@ def submit_stats(tier: str, group: str, st: dict) -> None:
 
 XFER_RES = {"XL": {"cpus": 8, "mem": "96G"}, "XXL": {"cpus": 8, "mem": "160G"}}
 XFER_WALL = "04:00:00"
-XFER_BURST_GB = 13.0  # largest prediction burst of one transfer leg (FNO at XL, one split)
-MAX_XFER = 4  # concurrent transfer legs: each writes up to ≈ 13 GB of XL predictions before its metrics run
-XFER_QUOTA_GB = 245.0  # no transfer submission above this scratch level (quota 300; ≤ 4 bursts of ≤ 13 GB in flight)
+XFER_BURST_GB = (
+    11.0  # largest prediction burst of one transfer leg (FNO at XL test_id measured 10.7 GB)
+)
+MAX_XFER = 4  # concurrent transfer legs (scratch floor ≈ 70 GB after the 2026-10-02 deletions): each writes up to ≈ 13 GB of XL predictions before its metrics run
+XFER_QUOTA_GB = 255.0  # no transfer submission above this scratch level (quota 300; ≤ 4 bursts of ≤ 13 GB in flight)
 
 
 def submit_transfer(j: dict, st: dict, gres: str, exclude: list[str]) -> None:
@@ -338,12 +389,7 @@ def submit_transfer(j: dict, st: dict, gres: str, exclude: list[str]) -> None:
             "sbatch",
             "--parsable",
             *exclude,
-            "-A",
-            "<account>",
-            "-q",
-            "<qos-a>",
-            "-p",
-            "<gpu-partition-a>",
+            *cluster.sbatch_args("gpu"),
             "-N1",
             "-n1",
             f"-c{res['cpus']}",
@@ -376,6 +422,35 @@ def submit_transfer(j: dict, st: dict, gres: str, exclude: list[str]) -> None:
         log(f"submit failed for {j['name']}: {jid[-200:]}")
 
 
+def choose_pool(queued: list[str]) -> tuple[str, str, str] | None:
+    """(partition, qos, gres) for the next training leg, or None when every QoS is at its leg budget. `queued` =
+    squeue lines "name|qos|gres|state|reason" of our jobs (queued + running). A pool is used when its QoS has fewer than
+    QOS_LEGS GPU legs queued+running and fewer than SPILL_AFTER of ours pending on its (qos, GPU type)."""
+    rows = [x.split("|") for x in queued if x.startswith("phase10-") and "gpu" in x]
+    for partition, qos, gres in POOLS:
+        gtype = gres.split(":")[1]
+        n_qos = sum(1 for r in rows if len(r) > 1 and r[1] == qos)
+        # pending with a real reason only: a leg submitted seconds ago shows PD/None and must not count as backlog
+        # (16:22Z: six quick submissions spilled the next two legs onto H200, where they waited on Priority)
+        n_pd = sum(
+            1
+            for r in rows
+            if len(r) > 3 and r[1] == qos and gtype in r[2] and r[3] == "PD" and (len(r) < 5 or r[4] not in ("None", ""))
+        )
+        if n_qos < QOS_LEGS.get(qos, 16) and n_pd < SPILL_AFTER:
+            return partition, qos, gres
+    return None
+
+
+def local_fetch(j: dict) -> bool:
+    """GNN training legs fetch their (tier, group) from the Hub straight to the compute node's NVMe (train_full.sbatch
+    LOCALDATA=1; compute nodes have outbound HTTPS, docs/compute_env.md) instead of reading the scratch cache: a GNN
+    leg pins its group for ≈ 12 h, which deadlocked the staging of every other group under the scratch guard.
+    A plan entry with "local": true does the same (01:30Z 2026-10-14: the FNO T3 L legs would have waited ≈ 2.5 h for
+    L/T4 to be released by the slow scale-aware T4 leg; a 64 GB fetch takes ≈ 10 min)."""
+    return (j.get("model") == "gnn" or bool(j.get("local"))) and j.get("kind") != "transfer"
+
+
 def submit(j: dict, st: dict) -> None:
     out = RUNS / j["name"]
     if j.get("kind") != "transfer":
@@ -389,16 +464,19 @@ def submit(j: dict, st: dict) -> None:
         res["mem"] = f"{min(int(res['mem'].rstrip('G')) * 2 ** prev['oom'], 180)}G"
     # GPU type: keep the L40S pool (16 healthy GPUs) as the default and spill to A100 (8 GPUs) only while ≥ ALT_AFTER
     # of our jobs are pending on L40S and fewer than 4 are pending on A100
-    pend = sh(
-        ["squeue", "-u", os.environ.get("USER", "<user>"), "-h", "-t", "PD", "-o", "%j|%b"]
+    queued = sh(
+        ["squeue", "-u", cluster.user(), "-h", "-t", "PD,R", "-o", "%j|%q|%b|%t|%r"]
     ).splitlines()
-    pd_l40s = sum(1 for x in pend if x.startswith("phase10-") and "l40s" in x)
-    pd_a100 = sum(1 for x in pend if x.startswith("phase10-") and "a100" in x)
-    gres = GRES_ALT if (pd_l40s >= ALT_AFTER and pd_a100 < 4) else GRES
+    pool = choose_pool(queued)
+    if pool is None and j.get("kind") != "transfer":
+        log(f"no pool with free legs for {j['name']} (per-QoS budgets full)")
+        return
+    partition, qos, gres = pool or (PARTITION, cluster.qos(), GRES)
     export = (
         f"ALL,MODEL={j['model']},TASK={j['task']},TIER={j['tier']},SEED={j['seed']},OUT={out},ROOT={CACHE},"
         f"EPOCHS={j.get('epochs', 30)},BATCH={batch},PATIENCE=8,WORKERS={res['cpus']},MAXTRAIN={j.get('maxtrain', '')},"
-        f"EXTRA={j.get('extra', '')},MEM={res['mem']},GRES={gres},WALL={WALL}"
+        f"EXTRA={j.get('extra', '')},MEM={res['mem']},GRES={gres},WALL={WALL},QOS={qos},"
+        f"PACK={PACK if j['model'] != 'gnn' else '0'},LOCALDATA={'1' if local_fetch(j) else '0'},GROUP={GROUP[j['task']]}"
     )
     bad = (
         LOGS / "gpu_bad_nodes.txt"
@@ -409,19 +487,14 @@ def submit(j: dict, st: dict) -> None:
         else []
     )
     if j.get("kind") == "transfer":
-        submit_transfer(j, st, gres, exclude)
+        submit_transfer(j, st, GRES, exclude)
         return
     jid = sh(
         [
             "sbatch",
             "--parsable",
             *exclude,
-            "-A",
-            "<account>",
-            "-q",
-            "<qos-a>",
-            "-p",
-            PARTITION,
+            *cluster.sbatch_args("gpu", qos_name=qos, partition_name=partition),
             "-N1",
             "-n1",
             f"-c{res['cpus']}",
@@ -533,24 +606,44 @@ def submit_t4_reference_backfill(jobs: list[dict], st: dict) -> None:
         if job and sh(["squeue", "-h", "-j", job]):
             continue
         pred = run / "predictions" / f"hfcache_{j['tier']}_test_id"
-        if not (pred / "predictions.h5").exists():
-            continue
         tier = j["tier"]
+        fetch = ""
+        cleanup = ""
+        root = "data/hfcache"
+        if not staged(tier, "T4"):
+            if tier != "M" or not (pred / "predictions.h5").exists():
+                continue  # the harness reads the shards; the staging block above requests the group
+            # M/T4 is not on scratch (the GNN legs read node-local copies): fetch the group onto the CPU node's local
+            # disk (54 GB, ≈ 10 min) instead of staging it beside the L work (00:05Z 2026-10-14)
+            fetch = (
+                f'G="${{TMPDIR:-/tmp}}/ampscape_t4ref_{j["name"]}_$SLURM_JOB_ID"; mkdir -p "$G/hfcache/stats"; '
+                f'cp data/hfcache/stats/norm_stats.json "$G/hfcache/stats/"; '
+                f'python scripts/slurm/gpu/stage_data.py stage --cache "$G/hfcache" --tier M --group T4 --workers 16 2>&1 | tail -1 && '
+            )
+            root = '"$G/hfcache"'
+            cleanup = '; rm -rf "$G"'
+        if not (pred / "predictions.h5").exists():
+            # offloaded to the Hub: fetched by the job onto the CPU node's local disk (1.4 TB; 22:58Z: 16 L fetches
+            # of 6.5 GB onto scratch would not have fit, and the hub-cache copies of the morning's M fetches stayed
+            # behind on scratch), xet chunk cache alongside it, everything removed with the job
+            rel = f"aux/results/runs_full/{j['name']}/predictions/hfcache_{tier}_test_id/predictions.h5"
+            fetch += (
+                f'L="${{TMPDIR:-/tmp}}/ampscape_t4ref_{j["name"]}_$SLURM_JOB_ID"; mkdir -p "$L"; '
+                f'HF_XET_CACHE="$L/xet" python -c "from huggingface_hub import hf_hub_download as d; '
+                f"d('Xirro/AmpScape', '{rel}', repo_type='dataset', local_dir='$L')\" && "
+            )
+            pred = pathlib.Path(f"$L/{rel}").parent
+            cleanup += '; rm -rf "$L"'
         cmd = (
-            f"source scripts/env.sh; python scripts/evaluate.py --predictions {pred} --root data/hfcache --tier {tier} "
+            f"source scripts/env.sh; {fetch}python scripts/evaluate.py --predictions {pred} --root {root} --tier {tier} "
             f"--split test_id --t4-reference aux/t4_bs1_reference/{tier}_bs1 "
-            f"--t4-blocks aux/t4_blocksize_baselines/{tier}_* --out {run}/eval_t4_reference"
+            f"--t4-blocks aux/t4_blocksize_baselines/{tier}_* --out {run}/eval_t4_reference" + cleanup
         )
         jid = sh(
             [
                 "sbatch",
                 "--parsable",
-                "-A",
-                "<account>",
-                "-q",
-                "<qos-a>",
-                "-p",
-                "<cpu-partition>",
+                *cluster.sbatch_args("cpu"),
                 "-N1",
                 "-n1",
                 "-c4",
@@ -570,12 +663,93 @@ def submit_t4_reference_backfill(jobs: list[dict], st: dict) -> None:
             log(f"T4 reference evaluation backfill for {j['name']}: job {jid}")
 
 
+ACCEL_SPLITS = ("test_id", "test_ood")
+
+
+def accel_missing(j: dict) -> list[str]:
+    """Splits whose warm-start (solver-acceleration) evaluation is missing for a voltage-head run (item 1)."""
+    if "--target voltage" not in j.get("extra", "") or j.get("kind") == "transfer":
+        return []
+    run = RUNS / j["name"]
+    return [sp for sp in ACCEL_SPLITS if not (run / f"eval_accel_{sp}" / "results.json").exists()]
+
+
+def submit_accel_backfill(jobs: list[dict], st: dict) -> None:
+    """Voltage-head runs (T3 / T1V, `--target voltage`): the AMG-PCG warm-start evaluation is a CPU job per split
+    (evaluate.py --acceleration, Julia) that reads the run's local predictions and the staged shards; until
+    2026-10-13 these were submitted by hand. The offloader holds the run until both splits exist."""
+    st.setdefault("accel_jobs", {})
+    for j in jobs:
+        if not done(j):
+            continue
+        for sp in accel_missing(j):
+            key = f"{j['name']}:{sp}"
+            job = st["accel_jobs"].get(key)
+            if job and sh(["squeue", "-h", "-j", job]):
+                continue
+            tier = j["tier"]
+            if not staged(tier, GROUP[j["task"]]):
+                continue  # the staging block requests the group
+            run = RUNS / j["name"]
+            pred = run / "predictions" / f"hfcache_{tier}_{sp}"
+            if not (pred / "predictions.h5").exists():
+                log(
+                    f"warm-start evaluation for {j['name']} {sp}: no local predictions (offloaded?) — skipped"
+                )
+                continue
+            cmd = (
+                f"source scripts/env.sh; python scripts/evaluate.py --predictions {pred} --root data/hfcache "
+                f"--tier {tier} --split {sp} --workers 8 --acceleration --out {run}/eval_accel_{sp}"
+            )
+            (LOGS / "accel").mkdir(exist_ok=True)
+            jid = sh(
+                [
+                    "sbatch",
+                    "--parsable",
+                    *cluster.sbatch_args("cpu"),
+                    "-N1",
+                    "-n1",
+                    "-c8",
+                    "--mem=" + ("96G" if tier == "L" else "64G"),
+                    "-t",
+                    "10:00:00",
+                    "-J",
+                    f"accel-{j['name']}-{sp}",
+                    "-o",
+                    f"{LOGS}/accel/accel_{j['name']}_{sp}_%j.out",
+                    "--wrap",
+                    cmd,
+                ]
+            )
+            if jid.isdigit():
+                st["accel_jobs"][key] = jid
+                log(f"warm-start evaluation for {j['name']} {sp}: job {jid}")
+
+
+def gnn_phase(j: dict) -> bool:
+    """Jobs held until everything else is done ("GNN strictly last"): the phase-10 GNN tags and, since 2026-10-13, any
+    GNN job from a plan file — a GNN leg pins its data group for ≈ 12 h, which deadlocks the staging of every other
+    group under the scratch guard (M/T4 at 07:00Z, M/T1 at 09:27Z)."""
+    return j["tag"] in ("P4", "XF4", "SN4", "SNX4") or j.get("model") == "gnn"
+
+
 def cycle(jobs: list[dict], st: dict) -> None:
     note_bad_nodes(jobs)
     note_oom(jobs, st)
     submit_t4_reference_backfill(jobs, st)
-    active = our_jobs()
-    running = {n for n, s in active.items() if not n.startswith(("stats-", "t4ref-"))}
+    submit_accel_backfill(jobs, st)
+    active = our_jobs()  # after the backfill submissions, so their groups are pinned in this cycle (06:32Z 2026-10-14:
+    # S/T1 was evicted by the transfer hold seconds after four warm-start evaluations were submitted on it)
+    fp = footprint_gb(active, jobs)
+    st["recent_stagings"] = [
+        x for x in st.get("recent_stagings", []) if time.time() - x[0] < RECENT_STAGE_S
+    ]
+
+    def used_gb() -> float:
+        return committed_gb(st, fp)
+
+    headroom = [QUOTA_SOFT_GB - used_gb()]  # GB of predictions that may still be committed this cycle
+    running = {n for n, s in active.items() if not n.startswith(("stats-", "t4ref-", "accel-"))}
     pending = [j for j in jobs if not done(j) and j["name"] not in running]
     # staging: data of the next pending jobs, in priority order, only when the group fits under the quota guard
     # (2026-09-24: an unguarded staging chain hit the 300 GB quota); groups no pending job needs are evicted first
@@ -583,25 +757,73 @@ def cycle(jobs: list[dict], st: dict) -> None:
     xfer_only: set[tuple[str, str]] = (
         set()
     )  # groups wanted only by transfer legs within the lookahead
-    for j in pending[:LOOKAHEAD]:
+    # the GNN phase (P4/XF4/SN4/SNX4) cannot be submitted while an earlier-phase job is pending, so its groups are
+    # not staged ahead either (2026-10-03 02:00Z: pre-staged S/M groups pushed scratch over the transfer threshold
+    # and blocked the very transfer legs the GNN phase was waiting for)
+    earlier_pending = any(not gnn_phase(jj) for jj in pending)
+    stageable = [
+        jj for jj in pending if not (earlier_pending and gnn_phase(jj))
+    ]
+    train_needs: set[tuple[str, str]] = set()
+    for j in stageable[:LOOKAHEAD]:
+        if local_fetch(j):
+            continue  # fetched on the node, nothing to stage
         key = (j["tier"], GROUP[j["task"]])
         if key not in needed:
             needed.append(key)
+        if j.get("kind") == "transfer":
+            if key not in train_needs:
+                xfer_only.add(key)  # staged under the lower transfer limit (03:57Z 2026-10-14: XL/T4 was staged
+                # beside XL/T1 + XXL/T1 up to the 280 GB guard and every transfer leg was then held under 255)
+        else:
+            train_needs.add(key)
+            xfer_only.discard(key)
+    # finished T4 M/L runs whose exact-reference evaluation is missing need their group staged for the CPU job
+    for j in jobs:
+        key = (j["tier"], GROUP[j["task"]])  # (16:18Z: was the loop variable left over from the stageable loop above)
+        if (
+            j["task"] == "T4"
+            and j["tier"] in ("M", "L")
+            and done(j)
+            and not (RUNS / j["name"] / "eval_t4_reference").exists()
+        ):
+            if j["tier"] == "M" and (
+                RUNS / j["name"] / "predictions" / "hfcache_M_test_id" / "predictions.h5"
+            ).exists():
+                continue  # the backfill fetches M/T4 onto the CPU node itself (00:08Z 2026-10-14)
+            key = (j["tier"], "T4")
+            if key not in needed:
+                needed.append(key)
             if j.get("kind") == "transfer":
                 xfer_only.add(key)
         elif key in xfer_only and j.get("kind") != "transfer":
             xfer_only.discard(key)
+    # finished voltage-head runs whose warm-start evaluation is missing need their group staged for the CPU job
+    for j in jobs:
+        if done(j) and accel_missing(j):
+            key = (j["tier"], GROUP[j["task"]])
+            if key not in needed:
+                needed.append(key)
     # staging in strict priority order: the data of the highest-priority pending jobs comes first; when it does not fit,
     # evict staged groups that no RUNNING job uses, those whose next pending use is furthest down the list first
     # (re-staging a group takes ≈ 3 min at the measured 8–10 GB/min). 2026-09-24: the S groups were pinning 87 GB and
     # blocking the headline M/L runs.
     running_jobs = [j for j in jobs if j["name"] in running]
-    running_groups = {(jj["tier"], GROUP[jj["task"]]) for jj in running_jobs}
+    running_groups = {(jj["tier"], GROUP[jj["task"]]) for jj in running_jobs if not local_fetch(jj)}
+    # CPU backfills read their group from scratch too (06:09Z 2026-10-14: S/T1 was evicted under four running
+    # warm-start evaluations, which failed after 10 min and would have re-staged it in a loop)
+    by_name = {j["name"]: j for j in jobs}
+    for n in active:
+        run = n[len("accel-") :].rsplit("-", 1)[0] if n.startswith("accel-") else n[len("t4ref-") :] if n.startswith("t4ref-") else None
+        if run in by_name:
+            running_groups.add((by_name[run]["tier"], GROUP[by_name[run]["task"]]))
     first_use = {}
     first_use_soon = {}  # ignoring the GNN phase (P4/XF4), which cannot start before everything else anyway
     for k, jj in enumerate(pending):
+        if local_fetch(jj):
+            continue
         first_use.setdefault((jj["tier"], GROUP[jj["task"]]), k)
-        if jj["tag"] not in ("P4", "XF4", "SN4", "SNX4"):
+        if not gnn_phase(jj):
             first_use_soon.setdefault((jj["tier"], GROUP[jj["task"]]), k)
     # draining: when the highest-priority unstaged group does not fit because RUNNING jobs pin the groups that would
     # be evicted, those groups stop receiving new jobs (their later seeds wait) so the pin dissolves as the running
@@ -611,20 +833,36 @@ def cycle(jobs: list[dict], st: dict) -> None:
     freed = [
         0.0
     ]  # GB evicted this cycle: <quota-tool> lags a few minutes behind deletions (09:59Z: read 271 after
-    # evicting 30 GB), so the fit test uses quota_gb() - freed
+    # evicting 30 GB), so the fit test uses used_gb() - freed
 
-    def evict_until(size: float, target_use: int) -> None:
+    def evict_until(size: float, target_use: int, limit: float = SCRATCH_LIMIT_GB) -> None:
         # never evict a group whose next pending use comes before the target's (10:18Z: the driver staged M/T4 and
         # evicted it seconds later to make room for L/T1)
         cands = []
+        pinned = set()
+        pf = (
+            LOGS / "pinned_groups.txt"
+        )  # groups other jobs (outside this plan) are reading: never evict
+        if pf.exists():
+            pinned = {tuple(x.split("_", 1)) for x in pf.read_text().split() if "_" in x}
         for p_ in sorted((CACHE / "staged").glob("*.json")) if (CACHE / "staged").exists() else []:
             t_, g_ = p_.stem.split("_", 1)
-            if (t_, g_) in running_groups or first_use.get((t_, g_), 10**6) <= target_use:
+            if (
+                (t_, g_) in running_groups
+                or (t_, g_) in pinned
+                or first_use.get((t_, g_), 10**6) <= target_use
+            ):
                 continue
             cands.append((first_use.get((t_, g_), 10**6), t_, g_))
+        if not evictions_suffice(
+            used_gb() - freed[0], [GROUP_GB.get((t_, g_), 60.0) for _, t_, g_ in cands], size, limit
+        ):
+            return  # 21:48Z: XXL/T1 (staged 16 min earlier for the transfer legs) was evicted for L/T3, which still
+            # did not fit behind the running L/T1 legs — evict only when the evictable groups make the target fit;
+            # once the drained legs finish, their group joins the candidates and the fit test passes
         for _, t_, g_ in sorted(cands, reverse=True):
-            if quota_gb() - freed[0] + size <= SCRATCH_LIMIT_GB:
-                return
+            if used_gb() - freed[0] + size <= limit:
+                return  # (02:50Z 2026-09-26: this compared against the 280 GB guard while the caller wanted 193)
             subprocess.run(
                 [
                     sys.executable,
@@ -651,22 +889,26 @@ def cycle(jobs: list[dict], st: dict) -> None:
         # a group staged for transfer legs must leave room for their prediction bursts below the transfer threshold
         # (22:45Z: XL/T4 was re-staged into the hold band and would have been evicted again next cycle)
         limit = (
-            (XFER_QUOTA_GB - XFER_BURST_GB * MAX_XFER)
+            (SCRATCH_LIMIT_GB - XFER_BURST_GB * MAX_XFER)
             if (tier, group) in xfer_only
             else SCRATCH_LIMIT_GB
-        )
-        if quota_gb() - freed[0] + size > limit:
-            evict_until(size, first_use.get((tier, group), 10**6))
-            if quota_gb() - freed[0] + size > limit:
+        )  # 2026-10-02: measured against the hard guard, not the transfer threshold — the old limit (201) sat
+        # below the scratch floor + one XL group (156 + 61) and the driver idled for six days with an empty queue
+        if used_gb() - freed[0] + size > limit:
+            evict_until(size, first_use.get((tier, group), 10**6), limit)
+            if used_gb() - freed[0] + size > limit:
                 # mark the pinned groups (furthest next use first) that would free enough space as draining —
                 # not for a transfer-only group: its predecessors' transfer legs must simply finish first (22:49Z:
                 # draining XL/T1 would have blocked the very T1 transfer legs the T4 group was waiting behind)
-                need = 0.0 if (tier, group) in xfer_only else quota_gb() - freed[0] + size - limit
+                need = 0.0 if (tier, group) in xfer_only else used_gb() - freed[0] + size - limit
                 # small tiers first (their legs end within 2 h; an M/L group stays pinned for hours), then the
                 # group whose next pending use is furthest away
                 # cost-free first: groups with no unsubmitted job (draining them blocks nothing), then small tiers
                 # (legs end sooner), then the furthest next use (00:15Z: M/T3 was drained — stalling six seeds —
                 # while L/T4 had every job already submitted)
+                # never drain a group whose next pending training use comes before the target's (17:03Z: L/T1 was
+                # drained for L/T4, wanted only by CPU backfill evaluations, which held the pending T1V L run)
+                target_use = first_use.get((tier, group), 10**6)
                 pinned = sorted(
                     (
                         0 if first_use_soon.get(g_, 10**6) >= 10**6 else 1,
@@ -675,7 +917,7 @@ def cycle(jobs: list[dict], st: dict) -> None:
                         g_,
                     )
                     for g_ in running_groups
-                    if g_ != (tier, group)
+                    if g_ != (tier, group) and first_use_soon.get(g_, 10**6) >= target_use
                 )
                 for _, _, _, g_ in pinned:
                     if need <= 0:
@@ -683,12 +925,20 @@ def cycle(jobs: list[dict], st: dict) -> None:
                     draining.add(g_)
                     need -= GROUP_GB.get(g_, 60.0)
                 log(
-                    f"scratch {quota_gb() - freed[0]:.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {limit:.0f} GB even after evictions; draining {sorted(draining)}"
+                    f"scratch {used_gb() - freed[0]:.0f} GB: {tier}/{group} ({size:.0f} GB) does not fit under {limit:.0f} GB even after evictions; draining {sorted(draining)}"
                 )
-                break  # strict priority: do not stage a later group before this one
+                if draining:
+                    # a drain is in progress (running jobs pin the space): later groups may be staged meanwhile —
+                    # the eviction order (furthest next use first, never a group needed before the target) hands
+                    # the space back to this group when its turn comes (07:30Z 2026-10-05: GPUs idled for hours
+                    # behind one long GNN run while S-tier jobs could have run)
+                    continue
+                break  # quota truly full: do not stage a later group before this one
+        q0 = quota_gb() - freed[0]  # evictions of this cycle are not in the reading yet (03:54Z: L/T4's 82 GB were)
         stage(tier, group)
         if staged(tier, group):
             freed[0] -= size
+            st.setdefault("recent_stagings", []).append([time.time(), size, q0])
         if staged(tier, group) and tier in TRAIN_TIERS and not stats_ready(tier):
             submit_stats(tier, group, st)
     # submission in priority order; none while scratch is within 10 GB of the quota (predictions of finishing runs
@@ -703,39 +953,66 @@ def cycle(jobs: list[dict], st: dict) -> None:
         ),
         None,
     )
-    if first_xfer is not None and quota_gb() > XFER_QUOTA_GB:
+    if first_xfer is not None and used_gb() > XFER_QUOTA_GB:
         # 12 h idle on 2026-09-25: all four XL/XXL groups (166 GB) kept the scratch above the transfer threshold and
         # nothing triggered an eviction — free the groups whose next use is later than the first runnable transfer
-        before = quota_gb()
-        evict_until(
-            SCRATCH_LIMIT_GB - XFER_QUOTA_GB, max(first_xfer, LOOKAHEAD)
-        )  # until quota - freed <= XFER_QUOTA_GB; only groups outside the lookahead (23:22Z: a 1 GB overshoot evicted XXL/T1 four jobs ahead of its use)
-        log(
-            f"transfer legs held by scratch {before:.0f} GB > {XFER_QUOTA_GB:.0f}: evicted later-use groups "
-            f"({freed[0]:.0f} GB)"
+        # whose group is already staged (03:01Z 2026-10-14: XXL/T1, staged and wanted by the first runnable XXL legs,
+        # was evicted because the XL leg ahead of them — its group unstageable behind L/T4 — set the target)
+        before = used_gb()
+        runnable = [
+            jj
+            for jj in pending
+            if jj.get("kind") == "transfer" and done({"name": jj["src"]}) and staged(jj["tier"], GROUP[jj["task"]])
+        ][:MAX_XFER]  # only the legs that can run now: a staged group wanted further down (XL/T4 behind eight
+        # T1 legs) is evicted rather than holding everything (03:57Z 2026-10-14)
+        protect = max(
+            [first_use.get((jj["tier"], GROUP[jj["task"]]), 10**6) for jj in runnable] + [first_xfer]
         )
-    if quota_gb() > 290.0:
-        log(f"scratch {quota_gb():.0f} GB > 290: no submissions this cycle")
+        evict_until(
+            0.0, protect, XFER_QUOTA_GB
+        )  # until quota - freed <= XFER_QUOTA_GB; only groups outside the lookahead (23:22Z: a 1 GB overshoot evicted XXL/T1 four jobs ahead of its use)
+        if freed[0] > 0:
+            log(
+                f"transfer legs held by scratch {before:.0f} GB > {XFER_QUOTA_GB:.0f}: evicted later-use groups "
+                f"({freed[0]:.0f} GB)"
+            )
+    if used_gb() > 290.0:
+        log(f"scratch {used_gb():.0f} GB > 290: no submissions this cycle")
         slots = 0
+    headroom[0] += freed[0]  # evictions this cycle
+    held_log = [False]
     for j in pending:
         if slots <= 0 or n_queued_total() >= MAX_QUEUED_TOTAL:
             break
         key = (j["tier"], GROUP[j["task"]])
-        if j["tag"] == "P4" and any(
-            jj["tag"] not in ("P4", "XF4", "SN4", "SNX4")
-            for jj in pending
-            if jj["name"] not in running
+        if gnn_phase(j) and j.get("kind") != "transfer" and not local_fetch(j) and any(
+            not gnn_phase(jj) for jj in pending if jj["name"] not in running
         ):
             continue  # GNN strictly last: never ahead of a P1–P3/WP4/XF job that is only waiting for its data
-        if j.get("kind") == "transfer":
+        if local_fetch(j):
+            if not stats_ready(j["tier"]):
+                continue  # norm stats (scratch) are copied to the node's cache by the leg
+        elif j.get("kind") == "transfer":
             if not done({"name": j["src"]}) or not staged(*key):
                 continue  # the L-trained source run is not finished, or its XL/XXL data is not staged
-            if n_xfer_running >= MAX_XFER or quota_gb() - freed[0] > XFER_QUOTA_GB:
+            if any(n.startswith(f"xfer_{j['src']}_") for n in running):
+                continue  # one transfer leg per source run at a time (2026-10-04: concurrent legs raced on the summary)
+            if n_xfer_running >= MAX_XFER or used_gb() - freed[0] > XFER_QUOTA_GB:
                 continue  # scratch: bounded number of prediction bursts in flight
         elif not (staged(*key) and stats_ready(j["tier"])):
             continue
-        if key in draining and not (RUNS / j["name"] / "done.json").exists():
+        if key in draining and not local_fetch(j) and not (RUNS / j["name"] / "done.json").exists():
             continue  # its group is about to be evicted for a higher-priority group (evaluation-only legs still go)
+        if j.get("kind") != "transfer" and not (RUNS / j["name"] / ".offloaded").exists():
+            need = PRED_GB.get(j["tier"], 7.0)
+            if need > headroom[0]:
+                if not held_log[0]:
+                    log(
+                        f"scratch {QUOTA_SOFT_GB - headroom[0]:.0f} GB committed (quota + recent stagings + predictions of running work): {j['name']} held, its {need:.0f} GB of predictions would not fit under {QUOTA_SOFT_GB:.0f}"
+                    )
+                    held_log[0] = True
+                continue
+            headroom[0] -= need
         # a paused run whose leg is no longer in the queue (self re-queue failed, e.g. at the submit cap; six runs sat
         # for 20 h on 2026-09-25) is simply submitted again: train.py --resume continues from last.pt / done.json
         submit(j, st)
@@ -745,12 +1022,32 @@ def cycle(jobs: list[dict], st: dict) -> None:
     save_state(st)
 
 
+def evictions_suffice(used_gb: float, cand_gb: list[float], size: float, limit: float) -> bool:
+    """True when evicting every evictable candidate would let a `size` GB group fit under `limit`."""
+    return used_gb - sum(cand_gb) + size <= limit
+
+
+def load_plan_file(path: pathlib.Path) -> list[dict]:
+    """Phase 13 (2026-10-05): the job list comes from a JSON file — a list of {name, model, task, tier, seed, tag,
+    extra?, est_h?, kind?, src?}; `extra` is appended verbatim to train.py's arguments (variant, --target, …);
+    entries with "done_marker": true are finished runs listed only so their T4 reference evaluation is (re)computed."""
+    jobs = json.loads(path.read_text())
+    for j in jobs:
+        j.setdefault("tag", "P")
+        j.setdefault("extra", "")
+        j.setdefault("seed", 1)
+    return jobs
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--plan", action="store_true")
     ap.add_argument("--once", action="store_true")
+    ap.add_argument(
+        "--plan-file", default=None, help="JSON job list instead of the built-in Phase 10 plan"
+    )
     a = ap.parse_args()
-    jobs = plan()
+    jobs = load_plan_file(pathlib.Path(a.plan_file)) if a.plan_file else plan()
     if a.plan:
         tot = 0.0
         by = {}

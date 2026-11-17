@@ -120,7 +120,7 @@ def main() -> None:
 > tested for fidelity after this report and rejected; the adopted rule is block = largest odd ≤ radius/10
 > (`docs/dataset_plan.md` §7, `DECISIONS.md`). The mini set described here was generated with the
 > Phase-5 blocks and has been regenerated under the adopted rule (`data/builds/mini`, old set kept as
-> `mini_phase5blocks`). Budget numbers in §6 are the cluster-oriented and superseded by the plan's cost table.
+> `mini_phase5blocks`). Budget numbers in §6 are specific to this cluster and superseded by the plan's cost table.
 > **§2.1/§2.2 are superseded** by the 2026-09-06 re-check (`data/builds/mini/stats/solver_comparison_pcg.json`,
 > `DECISIONS.md`): the comparison below used Circuitscape's own cg+amg path, which was never broken; the
 > AMG-PCG *acceleration baseline* added later was mis-preconditioned until 2026-09-06 and is re-validated there.

@@ -1,5 +1,5 @@
 #!/bin/bash
-cd $AMPSCAPE_SCRATCH
+cd "${AMPSCAPE_SCRATCH:-${SLURM_SUBMIT_DIR:-.}}"
 source scripts/env.sh
 nvidia-smi --query-gpu=name,memory.total --format=csv
 python -c 'import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.get_device_name(0), torch.cuda.is_bf16_supported())'

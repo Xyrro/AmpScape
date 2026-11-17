@@ -12,7 +12,7 @@ from ampscape.landscapes import real, sampling
 @pytest.mark.parametrize(
     "lat,lon,epsg",
     [
-        (33.77, -84.39, 32616),  # Atlanta, zone 16N
+        (41.88, -87.63, 32616),  # Chicago, zone 16N
         (-33.87, 151.21, 32756),  # Sydney, zone 56S
         (0.0, 0.0, 32631),  # zone 31N (lon 0 belongs to zone 31)
         (51.5, -0.1, 32630),  # London, zone 30N

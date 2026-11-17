@@ -1,5 +1,5 @@
 #!/bin/bash
-cd $AMPSCAPE_SCRATCH
+cd "${AMPSCAPE_SCRATCH:-${SLURM_SUBMIT_DIR:-.}}"
 source scripts/env.sh
 for m in unet fno vit gnn; do
   echo "== calib $m"

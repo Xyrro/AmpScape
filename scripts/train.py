@@ -39,12 +39,13 @@ from ampscape.models.common import (  # noqa: E402
     inverse_target,
     make_inputs,
     make_target,
+    make_voltage_target,
     masked_mse,
     n_channels,
     target_scale,
 )
 
-DEFAULT_LR = {"unet": 1e-3, "fno": 1e-3, "vit": 3e-4, "gnn": 1e-3}
+DEFAULT_LR = {"unet": 1e-3, "fno": 1e-3, "vit": 3e-4, "gnn": 1e-3, "mgno": 1e-3}
 
 
 class Items(torch.utils.data.Dataset):
@@ -58,6 +59,9 @@ class Items(torch.utils.data.Dataset):
         multiscale: bool = False,
         tier: str | None = None,
         target_norm: str = "abs",
+        target: str = "default",
+        voltage_scale: float = 1.0,
+        coarse_factor: int = 4,
     ):
         self.ds, self.task, self.stats, self.graph, self.extra, self.multiscale = (
             ds,
@@ -68,6 +72,8 @@ class Items(torch.utils.data.Dataset):
             multiscale,
         )
         self.tier, self.target_norm = tier, target_norm
+        self.target, self.voltage_scale = target, voltage_scale
+        self.coarse_factor = coarse_factor  # must equal the multiscale GNN's `factor`
 
     def __len__(self):
         return len(self.ds)
@@ -75,20 +81,27 @@ class Items(torch.utils.data.Dataset):
     def __getitem__(self, i):
         d = self.ds[i]
         x = make_inputs(d, self.task, self.stats, self.extra)
-        y, m = make_target(d, self.task, self.tier, self.target_norm)
+        if self.target == "voltage":
+            y, m = make_voltage_target(d, self.voltage_scale)
+            sc = self.voltage_scale
+        else:
+            y, m = make_target(d, self.task, self.tier, self.target_norm)
+            sc = target_scale(d, self.task, self.tier, self.target_norm)
         out = {
             "x": x,
             "y": y,
             "mask": m,
             "sample_id": d["sample_id"],
             "config": d["config"],
-            "scale": target_scale(d, self.task, self.tier, self.target_norm),
+            "scale": sc,
         }
         if self.graph:
             idx, ei, w = grid_graph(d["resistance"][0], d["nodata"][0] > 0)
             out.update({"node_index": idx, "edge_index": ei, "edge_weight": w})
             if self.multiscale:
-                idx_c, ei_c, w_c, f2c = coarse_graph(d["resistance"][0], d["nodata"][0] > 0)
+                idx_c, ei_c, w_c, f2c = coarse_graph(
+                    d["resistance"][0], d["nodata"][0] > 0, f=self.coarse_factor
+                )
                 out.update(
                     {
                         "coarse_edge_index": ei_c,
@@ -179,10 +192,11 @@ def run_epoch(model, name, loader, device, opt=None, sched=None, amp=True, clip=
 
 
 @torch.no_grad()
-def predict(model, name, loader, device, task, out_h5, amp=True):
-    """Write predictions.h5 in the documented format with per-sample inference time (GPU-synchronised)."""
+def predict(model, name, loader, device, task, out_h5, amp=True, target="default"):
+    """Write predictions.h5 in the documented format with per-sample inference time (GPU-synchronised).
+    target="voltage": the dataset key is `voltage` and the inverse is linear (prediction × scale)."""
     model.eval()
-    key = TASK_TARGET[task]
+    key = "voltage" if target == "voltage" else TASK_TARGET[task]
     n = 0
     with h5py.File(out_h5, "w") as f:
         for batch in loader:
@@ -198,9 +212,10 @@ def predict(model, name, loader, device, task, out_h5, amp=True):
             dt = (time.perf_counter() - t0) / pred.shape[0]
             pred = pred.cpu().numpy()
             for i, (sid, cfg) in enumerate(zip(batch["sample_id"], batch["config"], strict=True)):
+                sc_i = batch.get("scale", [1.0] * len(batch["sample_id"]))[i]
                 c = inverse_target(
-                    pred[i, 0], batch.get("scale", [1.0] * len(batch["sample_id"]))[i]
-                )
+                    pred[i, 0], sc_i
+                )  # voltage target: same floor-log transform, scale 1
                 c[batch["mask"][i, 0].numpy() == 0] = np.where(
                     batch["x"][i, 1].numpy() > 0, np.nan, c
                 )[batch["mask"][i, 0].numpy() == 0]
@@ -264,11 +279,29 @@ def main():
         help="target normalisation: abs = official (absolute currents); scale = scale-aware variant "
         "(ampscape.models.common.target_scale), for the documented zero-shot transfer variant",
     )
+    ap.add_argument(
+        "--target",
+        default="default",
+        choices=["default", "voltage"],
+        help="voltage: predict the T3 advanced-mode voltage map (linear target) for the solver-acceleration track",
+    )
+    ap.add_argument(
+        "--aux-root",
+        default=None,
+        help="T1V: directory of pre-solved first-pair voltages (default aux/t1_pair1/<tier>)",
+    )
     ap.add_argument("--published-root", default="data/builds/published")
     ap.add_argument(
         "--published-tiers", default="S", help="comma list; XXL only for fully convolutional models"
     )
     ap.add_argument("--no-amp", action="store_true")
+    ap.add_argument(
+        "--packed-dir",
+        default=None,
+        help="pack the train/val items once to this (node-local) directory and train from the memmaps "
+        "(ampscape.data.packed; same tensors as the HDF5 loader; ignored for the GNN)",
+    )
+    ap.add_argument("--prefetch", type=int, default=2, help="DataLoader prefetch_factor")
     ap.add_argument(
         "--resume", action="store_true", help="continue from <out>/last.pt if present (2026-09-24)"
     )
@@ -312,9 +345,17 @@ def main():
     )
     mcfg = dict(MODEL_VARIANTS[a.model][a.variant])
     multiscale = bool(mcfg.get("multiscale", False))
+    coarse_factor = int(
+        mcfg.get("factor", 4)
+    )  # multiscale GNN: the graph coarsening must match the model
     in_ch = n_channels(a.task, extra)
 
     stats = load_norm_stats(a.root, a.tier) or compute_norm_stats(a.root, a.tier, a.task)
+    voltage_scale = 1.0
+    if a.target == "voltage":
+        if a.task not in ("T3", "T1V"):
+            raise SystemExit("--target voltage requires --task T3 or T1V (voltage maps)")
+        print("voltage target: log10(V + eps*max V), inverse = inverse_target", flush=True)
     cfg = {
         "model": a.model,
         "task": a.task,
@@ -324,6 +365,8 @@ def main():
         "variant": a.variant,
         "extra_channels": list(extra),
         "target_norm": a.target_norm,
+        "target_kind": a.target,
+        "voltage_scale": voltage_scale,
         "lr": lr,
         "batch": a.batch,
         "epochs": a.epochs,
@@ -333,7 +376,11 @@ def main():
         "patience": a.patience,
         "time_budget_min": a.time_budget_min,
         "input_channels": in_ch,
-        "target": f"log10({TASK_TARGET[a.task]} + eps*max)",
+        "target": (
+            "log10(voltage + eps*max)"
+            if a.target == "voltage"
+            else f"log10({TASK_TARGET[a.task]} + eps*max)"
+        ),
         "norm_stats": stats["log_resistance"],
         "device": torch.cuda.get_device_name(0) if device.type == "cuda" else "cpu",
         "git": subprocess.run(
@@ -348,12 +395,36 @@ def main():
     if a.eval_only:
         model.load_state_dict(torch.load(a.eval_only, map_location=device)["model"])
     else:
-        tr = AmpScapeDataset(a.task, "train", a.tier, a.root)
+        tr = AmpScapeDataset(a.task, "train", a.tier, a.root, aux_root=a.aux_root)
         if a.max_train:
             tr.index = tr.index.iloc[: a.max_train].reset_index(drop=True)
-        va = AmpScapeDataset(a.task, "val", a.tier, a.root)
+        va = AmpScapeDataset(a.task, "val", a.tier, a.root, aux_root=a.aux_root)
+        items_tr = Items(tr, a.task, stats, graph, extra, multiscale, a.tier, a.target_norm, a.target, voltage_scale, coarse_factor)
+        items_va = Items(va, a.task, stats, graph, extra, multiscale, a.tier, a.target_norm, a.target, voltage_scale, coarse_factor)
+        if a.packed_dir and not graph:
+            from ampscape.data.packed import PackedItems, pack_items, pack_key
+
+            base = {
+                "task": a.task, "tier": a.tier, "root": str(pathlib.Path(a.root).resolve()), "extra": list(extra),
+                "target_norm": a.target_norm, "target": a.target, "voltage_scale": voltage_scale,
+                "stats": stats, "max_train": a.max_train or 0,
+            }
+            packs = {}
+            # the packing loaders draw from the global RNGs (DataLoader base seeds): save/restore so the training
+            # shuffle is the same permutation as the HDF5 path's (identical sample stream, verified 2026-10-13)
+            import random as _random
+
+            rng_state = (torch.get_rng_state(), np.random.get_state(), _random.getstate())
+            for split, it in (("train", items_tr), ("val", items_va)):
+                spec = dict(base, split=split)
+                packs[split] = pack_items(
+                    it, pathlib.Path(a.packed_dir) / f"{a.task}_{a.tier}_{split}_{pack_key(spec)}", spec,
+                    workers=a.workers, batch=max(a.batch, 8), collate=collate, log=print,
+                )
+            torch.set_rng_state(rng_state[0]); np.random.set_state(rng_state[1]); _random.setstate(rng_state[2])
+            items_tr, items_va = PackedItems(packs["train"]), PackedItems(packs["val"])
         dl_tr = torch.utils.data.DataLoader(
-            Items(tr, a.task, stats, graph, extra, multiscale, a.tier, a.target_norm),
+            items_tr,
             batch_size=a.batch,
             shuffle=True,
             num_workers=a.workers,
@@ -361,13 +432,16 @@ def main():
             pin_memory=True,
             drop_last=True,
             persistent_workers=a.workers > 0,
+            prefetch_factor=a.prefetch if a.workers > 0 else None,
         )
         dl_va = torch.utils.data.DataLoader(
-            Items(va, a.task, stats, graph, extra, multiscale, a.tier, a.target_norm),
+            items_va,
             batch_size=a.batch,
             shuffle=False,
             num_workers=a.workers,
             collate_fn=collate,
+            pin_memory=True,
+            prefetch_factor=a.prefetch if a.workers > 0 else None,
         )
         opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=a.weight_decay)
         steps = a.epochs * max(len(dl_tr), 1)
@@ -465,7 +539,9 @@ def main():
                     finished = True
                     print(f"stop at epoch {ep} ({'patience' if bad >= a.patience else 'epochs'})")
                     break
-                if (time.time() - t_start) / 60 > a.time_budget_min:
+                # predictive (2026-10-03): stop when the NEXT epoch would not fit — a GNN T4 L epoch is 30 min and a
+                # leg that starts one at minute 90 of a 105-min budget hits the walltime mid-epoch
+                if (time.time() - t_start) / 60 + 1.1 * dt / 60 > a.time_budget_min:
                     print(f"pause at epoch {ep} (time budget; resume with --resume)")
                     break
             if (
@@ -514,12 +590,24 @@ def main():
             if t.strip()
         ]
     for root, tier, split in groups:
-        ds = AmpScapeDataset(a.task, split, tier, root)
+        ds = AmpScapeDataset(a.task, split, tier, root, aux_root=a.aux_root)
         if len(ds) == 0:
             continue
         bs = 1 if tier in ("XL", "XXL") else a.batch
         dl = torch.utils.data.DataLoader(
-            Items(ds, a.task, stats, graph, extra, multiscale, tier, a.target_norm),
+            Items(
+                ds,
+                a.task,
+                stats,
+                graph,
+                extra,
+                multiscale,
+                tier,
+                a.target_norm,
+                a.target,
+                voltage_scale,
+                coarse_factor,
+            ),
             batch_size=bs,
             shuffle=False,
             num_workers=min(a.workers, 2),
@@ -528,7 +616,7 @@ def main():
         tag = f"{pathlib.Path(root).name}_{tier}_{split}"
         pdir = out / "predictions" / tag
         pdir.mkdir(parents=True, exist_ok=True)
-        n = predict(model, a.model, dl, device, a.task, pdir / "predictions.h5", amp)
+        n = predict(model, a.model, dl, device, a.task, pdir / "predictions.h5", amp, a.target)
         (pdir / "meta.json").write_text(
             json.dumps(
                 {

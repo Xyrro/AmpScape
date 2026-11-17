@@ -62,13 +62,42 @@ def block_rows(ref: pathlib.Path, blocks: list[pathlib.Path]) -> pd.DataFrame:
 
 
 def model_rows(runs: list[pathlib.Path], tier: str) -> pd.DataFrame:
+    """Learned rows. Phase 10-full runs carry the evaluation against the exact block-1 map in
+    <run>/eval_t4_reference/results.json (test_id; `scripts/evaluate.py --t4-reference`): its per-task metrics and the
+    median per-landscape inference time are used, and seeds of one model are averaged into one row
+    (`<model> (learned, k seeds)`). Dev-era runs without that file fall back to the production-target metrics in
+    results.json (tags `<root>_<tier>_<split>`)."""
+    import re
+
     rows = []
     for r in runs:
+        ref = r / "eval_t4_reference" / "results.json"
+        if ref.exists():
+            rr = json.loads(ref.read_text())
+            m = rr["per_task"].get("T4", {})
+            ts = [x.get("inference_time_s") for x in rr["per_sample"] if x.get("inference_time_s")]
+            rows.append(
+                {
+                    "split": rr["splits"][0],
+                    "method": re.sub(  # seeds of one configuration share a row; the scale-aware suffix is kept (2026-10-18)
+                        r"_s\d+(_t2)?(_scalenorm)?$", lambda m_: (m_.group(2) or "") + (" (tuned)" if m_.group(1) else ""), r.name
+                    ),
+                    "seed": r.name,
+                    "n": rr["n_rows"],
+                    "cost_s": float(pd.Series(ts).median()) if ts else None,
+                    **{
+                        k: (m.get(k) or {}).get("mean") if isinstance(m.get(k), dict) else m.get(k)
+                        for k in KEYS
+                    },
+                }
+            )
+            continue
         res = json.loads((r / "results.json").read_text())
         for tag, e in res["eval"].items():
-            if not tag.startswith(f"S_{tier}_") and not tag.startswith(f"{tier}_{tier}_"):
+            mt = re.match(rf"^[^_]+_{tier}_(test_id|test_ood|ood_region)$", tag)
+            if not mt:
                 continue
-            split = tag.split("_", 2)[2]
+            split = mt.group(1)
             m = e.get("T4", {})
             if not m or m.get("rel_l2") is None:
                 continue
@@ -81,12 +110,60 @@ def model_rows(runs: list[pathlib.Path], tier: str) -> pd.DataFrame:
             rows.append(
                 {
                     "split": split,
-                    "method": f"{r.name} (learned)",
+                    "method": re.sub(  # seeds of one configuration share a row; the scale-aware suffix is kept (2026-10-18)
+                        r"_s\d+(_t2)?(_scalenorm)?$", lambda m_: (m_.group(2) or "") + (" (tuned)" if m_.group(1) else ""), r.name
+                    ),
+                    "seed": r.name,
                     "n": e.get("n_rows"),
                     "cost_s": cost,
                     **{k: m.get(k) for k in KEYS},
                 }
             )
+    df = pd.DataFrame(rows)
+    if not len(df):
+        return df
+    agg = (
+        df.groupby(["split", "method"])
+        .agg(
+            n=("n", "first"),
+            seeds=("seed", "nunique"),
+            cost_s=("cost_s", "mean"),
+            **{k: (k, "mean") for k in KEYS},
+            rel_l2_median=("rel_l2", "median"),
+        )
+        .reset_index()
+    )
+    agg["method"] = [
+        f"{m} (learned, {k} seed{'s' if k > 1 else ''})"
+        for m, k in zip(agg.method, agg.seeds, strict=True)
+    ]
+    return agg.drop(columns="seeds")
+
+
+def short_label(method: str) -> str:
+    """'unet_T4_L (learned, 3 seeds)' -> 'U-Net'; '…_s1_scalenorm (learned, 1 seed)' -> 'U-Net (scale-aware)'; solver rows unchanged."""
+    import re as _re
+
+    mm = _re.match(
+        r"^(unet|fno|vit|gnn|mgno)_T4_\w+?(?: \(tuned\))?(_s\d+)?(?:_t2)?(_scalenorm)? \(learned", method
+    )
+    if not mm:
+        return method
+    name = {"unet": "U-Net", "fno": "FNO", "vit": "ViT", "gnn": "GNN", "mgno": "MgNO"}[mm.group(1)]
+    return name + (" (scale-aware)" if mm.group(3) else "")
+
+
+def heuristic_rows(path: pathlib.Path, tier: str) -> pd.DataFrame:
+    """Review round 3: the solver-free radius-law baseline (scripts/review/r3_t4_eval.py heuristic), one row per method
+    and split; cost = median CPU seconds per landscape (one core); no non-source or pinch metrics."""
+    if not path.exists():
+        return pd.DataFrame()
+    h = pd.read_parquet(path)
+    h = h[h.tier == tier]
+    rows = []
+    for (split, method), g in h.groupby(["split", "method"]):
+        rows.append({"split": split, "method": f"{method} (no solver, 1 core)", "n": len(g), "cost_s": g.time_s.median(),
+                     **{k: (g[k].mean() if k in g else None) for k in KEYS}})
     return pd.DataFrame(rows)
 
 
@@ -98,19 +175,21 @@ def main():
     ap.add_argument("--tier", default="M")
     ap.add_argument("--out", required=True)
     ap.add_argument("--fig", default=None)
+    ap.add_argument("--heuristic", default=None, help="aux/review_round3/heuristic/heuristic.parquet (review round 3)")
     a = ap.parse_args()
     df = pd.concat(
         [
             block_rows(pathlib.Path(a.reference), [pathlib.Path(b) for b in a.blocks]),
             model_rows([pathlib.Path(r) for r in a.runs], a.tier),
+            heuristic_rows(pathlib.Path(a.heuristic), a.tier) if a.heuristic else pd.DataFrame(),
         ],
         ignore_index=True,
     )
     lines = [
         f"# T4 error vs cost at tier {a.tier} (errors against the exact block-1 map on the reference subset)",
         "",
-        "| split | method | n | cost s / landscape | rel_l2 | ns_rel_l2 | mae_log10eps | top5_iou | pinch_recall | spearman |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| split | method | n | cost s / landscape | rel_l2 | rel_l2 median (seeds) | ns_rel_l2 | mae_log10eps | top5_iou | pinch_recall | spearman |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for split, g in df.groupby("split"):
         for r in g.sort_values("cost_s", ascending=False).itertuples():
@@ -118,9 +197,10 @@ def main():
             def f(v):
                 return "–" if v is None or pd.isna(v) else f"{v:.4f}"
 
+            med = getattr(r, "rel_l2_median", None)
             lines.append(
-                f"| {split} | {r.method} | {r.n} | {'–' if pd.isna(r.cost_s) else f'{r.cost_s:.3g}'} | "
-                + " | ".join(f(getattr(r, k)) for k in KEYS)
+                f"| {split} | {r.method} | {r.n} | {'–' if pd.isna(r.cost_s) else f'{r.cost_s:.3g}'} | {f(r.rel_l2)} | {f(med)} | "
+                + " | ".join(f(getattr(r, k)) for k in KEYS if k != "rel_l2")
                 + " |"
             )
     pathlib.Path(a.out).parent.mkdir(parents=True, exist_ok=True)
@@ -138,9 +218,17 @@ def main():
         for ax, split in zip(axes[0], splits, strict=True):
             g = df[(df.split == split) & df.cost_s.notna()]
             for r in g.itertuples():
-                ax.scatter(r.cost_s, r.rel_l2, s=40, marker="o" if "learned" in r.method else "s")
+                learned = "learned" in r.method
+                variant = "scalenorm" in r.method
+                ax.scatter(
+                    r.cost_s,
+                    r.rel_l2,
+                    s=40,
+                    marker=("^" if variant else "o") if learned else "s",
+                    alpha=0.6 if variant else 1.0,
+                )
                 ax.annotate(
-                    r.method.replace(" (correct_artifacts=", " ca=").replace(")", ""),
+                    short_label(r.method).replace(" (correct_artifacts=", " ca=").replace(")", ""),
                     (r.cost_s, r.rel_l2),
                     fontsize=6,
                     xytext=(3, 3),

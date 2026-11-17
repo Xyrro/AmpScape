@@ -1,0 +1,21 @@
+% src: docs/tables/review_round3_decision_bf16.md; docs/tables/review_round3_decision_fp32.md
+\begin{table}[htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{Verification budget in the many-query demonstration: $m$ of the 8 tables per tile are solved exactly and the surrogate supplies the rest (tables in the surrogate's own order of influence, reference table first). Persistent-pinch-point precision and recall and the consensus-core IoU against the all-solver route, for bf16 (left) and fp32 (right) inference, and the solver cost per tile (one core).}
+\label{tab:verify}
+\begin{tabular}{rrrrrrrr}
+\toprule
+tables solved & bf16 precision & bf16 recall & bf16 core IoU & fp32 precision & fp32 recall & fp32 core IoU & solver CPU-h / tile \\
+\midrule
+0 & 0.657 & 0.941 & 0.825 & 0.791 & 0.858 & 0.845 & 0.00 \\
+2 & 0.669 & 0.941 & 0.883 & 0.796 & 0.863 & 0.897 & 0.44 \\
+4 & 0.703 & 0.949 & 0.918 & 0.820 & 0.885 & 0.930 & 0.94 \\
+5 & 0.833 & 0.964 & 0.929 & 0.909 & 0.914 & 0.941 & 1.16 \\
+6 & 0.924 & 0.980 & 0.949 & 0.962 & 0.957 & 0.959 & 1.37 \\
+7 & 0.973 & 0.991 & 0.965 & 0.988 & 0.980 & 0.971 & 1.59 \\
+8 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 & 1.82 \\
+\bottomrule
+\end{tabular}
+\end{table}

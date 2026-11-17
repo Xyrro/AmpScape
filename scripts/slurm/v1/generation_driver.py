@@ -18,9 +18,10 @@ import subprocess
 import sys
 import time
 
-ROOT = pathlib.Path("$AMPSCAPE_SCRATCH")
+ROOT = pathlib.Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
+from ampscape import cluster  # noqa: E402  (site settings: scripts/env.local.sh)
 LOGS = ROOT / "logs"
 STATE = LOGS / "driver_state.json"
 CYCLE = 600
@@ -40,7 +41,7 @@ TIERS = [
     ("XL", 4000, 6, 300, 300, []),
     ("XXL", 400, 1, 300, 300, ["--n-tiles", "38"]),
 ]
-SB = ["sbatch", "--parsable", "-A", "<account>", "-q", "<qos-a>", "-p", "<cpu-partition>", "-N1", "-n1"]
+SB = ["sbatch", "--parsable", *cluster.sbatch_args("cpu"), "-N1", "-n1"]
 
 
 def now() -> str:
@@ -57,9 +58,9 @@ def sh(cmd: list[str], **kw) -> str:
 
 
 def scratch_gb() -> float:
-    out = sh(["lfs", "quota", "-u", os.environ.get("USER", "<user>"), "<scratch-fs>"])
+    out = sh(["lfs", "quota", "-u", cluster.user(), cluster.scratch_fs() or str(ROOT)])
     for line in out.splitlines():
-        if "<scratch-fs>" in line:
+        if (cluster.scratch_fs() or str(ROOT)) in line:
             v = line.split()[1].rstrip("*")
             return (
                 float(v) / 1e6
@@ -74,7 +75,7 @@ def scratch_gb() -> float:
 def data_gb() -> float:
     """Scratch usage for the guards: the whole scratch quota (<quota-tool>, instant), not only data/ — the 300 GB quota
     is what fills up (2026-09-21: ≈ 120 GB of sources, tiles, environments and aux builds live outside data/v1)."""
-    out = sh(["<quota-tool>"])
+    out = sh(cluster.quota_cmd())
     for line in out.splitlines():
         if line.startswith("Scratch:"):
             try:
@@ -179,7 +180,7 @@ def oom_shards(tier: str, shards: list[int]) -> set[int]:
         [
             "sacct",
             "-u",
-            os.environ.get("USER", "<user>"),
+            cluster.user(),
             "-S",
             "now-3days",
             "-X",
@@ -209,7 +210,7 @@ def oom_shards(tier: str, shards: list[int]) -> set[int]:
 def jobs_named(name: str) -> int:
     """Queued/running jobs whose name is exactly `name` (2026-09-19: a prefix match counted the aux array
     `ampscape-L_bs1` as tier-L work and stalled the L waves)."""
-    out = sh(["squeue", "-u", os.environ.get("USER", "<user>"), "-h", "-o", "%j"])
+    out = sh(["squeue", "-u", cluster.user(), "-h", "-o", "%j"])
     return sum(1 for j in out.splitlines() if j.strip() == name)
 
 
@@ -496,7 +497,7 @@ def run_tier(
         ]
         # shards with a queued/running task are in progress, not missing (2026-09-19: a running wave was counted as
         # missing three times and raised a false alert)
-        q = sh(["squeue", "-u", os.environ.get("USER", "<user>"), "-h", "-o", "%j|%K"])
+        q = sh(["squeue", "-u", cluster.user(), "-h", "-o", "%j|%K"])
         active: set[int] = set()
         for line in q.splitlines():
             name, _, tid = line.partition("|")

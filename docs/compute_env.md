@@ -8,7 +8,7 @@ Everything below was read directly from `sinfo`, `scontrol`, `sacctmgr`, `module
 
 | Item | Value |
 |---|---|
-| User | `<user>` (UID <uid>) |
+| User | `<user>` |
 | Slurm account | `<account>` (only account) |
 | QoS available | `<qos-a>` (default and only) |
 | `<qos-a>` limits | MaxSubmitPU = 500 jobs, MaxTRESPU = cpu 30720 / gpu 960, priority 7, no MaxWall override |

@@ -337,7 +337,9 @@ def cmd_compare(a):
     finally:
         shutil.rmtree(cache, ignore_errors=True)
     df = pd.DataFrame(rows)
-    df["tail_gt5pct"] = df.rel_l2 > 0.05  # flagged tail: production target > 5 % rel-L2 from the exact map
+    df["tail_gt5pct"] = (
+        df.rel_l2 > 0.05
+    )  # flagged tail: production target > 5 % rel-L2 from the exact map
     df.to_parquet(out / "index.parquet", index=False)
     keys = [
         "rel_l2",

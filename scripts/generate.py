@@ -32,7 +32,7 @@ def load_profile(name: str | None) -> dict:
     """Cluster profile from configs/cluster/<name>.yaml (name from --profile or AMPSCAPE_CLUSTER_PROFILE)."""
     import yaml
 
-    name = name or os.environ.get("AMPSCAPE_CLUSTER_PROFILE", "ice")
+    name = name or os.environ.get("AMPSCAPE_CLUSTER_PROFILE", "local")
     p = ROOT / "configs" / "cluster" / f"{name}.yaml"
     if not p.exists():
         raise SystemExit(f"cluster profile not found: {p} (copy configs/cluster/template.yaml)")
@@ -596,7 +596,7 @@ def main() -> None:
     b.add_argument(
         "--profile",
         default=None,
-        help="configs/cluster/<name>.yaml (default: $AMPSCAPE_CLUSTER_PROFILE or ice)",
+        help="configs/cluster/<name>.yaml (default: $AMPSCAPE_CLUSTER_PROFILE or local)",
     )
     b.add_argument("--time", default=None, help="override the profile's per-tier default")
     b.add_argument("--cpus", type=int, default=None)

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Push every scratch-only evaluation asset to the Hub under aux/ (owner 2026-09-21). Login node only; idempotent.
-cd $AMPSCAPE_SCRATCH; source scripts/env.sh
+cd "${AMPSCAPE_SCRATCH:-${SLURM_SUBMIT_DIR:-.}}"; source scripts/env.sh
 LOG=$AMPSCAPE_SCRATCH/logs/push_aux.log
 P="python scripts/push_aux.py"
 BUILD_INC="shards/*.h5 index/*.parquet index.parquet manifest*.parquet build.json splits/* stats/*"

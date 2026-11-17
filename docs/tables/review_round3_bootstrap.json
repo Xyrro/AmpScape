@@ -1,0 +1,2307 @@
+{
+ "B": 2000,
+ "rows": [
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id",
+   "model": "U-Net",
+   "n": 9850,
+   "rel_l2": 0.11407262470810597,
+   "ci_lo": 0.11270406845628603,
+   "ci_hi": 0.1154310602737378
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id",
+   "model": "FNO",
+   "n": 9850,
+   "rel_l2": 0.19944167979745817,
+   "ci_lo": 0.19699357171971346,
+   "ci_hi": 0.20188285981134205
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id",
+   "model": "ViT",
+   "n": 9850,
+   "rel_l2": 0.21750160186980852,
+   "ci_lo": 0.21518519866151667,
+   "ci_hi": 0.21986431025481482
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id",
+   "model": "GNN",
+   "n": 9850,
+   "rel_l2": 0.5612455316660451,
+   "ci_lo": 0.551716370281069,
+   "ci_hi": 0.570874687704859
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id",
+   "model": "MgNO",
+   "n": 9850,
+   "rel_l2": 0.44420980776232954,
+   "ci_lo": 0.44086009191309694,
+   "ci_hi": 0.44926253309327385
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "model": "U-Net",
+   "n": 6080,
+   "rel_l2": 0.13122448447426135,
+   "ci_lo": 0.12924396083783685,
+   "ci_hi": 0.13305683833961945
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "model": "FNO",
+   "n": 6080,
+   "rel_l2": 0.2385818438710472,
+   "ci_lo": 0.2351333694984081,
+   "ci_hi": 0.24235529280954127
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "model": "ViT",
+   "n": 6080,
+   "rel_l2": 0.2569342484025996,
+   "ci_lo": 0.2535565257658291,
+   "ci_hi": 0.2602767114217977
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "model": "GNN",
+   "n": 6080,
+   "rel_l2": 0.6117571552059253,
+   "ci_lo": 0.598264274552831,
+   "ci_hi": 0.6248811164863537
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "model": "MgNO",
+   "n": 6080,
+   "rel_l2": 0.45343202397750665,
+   "ci_lo": 0.44848024646740936,
+   "ci_hi": 0.4619342099817319
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id real",
+   "model": "U-Net",
+   "n": 3770,
+   "rel_l2": 0.08641126996587124,
+   "ci_lo": 0.08507107687575557,
+   "ci_hi": 0.08774490541209665
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id real",
+   "model": "FNO",
+   "n": 3770,
+   "rel_l2": 0.13631908097320852,
+   "ci_lo": 0.13449231103215423,
+   "ci_hi": 0.13816598710535222
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id real",
+   "model": "ViT",
+   "n": 3770,
+   "rel_l2": 0.1539073071962357,
+   "ci_lo": 0.15212918881006193,
+   "ci_hi": 0.15562967104979053
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id real",
+   "model": "GNN",
+   "n": 3770,
+   "rel_l2": 0.47978381518793595,
+   "ci_lo": 0.46809110868821724,
+   "ci_hi": 0.4912252121939938
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id real",
+   "model": "MgNO",
+   "n": 3770,
+   "rel_l2": 0.42933684368055847,
+   "ci_lo": 0.4273369310668061,
+   "ci_hi": 0.43154579666753595
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "model": "U-Net",
+   "n": 1108,
+   "rel_l2": 0.23389352683907524,
+   "ci_lo": 0.22708593112974976,
+   "ci_hi": 0.24175541873232123
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "model": "FNO",
+   "n": 1108,
+   "rel_l2": 0.41898690801438593,
+   "ci_lo": 0.4035803829926042,
+   "ci_hi": 0.4341457466795096
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "model": "ViT",
+   "n": 1108,
+   "rel_l2": 0.40884152485384445,
+   "ci_lo": 0.3989733108507237,
+   "ci_hi": 0.4187311078015474
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "model": "GNN",
+   "n": 1108,
+   "rel_l2": 0.8469064616681523,
+   "ci_lo": 0.8077273382120834,
+   "ci_hi": 0.8886381832876814
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "model": "MgNO",
+   "n": 1108,
+   "rel_l2": 0.5467380719894829,
+   "ci_lo": 0.5375411071590561,
+   "ci_hi": 0.5567359851543467
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "model": "U-Net",
+   "n": 5352,
+   "rel_l2": 0.09769144368684708,
+   "ci_lo": 0.09650442099359373,
+   "ci_hi": 0.0989595089328319
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "model": "FNO",
+   "n": 5352,
+   "rel_l2": 0.1551895265059622,
+   "ci_lo": 0.15343850642253126,
+   "ci_hi": 0.15699769467910402
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "model": "ViT",
+   "n": 5352,
+   "rel_l2": 0.17471995207499824,
+   "ci_lo": 0.1731841926648266,
+   "ci_hi": 0.17622433884265118
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "model": "GNN",
+   "n": 5352,
+   "rel_l2": 0.462732643921667,
+   "ci_lo": 0.4538048408265963,
+   "ci_hi": 0.471798259448834
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "model": "MgNO",
+   "n": 5352,
+   "rel_l2": 0.42447933820755773,
+   "ci_lo": 0.42325515650322465,
+   "ci_hi": 0.4257343893078778
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "published (S)",
+   "model": "U-Net",
+   "n": 45,
+   "rel_l2": 0.10926281220990468,
+   "ci_lo": 0.0997226785136463,
+   "ci_hi": 0.11940836184346378
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "published (S)",
+   "model": "FNO",
+   "n": 45,
+   "rel_l2": 0.18766880559681587,
+   "ci_lo": 0.16793397817545683,
+   "ci_hi": 0.21098877982452216
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "published (S)",
+   "model": "ViT",
+   "n": 45,
+   "rel_l2": 0.221107334641943,
+   "ci_lo": 0.20230047603810677,
+   "ci_hi": 0.2413699782463948
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "published (S)",
+   "model": "GNN",
+   "n": 45,
+   "rel_l2": 0.6100155637171013,
+   "ci_lo": 0.49313515913810035,
+   "ci_hi": 0.7374649604313064
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "published (S)",
+   "model": "MgNO",
+   "n": 45,
+   "rel_l2": 0.4268812946399763,
+   "ci_lo": 0.4155841008188827,
+   "ci_hi": 0.43848747341577243
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id",
+   "model": "U-Net",
+   "n": 4823,
+   "rel_l2": 0.18697112063827034,
+   "ci_lo": 0.18404263151053235,
+   "ci_hi": 0.18984155542139772
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id",
+   "model": "FNO",
+   "n": 4823,
+   "rel_l2": 0.2084703051567108,
+   "ci_lo": 0.20439928563454635,
+   "ci_hi": 0.2124677663487602
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id",
+   "model": "ViT",
+   "n": 4823,
+   "rel_l2": 0.30566451486460683,
+   "ci_lo": 0.30142032903967725,
+   "ci_hi": 0.3099242373797983
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id",
+   "model": "GNN",
+   "n": 4823,
+   "rel_l2": 0.6073907472676684,
+   "ci_lo": 0.5927418005324732,
+   "ci_hi": 0.6229514866683135
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id",
+   "model": "MgNO",
+   "n": 4823,
+   "rel_l2": 0.3757499602029329,
+   "ci_lo": 0.3725102734939962,
+   "ci_hi": 0.37913944175237524
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "model": "U-Net",
+   "n": 3048,
+   "rel_l2": 0.2139870866893104,
+   "ci_lo": 0.21014718723783132,
+   "ci_hi": 0.217877437545124
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "model": "FNO",
+   "n": 3048,
+   "rel_l2": 0.2496856994957292,
+   "ci_lo": 0.24385368650167993,
+   "ci_hi": 0.2553503211360468
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "model": "ViT",
+   "n": 3048,
+   "rel_l2": 0.3412247646412953,
+   "ci_lo": 0.33585038887658214,
+   "ci_hi": 0.3468100686253791
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "model": "GNN",
+   "n": 3048,
+   "rel_l2": 0.6654389380989727,
+   "ci_lo": 0.6445811702038606,
+   "ci_hi": 0.6872222457307806
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "model": "MgNO",
+   "n": 3048,
+   "rel_l2": 0.3990974089979637,
+   "ci_lo": 0.39466907349866825,
+   "ci_hi": 0.40348405512147895
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id real",
+   "model": "U-Net",
+   "n": 1775,
+   "rel_l2": 0.1405797603433012,
+   "ci_lo": 0.137644374630199,
+   "ci_hi": 0.14364003336940584
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id real",
+   "model": "FNO",
+   "n": 1775,
+   "rel_l2": 0.13769592659596253,
+   "ci_lo": 0.1346085407521814,
+   "ci_hi": 0.14081778946285928
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id real",
+   "model": "ViT",
+   "n": 1775,
+   "rel_l2": 0.24460105496638343,
+   "ci_lo": 0.2396811486920147,
+   "ci_hi": 0.24956583285349707
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id real",
+   "model": "GNN",
+   "n": 1775,
+   "rel_l2": 0.5077113750683356,
+   "ci_lo": 0.48897426779268083,
+   "ci_hi": 0.526534586067242
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id real",
+   "model": "MgNO",
+   "n": 1775,
+   "rel_l2": 0.3356581157368745,
+   "ci_lo": 0.3323083747872228,
+   "ci_hi": 0.339110470850153
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "model": "U-Net",
+   "n": 541,
+   "rel_l2": 0.3450295043137848,
+   "ci_lo": 0.3341191812201539,
+   "ci_hi": 0.35640280363408916
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "model": "FNO",
+   "n": 541,
+   "rel_l2": 0.4312009139630036,
+   "ci_lo": 0.41224023254320497,
+   "ci_hi": 0.44935583313289784
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "model": "ViT",
+   "n": 541,
+   "rel_l2": 0.5121615441376561,
+   "ci_lo": 0.49486314937886067,
+   "ci_hi": 0.528394450267984
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "model": "GNN",
+   "n": 541,
+   "rel_l2": 0.9112909781194966,
+   "ci_lo": 0.8494605753359631,
+   "ci_hi": 0.9799445668580866
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "model": "MgNO",
+   "n": 541,
+   "rel_l2": 0.597940492367214,
+   "ci_lo": 0.5664219443478526,
+   "ci_hi": 0.632735699771715
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "model": "U-Net",
+   "n": 2684,
+   "rel_l2": 0.14911488625064487,
+   "ci_lo": 0.14695492050647407,
+   "ci_hi": 0.15133519746111918
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "model": "FNO",
+   "n": 2684,
+   "rel_l2": 0.15876408222454189,
+   "ci_lo": 0.15624628298836538,
+   "ci_hi": 0.16115471167080583
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "model": "ViT",
+   "n": 2684,
+   "rel_l2": 0.2511198786405918,
+   "ci_lo": 0.24796510555992998,
+   "ci_hi": 0.25433904435957083
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "model": "GNN",
+   "n": 2684,
+   "rel_l2": 0.5039713738464512,
+   "ci_lo": 0.4891805717503859,
+   "ci_hi": 0.517937407101275
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "model": "MgNO",
+   "n": 2684,
+   "rel_l2": 0.34041624492915906,
+   "ci_lo": 0.33801606903146697,
+   "ci_hi": 0.3428638957990461
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id",
+   "model": "U-Net",
+   "n": 1928,
+   "rel_l2": 0.3967048731477685,
+   "ci_lo": 0.3890645879592405,
+   "ci_hi": 0.40492419806028607
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id",
+   "model": "FNO",
+   "n": 1928,
+   "rel_l2": 0.2987046450980928,
+   "ci_lo": 0.2911707698306261,
+   "ci_hi": 0.3065811088613397
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id",
+   "model": "ViT",
+   "n": 1928,
+   "rel_l2": 0.6484122305874852,
+   "ci_lo": 0.639542565688572,
+   "ci_hi": 0.6569442569721609
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id",
+   "model": "GNN",
+   "n": 1928,
+   "rel_l2": 0.940707349082167,
+   "ci_lo": 0.8987612509818171,
+   "ci_hi": 0.9825066601433461
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id synthetic",
+   "model": "U-Net",
+   "n": 1218,
+   "rel_l2": 0.43114108269161905,
+   "ci_lo": 0.4206480746249777,
+   "ci_hi": 0.44263581376543476
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id synthetic",
+   "model": "FNO",
+   "n": 1218,
+   "rel_l2": 0.3422806447258579,
+   "ci_lo": 0.33134783364925124,
+   "ci_hi": 0.3538070578279196
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id synthetic",
+   "model": "ViT",
+   "n": 1218,
+   "rel_l2": 0.6643726205731211,
+   "ci_lo": 0.6546094669918682,
+   "ci_hi": 0.6747259396622336
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id synthetic",
+   "model": "GNN",
+   "n": 1218,
+   "rel_l2": 0.9339527000663606,
+   "ci_lo": 0.883416951182651,
+   "ci_hi": 0.9844929526378879
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id real",
+   "model": "U-Net",
+   "n": 710,
+   "rel_l2": 0.33762979818381084,
+   "ci_lo": 0.3285687870043351,
+   "ci_hi": 0.34706658288845643
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id real",
+   "model": "FNO",
+   "n": 710,
+   "rel_l2": 0.22395032460989872,
+   "ci_lo": 0.21682271825061128,
+   "ci_hi": 0.23194937864143939
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id real",
+   "model": "ViT",
+   "n": 710,
+   "rel_l2": 0.6210322939642396,
+   "ci_lo": 0.6067643450941089,
+   "ci_hi": 0.6366826253833006
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id real",
+   "model": "GNN",
+   "n": 710,
+   "rel_l2": 0.952294901900832,
+   "ci_lo": 0.8786487826323768,
+   "ci_hi": 1.0344317893902755
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_ood contrast 1e6",
+   "model": "U-Net",
+   "n": 209,
+   "rel_l2": 0.5775555102210318,
+   "ci_lo": 0.5537580588257983,
+   "ci_hi": 0.6033903869514863
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_ood contrast 1e6",
+   "model": "FNO",
+   "n": 209,
+   "rel_l2": 0.633087691298476,
+   "ci_lo": 0.5337449039397835,
+   "ci_hi": 0.7840898640895954
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_ood contrast 1e6",
+   "model": "ViT",
+   "n": 209,
+   "rel_l2": 2.7034030781853122,
+   "ci_lo": 1.0539581312132256,
+   "ci_hi": 4.921935327831807
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_ood contrast 1e6",
+   "model": "GNN",
+   "n": 209,
+   "rel_l2": 1.1532203848769182,
+   "ci_lo": 1.0007804519753463,
+   "ci_hi": 1.3379797490935255
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_ood held-out table",
+   "model": "U-Net",
+   "n": 1069,
+   "rel_l2": 0.3498502950729416,
+   "ci_lo": 0.3425021652335257,
+   "ci_hi": 0.35760679077306345
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_ood held-out table",
+   "model": "FNO",
+   "n": 1069,
+   "rel_l2": 0.23864807284784148,
+   "ci_lo": 0.2321225118886594,
+   "ci_hi": 0.24515473373020383
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_ood held-out table",
+   "model": "ViT",
+   "n": 1069,
+   "rel_l2": 0.6229352659306677,
+   "ci_lo": 0.611788458253149,
+   "ci_hi": 0.6345262131727936
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_ood held-out table",
+   "model": "GNN",
+   "n": 1069,
+   "rel_l2": 0.8821982581941517,
+   "ci_lo": 0.8261812216250766,
+   "ci_hi": 0.9393152610756417
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_id",
+   "model": "U-Net",
+   "n": 9850,
+   "rel_l2": 0.11100168586499491,
+   "ci_lo": 0.10724866471574872,
+   "ci_hi": 0.11674334972340039
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_id",
+   "model": "FNO",
+   "n": 9850,
+   "rel_l2": 0.2523158181242225,
+   "ci_lo": 0.24867585530517353,
+   "ci_hi": 0.25582676098506296
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "model": "U-Net",
+   "n": 6080,
+   "rel_l2": 0.13675936983442774,
+   "ci_lo": 0.13106384205311275,
+   "ci_hi": 0.14588045782586315
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "model": "FNO",
+   "n": 6080,
+   "rel_l2": 0.3069457583098083,
+   "ci_lo": 0.3021313217359235,
+   "ci_hi": 0.3118837520858579
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_id real",
+   "model": "U-Net",
+   "n": 3770,
+   "rel_l2": 0.06946144222198383,
+   "ci_lo": 0.06818199711388112,
+   "ci_hi": 0.07089285967596187
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_id real",
+   "model": "FNO",
+   "n": 3770,
+   "rel_l2": 0.16421236021219018,
+   "ci_lo": 0.16107689348504248,
+   "ci_hi": 0.1673742630817289
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "model": "U-Net",
+   "n": 1108,
+   "rel_l2": 0.29244757452856646,
+   "ci_lo": 0.27733199652878837,
+   "ci_hi": 0.30928102431453475
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "model": "FNO",
+   "n": 1108,
+   "rel_l2": 0.5189941514934399,
+   "ci_lo": 0.5071202722651766,
+   "ci_hi": 0.5313666071113662
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "model": "U-Net",
+   "n": 5352,
+   "rel_l2": 0.0764124871273979,
+   "ci_lo": 0.07535839151565167,
+   "ci_hi": 0.0775070690362397
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "model": "FNO",
+   "n": 5352,
+   "rel_l2": 0.17576423820662734,
+   "ci_lo": 0.17299960459815036,
+   "ci_hi": 0.17847493816799911
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "published (S)",
+   "model": "U-Net",
+   "n": 45,
+   "rel_l2": 0.1263481537333434,
+   "ci_lo": 0.1122228057610575,
+   "ci_hi": 0.14054304646954605
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "published (S)",
+   "model": "FNO",
+   "n": 45,
+   "rel_l2": 0.2893045564306761,
+   "ci_lo": 0.25812485330944535,
+   "ci_hi": 0.3196659098019971
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_id",
+   "model": "U-Net",
+   "n": 4823,
+   "rel_l2": 0.2017175819677334,
+   "ci_lo": 0.19833430846878908,
+   "ci_hi": 0.20533543095063939
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_id",
+   "model": "FNO",
+   "n": 4823,
+   "rel_l2": 0.2549758852365792,
+   "ci_lo": 0.2497967211235034,
+   "ci_hi": 0.25994605466532905
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "model": "U-Net",
+   "n": 3048,
+   "rel_l2": 0.23765635060162418,
+   "ci_lo": 0.2329026612459853,
+   "ci_hi": 0.2426151043567253
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "model": "FNO",
+   "n": 3048,
+   "rel_l2": 0.30841813366214565,
+   "ci_lo": 0.3016557038118175,
+   "ci_hi": 0.3149463268003033
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_id real",
+   "model": "U-Net",
+   "n": 1775,
+   "rel_l2": 0.14000413588542412,
+   "ci_lo": 0.13735124192459966,
+   "ci_hi": 0.14279000642197054
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_id real",
+   "model": "FNO",
+   "n": 1775,
+   "rel_l2": 0.1632057594894657,
+   "ci_lo": 0.15890705981037212,
+   "ci_hi": 0.16734187638840245
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "model": "U-Net",
+   "n": 538,
+   "rel_l2": 0.4322316329125615,
+   "ci_lo": 0.4003522317445221,
+   "ci_hi": 0.47513775324855473
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "model": "FNO",
+   "n": 538,
+   "rel_l2": 0.5666007606155768,
+   "ci_lo": 0.5247024756456534,
+   "ci_hi": 0.6391578282042847
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "model": "U-Net",
+   "n": 2684,
+   "rel_l2": 0.1509970048460928,
+   "ci_lo": 0.14872684409216866,
+   "ci_hi": 0.15323145097089197
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "model": "FNO",
+   "n": 2684,
+   "rel_l2": 0.1775098026559249,
+   "ci_lo": 0.1737759382120498,
+   "ci_hi": 0.18110526581631853
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_id",
+   "model": "U-Net",
+   "n": 1928,
+   "rel_l2": 0.3787983151234849,
+   "ci_lo": 0.3717905952095768,
+   "ci_hi": 0.38588665607750167
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_id",
+   "model": "FNO",
+   "n": 1928,
+   "rel_l2": 0.32315778419796387,
+   "ci_lo": 0.31454432223512124,
+   "ci_hi": 0.33167936879335
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_id synthetic",
+   "model": "U-Net",
+   "n": 1218,
+   "rel_l2": 0.41573235912826784,
+   "ci_lo": 0.40592529229308055,
+   "ci_hi": 0.4260049324222795
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_id synthetic",
+   "model": "FNO",
+   "n": 1218,
+   "rel_l2": 0.37382285675681254,
+   "ci_lo": 0.3629662438330465,
+   "ci_hi": 0.3851279537184757
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_id real",
+   "model": "U-Net",
+   "n": 710,
+   "rel_l2": 0.3154382227321813,
+   "ci_lo": 0.3086183160527055,
+   "ci_hi": 0.3227931846590506
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_id real",
+   "model": "FNO",
+   "n": 710,
+   "rel_l2": 0.2362422090195446,
+   "ci_lo": 0.2280261378843479,
+   "ci_hi": 0.24477470625760386
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_ood contrast 1e6",
+   "model": "U-Net",
+   "n": 206,
+   "rel_l2": 0.562370932880014,
+   "ci_lo": 0.5389912302953643,
+   "ci_hi": 0.5871076176891136
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_ood contrast 1e6",
+   "model": "FNO",
+   "n": 206,
+   "rel_l2": 0.581815250204416,
+   "ci_lo": 0.5520944055080705,
+   "ci_hi": 0.6122885751641964
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_ood held-out table",
+   "model": "U-Net",
+   "n": 1069,
+   "rel_l2": 0.31703660717382637,
+   "ci_lo": 0.31210735485930574,
+   "ci_hi": 0.32184526782022954
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_ood held-out table",
+   "model": "FNO",
+   "n": 1069,
+   "rel_l2": 0.24243359916280408,
+   "ci_lo": 0.2360191183005775,
+   "ci_hi": 0.24864962766026652
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id",
+   "model": "U-Net",
+   "n": 9850,
+   "rel_l2": 0.04114389922173347,
+   "ci_lo": 0.040094835442548896,
+   "ci_hi": 0.042356116922717756
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id",
+   "model": "FNO",
+   "n": 9850,
+   "rel_l2": 0.050784729951452355,
+   "ci_lo": 0.04983961575564517,
+   "ci_hi": 0.05175582567068782
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id",
+   "model": "ViT",
+   "n": 9850,
+   "rel_l2": 0.052008115541702205,
+   "ci_lo": 0.05104119657738213,
+   "ci_hi": 0.052963778527410604
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id",
+   "model": "GNN",
+   "n": 9850,
+   "rel_l2": 0.06617928411653348,
+   "ci_lo": 0.06508250223553254,
+   "ci_hi": 0.06728869752736133
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id",
+   "model": "MgNO",
+   "n": 9850,
+   "rel_l2": 0.35838247916687577,
+   "ci_lo": 0.3520985151990718,
+   "ci_hi": 0.36516274759116774
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "model": "U-Net",
+   "n": 6080,
+   "rel_l2": 0.0495224698317395,
+   "ci_lo": 0.047928210946221524,
+   "ci_hi": 0.05141003740226918
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "model": "FNO",
+   "n": 6080,
+   "rel_l2": 0.061439776310636185,
+   "ci_lo": 0.06004865085646601,
+   "ci_hi": 0.06291042608906966
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "model": "ViT",
+   "n": 6080,
+   "rel_l2": 0.06350462161632574,
+   "ci_lo": 0.06205278187299741,
+   "ci_hi": 0.06498540569172051
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "model": "GNN",
+   "n": 6080,
+   "rel_l2": 0.07904537175307098,
+   "ci_lo": 0.07746708287398596,
+   "ci_hi": 0.08067519033043108
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "model": "MgNO",
+   "n": 6080,
+   "rel_l2": 0.3890063330613338,
+   "ci_lo": 0.37909478250219036,
+   "ci_hi": 0.39994683164974315
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id real",
+   "model": "U-Net",
+   "n": 3770,
+   "rel_l2": 0.027631509484641496,
+   "ci_lo": 0.02700141513236661,
+   "ci_hi": 0.028289718063423775
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id real",
+   "model": "FNO",
+   "n": 3770,
+   "rel_l2": 0.03360099470905508,
+   "ci_lo": 0.03298626408573774,
+   "ci_hi": 0.034229650437522574
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id real",
+   "model": "ViT",
+   "n": 3770,
+   "rel_l2": 0.033467331209152885,
+   "ci_lo": 0.032780902548435895,
+   "ci_hi": 0.034135175425279204
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id real",
+   "model": "GNN",
+   "n": 3770,
+   "rel_l2": 0.045429731641693116,
+   "ci_lo": 0.04464353547515223,
+   "ci_hi": 0.046259289646984295
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id real",
+   "model": "MgNO",
+   "n": 3770,
+   "rel_l2": 0.308994407103665,
+   "ci_lo": 0.3052562932684597,
+   "ci_hi": 0.31311632956051133
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "model": "U-Net",
+   "n": 1108,
+   "rel_l2": 0.13008227270492434,
+   "ci_lo": 0.12326549109834957,
+   "ci_hi": 0.13774281027013918
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "model": "FNO",
+   "n": 1108,
+   "rel_l2": 0.13265319525914568,
+   "ci_lo": 0.12706295725506103,
+   "ci_hi": 0.13887049133526602
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "model": "ViT",
+   "n": 1108,
+   "rel_l2": 0.12179870717570367,
+   "ci_lo": 0.11650846001037503,
+   "ci_hi": 0.12723831913870456
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "model": "GNN",
+   "n": 1108,
+   "rel_l2": 0.13533688327162935,
+   "ci_lo": 0.12927034775015112,
+   "ci_hi": 0.14137856638445306
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "model": "MgNO",
+   "n": 1108,
+   "rel_l2": 0.8194636883899945,
+   "ci_lo": 0.7599714899373059,
+   "ci_hi": 0.8844097160345633
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "model": "U-Net",
+   "n": 5352,
+   "rel_l2": 0.03209639561099085,
+   "ci_lo": 0.031640279101128654,
+   "ci_hi": 0.03252771541252466
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "model": "FNO",
+   "n": 5352,
+   "rel_l2": 0.038461959101120116,
+   "ci_lo": 0.03796708827355675,
+   "ci_hi": 0.038980461659082186
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "model": "ViT",
+   "n": 5352,
+   "rel_l2": 0.04106670094397306,
+   "ci_lo": 0.04051818228230855,
+   "ci_hi": 0.04165691814607004
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "model": "GNN",
+   "n": 5352,
+   "rel_l2": 0.06259450074582301,
+   "ci_lo": 0.06192993841014314,
+   "ci_hi": 0.06322611766339471
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "model": "MgNO",
+   "n": 5352,
+   "rel_l2": 0.3052502748073784,
+   "ci_lo": 0.30366106265989473,
+   "ci_hi": 0.30683740069219806
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "published (S)",
+   "model": "U-Net",
+   "n": 45,
+   "rel_l2": 0.06294508300387876,
+   "ci_lo": 0.05286855306106607,
+   "ci_hi": 0.07407408689967585
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "published (S)",
+   "model": "FNO",
+   "n": 45,
+   "rel_l2": 0.06602493851193257,
+   "ci_lo": 0.05840754767994277,
+   "ci_hi": 0.07367660291250705
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "published (S)",
+   "model": "ViT",
+   "n": 45,
+   "rel_l2": 0.0706896752782399,
+   "ci_lo": 0.06371072586076923,
+   "ci_hi": 0.07819714302177674
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "published (S)",
+   "model": "GNN",
+   "n": 45,
+   "rel_l2": 0.08941739396561149,
+   "ci_lo": 0.0812507345443996,
+   "ci_hi": 0.09854445622803104
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "published (S)",
+   "model": "MgNO",
+   "n": 45,
+   "rel_l2": 0.6318108757727531,
+   "ci_lo": 0.48918645149773027,
+   "ci_hi": 0.7914293504341275
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id",
+   "model": "U-Net",
+   "n": 4823,
+   "rel_l2": 0.041884911517812706,
+   "ci_lo": 0.040699713571801695,
+   "ci_hi": 0.04315057940410739
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id",
+   "model": "FNO",
+   "n": 4823,
+   "rel_l2": 0.07274615539019914,
+   "ci_lo": 0.07074065236339147,
+   "ci_hi": 0.07482295064464499
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id",
+   "model": "ViT",
+   "n": 4823,
+   "rel_l2": 0.09424243021316307,
+   "ci_lo": 0.09210646348421993,
+   "ci_hi": 0.09646444605044004
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id",
+   "model": "GNN",
+   "n": 4823,
+   "rel_l2": 0.09887708959572726,
+   "ci_lo": 0.096720077142634,
+   "ci_hi": 0.10122751460361587
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id",
+   "model": "MgNO",
+   "n": 4823,
+   "rel_l2": 0.18380295392928533,
+   "ci_lo": 0.18126112096899455,
+   "ci_hi": 0.18642061368710847
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "model": "U-Net",
+   "n": 3048,
+   "rel_l2": 0.05046716171909149,
+   "ci_lo": 0.04874718293624404,
+   "ci_hi": 0.05227173389311607
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "model": "FNO",
+   "n": 3048,
+   "rel_l2": 0.08823440594247052,
+   "ci_lo": 0.0852620863081389,
+   "ci_hi": 0.09129912205237359
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "model": "ViT",
+   "n": 3048,
+   "rel_l2": 0.11355250852100766,
+   "ci_lo": 0.11017984106932562,
+   "ci_hi": 0.1167731716062044
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "model": "GNN",
+   "n": 3048,
+   "rel_l2": 0.11891928846117415,
+   "ci_lo": 0.1154208101007449,
+   "ci_hi": 0.12222011423629907
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "model": "MgNO",
+   "n": 3048,
+   "rel_l2": 0.19571726947825763,
+   "ci_lo": 0.1918017701620372,
+   "ci_hi": 0.19950491481283072
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id real",
+   "model": "U-Net",
+   "n": 1775,
+   "rel_l2": 0.027147616524292862,
+   "ci_lo": 0.02617113061920745,
+   "ci_hi": 0.028311648216102384
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id real",
+   "model": "FNO",
+   "n": 1775,
+   "rel_l2": 0.04614999331508746,
+   "ci_lo": 0.04490207988436495,
+   "ci_hi": 0.04744240658704982
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id real",
+   "model": "ViT",
+   "n": 1775,
+   "rel_l2": 0.061083490110453054,
+   "ci_lo": 0.05950070271185476,
+   "ci_hi": 0.06264796663314946
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id real",
+   "model": "GNN",
+   "n": 1775,
+   "rel_l2": 0.06446096444537112,
+   "ci_lo": 0.0628819176400054,
+   "ci_hi": 0.06605444064459781
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id real",
+   "model": "MgNO",
+   "n": 1775,
+   "rel_l2": 0.16334389263730356,
+   "ci_lo": 0.1609749871910029,
+   "ci_hi": 0.16560349830981128
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "model": "U-Net",
+   "n": 541,
+   "rel_l2": 0.13797157275270802,
+   "ci_lo": 0.12425597680750536,
+   "ci_hi": 0.15368127123845118
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "model": "FNO",
+   "n": 541,
+   "rel_l2": 0.18713085011257388,
+   "ci_lo": 0.17559340201861123,
+   "ci_hi": 0.19883389517300232
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "model": "ViT",
+   "n": 541,
+   "rel_l2": 0.20061501930182501,
+   "ci_lo": 0.18897692214616577,
+   "ci_hi": 0.21268654399834538
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "model": "GNN",
+   "n": 541,
+   "rel_l2": 0.19550574290553613,
+   "ci_lo": 0.18324898683602323,
+   "ci_hi": 0.20721169417127314
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "model": "MgNO",
+   "n": 541,
+   "rel_l2": 0.3092313468297861,
+   "ci_lo": 0.2941825360787731,
+   "ci_hi": 0.3238909308715572
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "model": "U-Net",
+   "n": 2684,
+   "rel_l2": 0.03211930398356489,
+   "ci_lo": 0.03150671832298241,
+   "ci_hi": 0.032697373634723
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "model": "FNO",
+   "n": 2684,
+   "rel_l2": 0.057359177887423875,
+   "ci_lo": 0.05618421800510918,
+   "ci_hi": 0.05849534841422087
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "model": "ViT",
+   "n": 2684,
+   "rel_l2": 0.07726438665775169,
+   "ci_lo": 0.07588440530809855,
+   "ci_hi": 0.07872150909505651
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "model": "GNN",
+   "n": 2684,
+   "rel_l2": 0.08684378825030532,
+   "ci_lo": 0.08571436040640065,
+   "ci_hi": 0.08800109730812414
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "model": "MgNO",
+   "n": 2684,
+   "rel_l2": 0.18624039228918718,
+   "ci_lo": 0.18409819910453312,
+   "ci_hi": 0.18853231124289938
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id",
+   "model": "U-Net",
+   "n": 1927,
+   "rel_l2": 0.08096868353564052,
+   "ci_lo": 0.07754156220193527,
+   "ci_hi": 0.08435783003181767
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id",
+   "model": "FNO",
+   "n": 1927,
+   "rel_l2": 0.11592737259814301,
+   "ci_lo": 0.11163404533289703,
+   "ci_hi": 0.12062690822212067
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id",
+   "model": "ViT",
+   "n": 1927,
+   "rel_l2": 0.15864261276451216,
+   "ci_lo": 0.1539050841504062,
+   "ci_hi": 0.16355653089001385
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id",
+   "model": "GNN",
+   "n": 1927,
+   "rel_l2": 0.1416972801727371,
+   "ci_lo": 0.1370008662851928,
+   "ci_hi": 0.14651743451855317
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id synthetic",
+   "model": "U-Net",
+   "n": 1217,
+   "rel_l2": 0.09397520153939519,
+   "ci_lo": 0.08931351953629052,
+   "ci_hi": 0.09884961048541374
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id synthetic",
+   "model": "FNO",
+   "n": 1217,
+   "rel_l2": 0.1387326839380675,
+   "ci_lo": 0.132279483200981,
+   "ci_hi": 0.1456352908206014
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id synthetic",
+   "model": "ViT",
+   "n": 1217,
+   "rel_l2": 0.18340121190111,
+   "ci_lo": 0.17643690774413134,
+   "ci_hi": 0.19014129205158023
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id synthetic",
+   "model": "GNN",
+   "n": 1217,
+   "rel_l2": 0.16946442808710097,
+   "ci_lo": 0.1628661487082586,
+   "ci_hi": 0.17614407709365712
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id real",
+   "model": "U-Net",
+   "n": 710,
+   "rel_l2": 0.058674412534838495,
+   "ci_lo": 0.05492752645605983,
+   "ci_hi": 0.06315152381139832
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id real",
+   "model": "FNO",
+   "n": 710,
+   "rel_l2": 0.07683714175210339,
+   "ci_lo": 0.07371020778651544,
+   "ci_hi": 0.08020246594229564
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id real",
+   "model": "ViT",
+   "n": 710,
+   "rel_l2": 0.1162042815684002,
+   "ci_lo": 0.11225163632636836,
+   "ci_hi": 0.12089484066183515
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id real",
+   "model": "GNN",
+   "n": 710,
+   "rel_l2": 0.09410204212797542,
+   "ci_lo": 0.09063004028889643,
+   "ci_hi": 0.09743437457963038
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_ood contrast 1e6",
+   "model": "U-Net",
+   "n": 210,
+   "rel_l2": 0.20910245411291908,
+   "ci_lo": 0.19051855899805145,
+   "ci_hi": 0.22716790315587757
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_ood contrast 1e6",
+   "model": "FNO",
+   "n": 210,
+   "rel_l2": 0.2899136759951065,
+   "ci_lo": 0.2597040205580816,
+   "ci_hi": 0.3216462192549272
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_ood contrast 1e6",
+   "model": "ViT",
+   "n": 210,
+   "rel_l2": 0.3025848757498168,
+   "ci_lo": 0.27924290048948114,
+   "ci_hi": 0.32772891561997475
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_ood contrast 1e6",
+   "model": "GNN",
+   "n": 210,
+   "rel_l2": 0.25733222541636475,
+   "ci_lo": 0.23495605432863925,
+   "ci_hi": 0.28095616875240836
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_ood held-out table",
+   "model": "U-Net",
+   "n": 1069,
+   "rel_l2": 0.0657178611191372,
+   "ci_lo": 0.06417310174671377,
+   "ci_hi": 0.06729132260610834
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_ood held-out table",
+   "model": "FNO",
+   "n": 1069,
+   "rel_l2": 0.09210240703152144,
+   "ci_lo": 0.08955095019819413,
+   "ci_hi": 0.09470079859755084
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_ood held-out table",
+   "model": "ViT",
+   "n": 1069,
+   "rel_l2": 0.12269808492933378,
+   "ci_lo": 0.11980666440747005,
+   "ci_hi": 0.12550978707609345
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_ood held-out table",
+   "model": "GNN",
+   "n": 1069,
+   "rel_l2": 0.11206075089514633,
+   "ci_lo": 0.10965884651321806,
+   "ci_hi": 0.11456900643526358
+  }
+ ],
+ "ranking": [
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 9850,
+   "diff": -0.0853690550893522,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 6080,
+   "diff": -0.1073573593967858,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_id real",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 3770,
+   "diff": -0.04990781100733727,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "best": "U-Net",
+   "runner_up": "ViT",
+   "n_common": 1108,
+   "diff": -0.1749479980147692,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 5352,
+   "diff": -0.05749808281911512,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T1",
+   "tier": "S",
+   "stratum": "published (S)",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 45,
+   "diff": -0.0784059933869112,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 4823,
+   "diff": -0.02149918451844048,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 3048,
+   "diff": -0.0356986128064188,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_id real",
+   "best": "FNO",
+   "runner_up": "U-Net",
+   "n_common": 1775,
+   "diff": -0.0028838337473386403,
+   "p_order_flips": 0.011
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 541,
+   "diff": -0.08617140964921878,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T1",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 2684,
+   "diff": -0.009649195973897027,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id",
+   "best": "FNO",
+   "runner_up": "U-Net",
+   "n_common": 1928,
+   "diff": -0.0980002280496757,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id synthetic",
+   "best": "FNO",
+   "runner_up": "U-Net",
+   "n_common": 1218,
+   "diff": -0.08886043796576121,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_id real",
+   "best": "FNO",
+   "runner_up": "U-Net",
+   "n_common": 710,
+   "diff": -0.11367947357391207,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_ood contrast 1e6",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 209,
+   "diff": -0.05553218107744415,
+   "p_order_flips": 0.247
+  },
+  {
+   "task": "T1",
+   "tier": "L",
+   "stratum": "test_ood held-out table",
+   "best": "FNO",
+   "runner_up": "U-Net",
+   "n_common": 1069,
+   "diff": -0.11120222222510015,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_id",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 9850,
+   "diff": -0.1413141322592276,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 6080,
+   "diff": -0.17018638847538053,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_id real",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 3770,
+   "diff": -0.09475091799020635,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 1108,
+   "diff": -0.22654657696487335,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 5352,
+   "diff": -0.09935175107922942,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "S",
+   "stratum": "published (S)",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 45,
+   "diff": -0.16295640269733266,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_id",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 4823,
+   "diff": -0.05325830326884581,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 3048,
+   "diff": -0.07076178306052147,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_id real",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 1775,
+   "diff": -0.023201623604041592,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 538,
+   "diff": -0.13436912770301532,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 2684,
+   "diff": -0.0265127978098321,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_id",
+   "best": "FNO",
+   "runner_up": "U-Net",
+   "n_common": 1928,
+   "diff": -0.05564053092552106,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_id synthetic",
+   "best": "FNO",
+   "runner_up": "U-Net",
+   "n_common": 1218,
+   "diff": -0.04190950237145526,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_id real",
+   "best": "FNO",
+   "runner_up": "U-Net",
+   "n_common": 710,
+   "diff": -0.07919601371263675,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_ood contrast 1e6",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 206,
+   "diff": -0.01944431732440205,
+   "p_order_flips": 0.039
+  },
+  {
+   "task": "T3",
+   "tier": "L",
+   "stratum": "test_ood held-out table",
+   "best": "FNO",
+   "runner_up": "U-Net",
+   "n_common": 1069,
+   "diff": -0.07460300801102222,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 9850,
+   "diff": -0.009640830729718884,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id synthetic",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 6080,
+   "diff": -0.011917306478896675,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_id real",
+   "best": "U-Net",
+   "runner_up": "ViT",
+   "n_common": 3770,
+   "diff": -0.005835821724511385,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_ood contrast 1e6",
+   "best": "ViT",
+   "runner_up": "U-Net",
+   "n_common": 1108,
+   "diff": -0.008283565529220667,
+   "p_order_flips": 0.0015
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "test_ood held-out table",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 5352,
+   "diff": -0.006365563490129266,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T4",
+   "tier": "S",
+   "stratum": "published (S)",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 45,
+   "diff": -0.0030798555080538237,
+   "p_order_flips": 0.194
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 4823,
+   "diff": -0.030861243872386437,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id synthetic",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 3048,
+   "diff": -0.03776724422337905,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_id real",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 1775,
+   "diff": -0.019002376790794608,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_ood contrast 1e6",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 541,
+   "diff": -0.04915927735986587,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T4",
+   "tier": "M",
+   "stratum": "test_ood held-out table",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 2684,
+   "diff": -0.02523987390385899,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 1927,
+   "diff": -0.03495868906250249,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id synthetic",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 1217,
+   "diff": -0.04475748239867233,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_id real",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 710,
+   "diff": -0.0181627292172649,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_ood contrast 1e6",
+   "best": "U-Net",
+   "runner_up": "GNN",
+   "n_common": 210,
+   "diff": -0.04822977130344565,
+   "p_order_flips": 0.0
+  },
+  {
+   "task": "T4",
+   "tier": "L",
+   "stratum": "test_ood held-out table",
+   "best": "U-Net",
+   "runner_up": "FNO",
+   "n_common": 1069,
+   "diff": -0.026384545912384243,
+   "p_order_flips": 0.0
+  }
+ ]
+}

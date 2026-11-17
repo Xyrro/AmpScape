@@ -1,0 +1,171 @@
+{
+  "ghm_v1_1km": {
+    "bytes": 415104250,
+    "downloaded_utc": "2026-09-05T14:49:16+00:00",
+    "file": "gHM.zip",
+    "license": "CC BY 4.0",
+    "sha256": "b20f0f76a6a235bebf84fde5103c9491bc9fbe5e86e7cb4e9c57041d340ffb12",
+    "url": "https://ndownloader.figshare.com/files/13448294"
+  },
+  "grip4_region1": {
+    "bytes": 909111290,
+    "downloaded_utc": "2026-09-05T14:49:43+00:00",
+    "file": "GRIP4_Region1_vector_shp.zip",
+    "license": "CC0 / CC BY 4.0 (see docs/licenses.md)",
+    "sha256": "fa3958e36a8a9bd8f0a3a14c0e5aadb6ae48942cad6d06916b4bad17c15e1db1",
+    "url": "https://dataportaal.pbl.nl/downloads/GRIP4/GRIP4_Region1_vector_shp.zip"
+  },
+  "grip4_region2": {
+    "bytes": 447324105,
+    "downloaded_utc": "2026-09-05T14:49:55+00:00",
+    "file": "GRIP4_Region2_vector_shp.zip",
+    "license": "CC0 / CC BY 4.0 (see docs/licenses.md)",
+    "sha256": "3d9abcb589e636a0594b13f8456f4314f5e50027acc003dabc457f4cf52e31ff",
+    "url": "https://dataportaal.pbl.nl/downloads/GRIP4/GRIP4_Region2_vector_shp.zip"
+  },
+  "grip4_region3": {
+    "bytes": 241722552,
+    "downloaded_utc": "2026-09-05T14:50:02+00:00",
+    "file": "GRIP4_Region3_vector_shp.zip",
+    "license": "CC0 / CC BY 4.0 (see docs/licenses.md)",
+    "sha256": "a774a67acaf15820f15094f0c74935645b31ed7d7d698b0b1c62e7c21844eeb1",
+    "url": "https://dataportaal.pbl.nl/downloads/GRIP4/GRIP4_Region3_vector_shp.zip"
+  },
+  "grip4_region4": {
+    "bytes": 1233416132,
+    "downloaded_utc": "2026-09-05T17:23:03+00:00",
+    "file": "GRIP4_Region4_vector_shp.zip",
+    "license": "CC0 / CC BY 4.0 (see docs/licenses.md)",
+    "sha256": "550a848f032f0d04f3d2aaadba50c47a87227cb4d108bf138ab254d17886b399",
+    "url": "https://dataportaal.pbl.nl/downloads/GRIP4/GRIP4_Region4_vector_shp.zip"
+  },
+  "grip4_region5": {
+    "bytes": 151388975,
+    "downloaded_utc": "2026-09-05T14:50:07+00:00",
+    "file": "GRIP4_Region5_vector_shp.zip",
+    "license": "CC0 / CC BY 4.0 (see docs/licenses.md)",
+    "sha256": "4ef0be517b962b67c6adcb887d8d291e2fa0bc18d4b913fe1010300a485aa414",
+    "url": "https://dataportaal.pbl.nl/downloads/GRIP4/GRIP4_Region5_vector_shp.zip"
+  },
+  "grip4_region6": {
+    "bytes": 710996606,
+    "downloaded_utc": "2026-09-05T17:23:23+00:00",
+    "file": "GRIP4_Region6_vector_shp.zip",
+    "license": "CC0 / CC BY 4.0 (see docs/licenses.md)",
+    "sha256": "3285978f1ce05edcc6ac666c70530b627f834ea4ffac3bf5f16b19fcab43f467",
+    "url": "https://dataportaal.pbl.nl/downloads/GRIP4/GRIP4_Region6_vector_shp.zip"
+  },
+  "grip4_region7": {
+    "bytes": 59381772,
+    "downloaded_utc": "2026-09-05T14:50:10+00:00",
+    "file": "GRIP4_Region7_vector_shp.zip",
+    "license": "CC0 / CC BY 4.0 (see docs/licenses.md)",
+    "sha256": "609d9f8d868aab5586191547efbe0b279b63f84ebfc58099656f6713bfbf5e56",
+    "url": "https://dataportaal.pbl.nl/downloads/GRIP4/GRIP4_Region7_vector_shp.zip"
+  },
+  "hydrorivers_v10_af": {
+    "bytes": 107873468,
+    "downloaded_utc": "2026-09-05T14:49:18+00:00",
+    "file": "HydroRIVERS_v10_af_shp.zip",
+    "license": "CC BY 4.0",
+    "sha256": "63cc615134d8812b73f27ee9dfd9d790c520af96bc609dfc97bcd47811fec125",
+    "url": "https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_af_shp.zip"
+  },
+  "hydrorivers_v10_ar": {
+    "bytes": 22048523,
+    "downloaded_utc": "2026-09-05T17:22:29+00:00",
+    "file": "HydroRIVERS_v10_ar_shp.zip",
+    "license": "CC BY 4.0",
+    "sha256": "fd679ed159594406394b7438231762516cc3f92868b0a3f2c506d09e50489e16",
+    "url": "https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_ar_shp.zip"
+  },
+  "hydrorivers_v10_as": {
+    "bytes": 90510995,
+    "downloaded_utc": "2026-09-05T17:22:29+00:00",
+    "file": "HydroRIVERS_v10_as_shp.zip",
+    "license": "CC BY 4.0",
+    "sha256": "29780b0a75f90024f22e7e2029e5e3045f7325cda0528db65c5cc4c864b98525",
+    "url": "https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_as_shp.zip"
+  },
+  "hydrorivers_v10_au": {
+    "bytes": 48770754,
+    "downloaded_utc": "2026-09-05T14:49:18+00:00",
+    "file": "HydroRIVERS_v10_au_shp.zip",
+    "license": "CC BY 4.0",
+    "sha256": "538c87868636c63cb3933b121ab4da07577c67ba73ed3b06f39e7770da9542f4",
+    "url": "https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_au_shp.zip"
+  },
+  "hydrorivers_v10_eu": {
+    "bytes": 67648957,
+    "downloaded_utc": "2026-09-05T14:49:19+00:00",
+    "file": "HydroRIVERS_v10_eu_shp.zip",
+    "license": "CC BY 4.0",
+    "sha256": "500da7d36ceee0aa4c82dd625f5c53d80ba2f7ac14ad022cd3a6601bf55068e5",
+    "url": "https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_eu_shp.zip"
+  },
+  "hydrorivers_v10_gr": {
+    "bytes": 9377170,
+    "downloaded_utc": "2026-09-05T17:22:30+00:00",
+    "file": "HydroRIVERS_v10_gr_shp.zip",
+    "license": "CC BY 4.0",
+    "sha256": "436bd112718f14ada7d7cda0182426b14f2561328f772b5e7398ecac1cb96dbc",
+    "url": "https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_gr_shp.zip"
+  },
+  "hydrorivers_v10_na": {
+    "bytes": 66335898,
+    "downloaded_utc": "2026-09-05T14:49:16+00:00",
+    "file": "HydroRIVERS_v10_na_shp.zip",
+    "license": "CC BY 4.0",
+    "sha256": "47c2e30041b1a6e07ba3c1d82f07c70f2bfdd376a263153699902cf96ea006ea",
+    "url": "https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_na_shp.zip"
+  },
+  "hydrorivers_v10_sa": {
+    "bytes": 95257204,
+    "downloaded_utc": "2026-09-05T14:49:17+00:00",
+    "file": "HydroRIVERS_v10_sa_shp.zip",
+    "license": "CC BY 4.0",
+    "sha256": "38bfdcdfcc0698b1b37c1700434bcd65e792244d704153f055969f356d5cc7d5",
+    "url": "https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_sa_shp.zip"
+  },
+  "hydrorivers_v10_si": {
+    "bytes": 47301335,
+    "downloaded_utc": "2026-09-05T17:22:30+00:00",
+    "file": "HydroRIVERS_v10_si_shp.zip",
+    "license": "CC BY 4.0",
+    "sha256": "ea7432be3b350f3e83f22750de33fd765ae61b2e1847c525175939b06ff1cb15",
+    "url": "https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_si_shp.zip"
+  },
+  "published_eurac_alps_permeability": {
+    "bytes": 158816799,
+    "downloaded_utc": "2026-09-07T03:42:28+00:00",
+    "file": "published_eurac_alps_landscape_permeability.zip",
+    "license": "CC BY 4.0 (Zenodo 10.5281/zenodo.6602481)",
+    "sha256": "333296bf2fdd23b339351a8109478483a734cdea41cd5c948ef0c194d2a92660",
+    "url": "https://zenodo.org/records/6602481/files/Landscape%20permeability.zip?download=1"
+  },
+  "published_hawaiian_gallinule_resistance": {
+    "bytes": 299227517,
+    "downloaded_utc": "2026-09-07T05:04:23+00:00",
+    "file": "published_hawaiian_gallinule_dryad.zip",
+    "license": "CC0 1.0 (Dryad 10.5061/dryad.p90b87p)",
+    "note": "manual download registered",
+    "sha256": "7cb2c8e684a27dbffa89a091fe712704355f9e9e967d107995009ecd9de0df23",
+    "url": "https://datadryad.org/api/v2/files/5409/download"
+  },
+  "published_raccoon_europe_maps": {
+    "bytes": 121065668,
+    "downloaded_utc": "2026-09-07T03:42:34+00:00",
+    "file": "published_raccoon_europe_output_maps.zip",
+    "license": "CC BY 4.0 (figshare 10.6084/m9.figshare.27311484.v1)",
+    "sha256": "c7d349831ced3e3f4e191a53f0db8aeeb42b2678e33ab8af8db84aa0dd323f36",
+    "url": "https://ndownloader.figshare.com/files/52023179"
+  },
+  "resolve_ecoregions_2017": {
+    "bytes": 149248653,
+    "downloaded_utc": "2026-09-05T14:49:03+00:00",
+    "file": "Ecoregions2017.zip",
+    "license": "CC BY 4.0",
+    "sha256": "be36d6209e443038d02e309f0447c6e7f2a62f5fe60c605ffe90d064952f2a60",
+    "url": "https://storage.googleapis.com/teow2016/Ecoregions2017.zip"
+  }
+}

@@ -5,7 +5,7 @@ import pathlib
 import sys
 import time
 
-sys.path.insert(0, "$AMPSCAPE_SCRATCH")
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3]))
 from ampscape.landscapes import real
 
 sources = real.local_sources_from_dir("data/sources")

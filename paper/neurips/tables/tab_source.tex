@@ -1,0 +1,27 @@
+% src: docs/tables/review_round3_source_ood.md
+\begin{table*}[htbp]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{T4 under source rules the models never saw: rel-L2 against the exact Omniscape map of each rule on the same \texttt{test\_id} landscapes (200 at S, 100 at M) and Omniscape geometry. \emph{true}: the rule's own source raster as input; \emph{swapped}: the production source raster of the same landscape as input, so a model that ignored its source channel would score the same in both columns; production-rule map: the solver's map under the production rule used as the prediction. Rules: uniform sources on every valid pixel; a Gaussian random field independent of resistance, kept above its median; $(1/R)^2$ above its 0.8 quantile. Official runs, three seeds, fp32 inference on CPU.}
+\label{tab:source}
+\setlength{\tabcolsep}{2.2pt}
+\begin{tabular}{llrrrrrrr}
+\toprule
+tier & model & production rule & uniform: true & swapped & random field: true & swapped & habitat core: true & swapped \\
+\midrule
+S & U-Net & 0.037 & 0.113 & 0.778 & 0.159 & 1.240 & 0.126 & 1.460 \\
+S & FNO & 0.047 & 0.118 & 0.778 & 0.163 & 1.238 & 0.136 & 1.466 \\
+S & ViT & 0.047 & 0.106 & 0.779 & 0.112 & 1.237 & 0.108 & 1.460 \\
+S & GNN & 0.062 & 0.134 & 0.779 & 0.146 & 1.237 & 0.094 & 1.457 \\
+S & MgNO & 0.355 & 0.373 & 0.827 & 0.346 & 1.115 & 0.731 & 1.664 \\
+S & production-rule map & 0 & -- & 0.777 & -- & 1.239 & -- & 1.454 \\
+M & U-Net & 0.038 & 0.123 & 0.813 & 0.176 & 1.115 & 0.161 & 1.946 \\
+M & FNO & 0.068 & 0.160 & 0.815 & 0.211 & 1.108 & 0.218 & 1.936 \\
+M & ViT & 0.088 & 0.159 & 0.816 & 0.148 & 1.107 & 0.166 & 1.936 \\
+M & GNN & 0.095 & 0.153 & 0.817 & 0.172 & 1.103 & 0.153 & 1.919 \\
+M & MgNO & 0.183 & 0.225 & 0.818 & 0.226 & 1.145 & 0.250 & 2.039 \\
+M & production-rule map & 0 & -- & 0.813 & -- & 1.112 & -- & 1.927 \\
+\bottomrule
+\end{tabular}
+\end{table*}

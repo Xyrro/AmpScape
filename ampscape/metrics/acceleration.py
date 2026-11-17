@@ -18,11 +18,16 @@ JULIA_PKG = ROOT / "julia" / "AmpScapeSolve.jl"
 
 
 def run_warm_start_eval(
-    source_h5: str | pathlib.Path,
+    source_h5: str | pathlib.Path | list,
     predictions_h5: str | pathlib.Path,
     out_json: str | pathlib.Path,
     rtol: float = 1e-6,
 ) -> list[dict]:
+    """`source_h5` may be a list of shard paths: they are written to a .txt list and solved by ONE Julia process."""
+    if isinstance(source_h5, (list, tuple)):
+        lst = pathlib.Path(out_json).with_suffix(".shards.txt")
+        lst.write_text("\n".join(str(x) for x in source_h5) + "\n")
+        source_h5 = lst
     cmd = [
         "julia",
         f"--project={JULIA_PKG}",

@@ -9,6 +9,7 @@ log.csv, best.pt and the T4-reference evaluation stay local. Login node only (Hu
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import pathlib
 import subprocess
@@ -24,6 +25,8 @@ INCLUDE = [
     "best.pt",
     "predictions",
     "eval_t4_reference",
+    "eval_accel_test_id",  # 2026-10-15 verification: the acceleration evaluations of the voltage heads were never
+    "eval_accel_test_ood",  # published (docs/tables/acceleration.md could not be regenerated from the Hub)
     "train.log",
 ]
 
@@ -42,13 +45,37 @@ def finished(run: pathlib.Path) -> bool:
         and not (run / "eval_t4_reference").exists()
     ):
         return False  # the reference evaluation runs at the end of the job; wait for it
+    if cfg.get("target_kind") == "voltage" and not all(
+        (run / f"eval_accel_{sp}" / "results.json").exists() for sp in ("test_id", "test_ood")
+    ):
+        return (
+            False  # warm-start evaluations (driver backfill, CPU) read the local predictions first
+        )
     return True
+
+
+def run_includes(run: pathlib.Path, tier: str) -> list[str]:
+    """The whole-run push ships `predictions/<tag>` only for the run's own tier. Transfer tags (XL/XXL legs write
+    `predictions/hfcache_XL_*` into the same run directory while they run) are shipped per tag by offload_transfer
+    once their metrics exist — 2026-10-16 verification: two runs had a partial predictions.h5 on the Hub whose size
+    metadata disagreed with its content because the whole-run push caught a transfer leg's file while it was growing."""
+    inc = [x for x in INCLUDE if x != "predictions"]
+    pred = run / "predictions"
+    if pred.exists():
+        for d in sorted(pred.iterdir()):
+            if d.is_dir() and d.name.split("_")[1:2] == [tier]:
+                inc.append(f"predictions/{d.name}")
+    return inc
 
 
 def offload(run: pathlib.Path) -> None:
     mark = run / ".offloaded"
     if mark.exists():
         return
+    try:
+        tier = json.loads((run / "config.json").read_text())["tier"]
+    except (OSError, json.JSONDecodeError, KeyError):
+        tier = run.name.split("_")[2] if len(run.name.split("_")) > 2 else ""
     r = subprocess.run(
         [
             sys.executable,
@@ -58,7 +85,7 @@ def offload(run: pathlib.Path) -> None:
             "--dest",
             f"aux/results/runs_full/{run.name}",
             "--include",
-            *INCLUDE,
+            *run_includes(run, tier),
         ],
         capture_output=True,
         text=True,
@@ -82,6 +109,49 @@ def offload(run: pathlib.Path) -> None:
 
 
 XFER_SPLITS = ("test_id", "test_ood", "ood_region")
+
+REFERENCE = "eval_t4_reference/results.json"
+
+
+def reference_stale(run: pathlib.Path) -> bool:
+    """An offloaded T4 run whose local exact-reference evaluation differs from the one pushed (2026-10-13: the
+    reference evaluation of 28 M/L T4 runs was recomputed after their offload — the old one is kept as
+    eval_t4_reference_prodtarget_wrong/ — and the `.offloaded` mark made the offloader skip them, so the Hub kept
+    the superseded results.json/results.md)."""
+    ref = run / REFERENCE
+    if not (run / ".offloaded").exists() or not ref.exists():
+        return False
+    try:
+        rec = json.loads((run / ".hub_pushed.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return True
+    return rec.get(REFERENCE, {}).get("sha256") != hashlib.sha256(ref.read_bytes()).hexdigest()
+
+
+def repush_reference(run: pathlib.Path) -> None:
+    """Push a recomputed eval_t4_reference/ of an already offloaded run (push_aux.py uploads only the files whose
+    sha256 changed, so the Hub copy is replaced in place and .hub_pushed.json records the new hash)."""
+    if not reference_stale(run):
+        return
+    r = subprocess.run(
+        [
+            sys.executable,
+            "scripts/push_aux.py",
+            "--src",
+            str(run),
+            "--dest",
+            f"aux/results/runs_full/{run.name}",
+            "--include",
+            "eval_t4_reference",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(ROOT),
+    )
+    if r.returncode != 0 or "MISMATCH" in r.stdout or reference_stale(run):
+        print(f"{run.name}: eval_t4_reference re-push failed\n{r.stdout[-400:]}\n{r.stderr[-400:]}", flush=True)
+        return
+    print(f"{run.name}: recomputed eval_t4_reference re-pushed (Hub copy replaced)", flush=True)
 
 
 def offload_transfer(run: pathlib.Path) -> None:
@@ -149,6 +219,7 @@ def main():
                 try:
                     offload(run)
                     offload_transfer(run)
+                    repush_reference(run)
                 except Exception as e:  # noqa: BLE001
                     print(f"{run.name}: {e!r}", flush=True)
         if not a.loop:

@@ -1,6 +1,6 @@
 #!/bin/bash
 # usage: sbatch ... tune_one.sh <model> <variant> <extra|none> <task> [budget_min]
-cd $AMPSCAPE_SCRATCH
+cd "${AMPSCAPE_SCRATCH:-${SLURM_SUBMIT_DIR:-.}}"
 source scripts/env.sh
 M=$1; V=$2; X=$3; T=$4; B=${5:-60}
 [ "$X" = "none" ] && XA="" || XA="--extra $X"

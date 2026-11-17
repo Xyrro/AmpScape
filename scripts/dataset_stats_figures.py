@@ -154,7 +154,7 @@ def main() -> None:
 
     # 4. solve-time distributions per tier and configuration
     fig, axes = plt.subplots(1, 5, figsize=(18, 4), sharey=False)
-    for axi, t in zip(axes, TIERS):
+    for axi, t in zip(axes, TIERS, strict=False):
         sub = idx[idx.tier == t]
         data = [
             np.log10(sub[sub.config == c].solve_time_s.clip(lower=1e-2).dropna())

@@ -10,7 +10,7 @@
 | queue wait now | L40S and V100: ≈ 10 min (`sbatch --test-only`); A100: ≈ 1 h; H100 (`<gpu-partition-b>`): ≈ 26 h. Dev runs on 09-14 started within 1–17 min |
 | chosen pool | L40S (bf16, 48 GB; 16 healthy GPUs on 2 nodes, 2 nodes excluded for ECC errors) with A100 spill-over; **2-hour legs** that checkpoint and re-queue themselves (`train.py --resume --pause-exit`), ≤ 18 concurrent jobs of ours |
 | data | the trainer reads the Hub layout directly; groups are staged to `data/hfcache` on the login node per (tier, task group) and evicted when no pending job needs them (sizes: S 32/25/30 GB for T1/T3/T4, M 57/43/54, L 84/64/82, XL 61/47/61; scratch guard 230 GB) |
-| bad nodes | `<node>` and `<node>` (uncorrectable ECC errors on one GPU each, probed 04:40Z) excluded; the driver adds any node that throws a CUDA/ECC error |
+| bad nodes | `<node>` and `<node>` (uncorrectable ECC errors on one GPU each, probed 04:40Z) excluded; the driver adds any node that throws a CUDA/ECC error; `<node>`, `<node>` added later; `<node>` added by hand 2026-10-15 08:18Z (H200 index 2, `GPU-29b46eb7`, reports "GPU requires reset" with N/A clocks/utilisation and slurmstepd NVML "Not Supported" errors; a training job on it spins on the CPU without ever allocating GPU memory and raises no CUDA error, so the driver's log-based detection does not catch it — check `nvidia-smi -q | grep -A1 Pending` and `memory.used` when a run has an empty `log.csv` after 30 min) |
 
 ## 2. Plan (132 jobs, ≈ 949 GPU-hours; `scripts/slurm/gpu/gpu_driver.py --plan`)
 
@@ -46,6 +46,48 @@ S runs; GNN last because it is two thirds of the budget and its receptive field,
   jobs stop receiving new jobs ("draining") until their legs finish and they can be evicted. Without this the P3 S
   seeds kept the S groups pinned and the headline M/L runs waited.
 - Offloader: `bash scripts/slurm/gpu/offload_loop.sh 600` (starts `offload_runs.py --loop 600` once; see §4).
+- **Restart after a dead session or a login-node reboot (runbook, 2026-10-02)** — one line, idempotent, detached:
+  `setsid nohup bash scripts/slurm/gpu/keepalive.sh > /dev/null 2>&1 < /dev/null &`
+  The keepalive (pid in `logs/keepalive.pid`, log `logs/keepalive.log`) restarts the driver whenever its lease pid is
+  dead and the offloader whenever no copy runs, every 5 min; both are resumable, nothing is lost by a restart. It
+  survives the session that launched it; a login-node reboot kills it (no cron/systemd for users on the cluster login
+  nodes) — run the line again. Health check: `tail logs/keepalive.log logs/gpu_driver.log; squeue -u $USER`.
+
+- **Login-node memory (2026-10-13).** Each user runs in a 4 GB memory cgroup (`/sys/fs/cgroup/user.slice/user-$(id -u).slice`,
+  `memory.max`); the kernel did not reclaim our clean page cache (≈ 3.85 GB of `file` in `memory.stat` after scratch
+  I/O), `memory.reclaim` is not writable by the user, and the cgroup OOM-killed instead: on 2026-10-10 the driver's Hub
+  staging subprocesses died within seconds in a loop (no job submitted) and the owner's tmux/screen attaches and SSH
+  session were SIGKILLed; on 2026-10-13 the first fix (drop the cache *after* a group) was not enough — `snapshot_download`
+  with 8 workers filled the slice in seconds, the L/T1 and M/T4 staging subprocesses were killed at 20–25 %, and the
+  OOM killer also took the Claude CLI session that was fixing it. Rules now:
+  1. **During a transfer, not after it.** `stage_data.py stage` downloads per file with `--workers 2` (hf_hub_download),
+     fsyncs + advises DONTNEED each file on completion, and runs `ampscape.io.pagecache.CacheSweeper` (a thread that
+     sweeps the group dir, the `.cache/huggingface/download` temp dir, index/splits and `$HF_HOME/xet` every 5 s).
+     `push_aux.py` (offloader, aux uploads) runs the same sweeper over the source dir and the xet cache for the whole
+     push, plus the per-file drop after each commit. Test (2026-10-13 06:39Z, login node, logged `memory.current` every
+     5 s): staging 101 new M/T4 shards (10.4 GB, 2 workers, 70 s) peaked at 1.08 GiB (0.82 GiB before), never above
+     1.5 GiB; `python scripts/slurm/gpu/stage_data.py stage --tier M --group T4 --max-files 240` reproduces it (partial
+     stage, no marker).
+  2. The keepalive still runs `scripts/evict_cache.py` every 10 min and whenever `memory.current` > 2.5 GiB (lines in
+     `logs/keepalive.log`); manual: `python scripts/evict_cache.py`; check: `cat .../memory.current`, OOM count:
+     `grep oom_kill .../memory.events`.
+  3. Nothing on the login node reads or writes large files without `drop_file_cache` / a sweeper
+     (`ampscape/io/pagecache.py`; `tests/test_pagecache.py`).
+- **No pattern kills (2026-10-13 audit, widened the same day).** Stop a daemon via its lease / pid file only
+  (`logs/lease_<name>.json`, `logs/keepalive.pid`; the offloader by the pid of the exact `python scripts/slurm/gpu/offload_runs.py`
+  line). The audit covered every tracked file (scripts, package, Julia, tests, Makefile), `work/`, the git hooks and the
+  Claude settings/hooks: no `pkill`, `killall`, `kill -9`, `pgrep -f`, `kill -f`, `killpg` or `xargs kill` anywhere; the only
+  `kill`s are `kill -0 <pid>` liveness probes and `kill $(cat <pidfile>)`. `tests/test_no_pattern_kills.py` scans the
+  same scope and fails on any selector that could match tmux, screen, sshd, bash or the Claude CLI.
+
+- **GPU pools and packed input (2026-10-13).** Training legs are routed by `choose_pool` over two QoS budgets (per-user
+  per-QoS: 1 920 GPU-min and 50 jobs each): <qos-a> → `<gpu-partition-b>` H100, H200, `<gpu-partition-a>` L40S, A100; <qos-b> → `<gpu-partition-c>`
+  H100, H200 (16 two-hour legs per QoS, spill when ≥ 3 of ours are pending on a type, ≤ 45 queued in total);
+  transfer/evaluation legs stay on L40S/<qos-a>. **GNN legs** fetch their group from the Hub to the node's NVMe at job
+  start (`LOCALDATA=1`, ≈ 20 min, reused on the same node) and never pin scratch. Non-GNN legs run with `PACK=1`: `train.py --packed-dir` packs the train/val tensors once per job to the
+  node's local NVMe (`/tmp/ampscape_$USER/pack/<key>`, reused by later legs on the same node, 2-day cleanup) — the
+  epoch is then GPU-bound (U-Net M 56 s on H200 vs 170 s before; FNO 59 vs 208 s; `docs/tables/gpu_probe.md`).
+  Probe one configuration: `sbatch ... --export=ALL,MODEL=unet,TASK=T4,TIER=M,BATCH=8,WORKERS=6,PACK=1 scripts/slurm/gpu/gpu_probe.sbatch`.
 
 ## 4. Storage rule for runs (2026-09-24)
 
@@ -54,6 +96,17 @@ A finished S run holds ≈ 2.6 GB of predictions (26 k test items), so 133 runs 
 T4-reference evaluation) to `aux/results/runs_full/<run>/` on the Hub with sha256 verification and then removes the
 local `predictions/*.h5` and `last.pt`; results, config, log and best.pt stay local. Tables are built from the local
 `results.json` files; predictions are re-downloadable per run for figures.
+Scratch accounting (2026-10-13 23:00Z): the driver's fit tests use `committed_gb` = `<quota-tool>` reading + the part of
+the last 15 min of stagings the (lagging) accounting has not shown yet + the predictions every running training leg
+will still write (`PRED_GB` per tier; a run's predictions stay until the offloader frees them); a leg is held when its
+predictions would not fit under 295 GB, and a staged group is evicted only when the evictable set makes the target fit.
+T4 reference backfills fetch their `predictions.h5` onto the CPU node's local disk, not scratch.
+A run that is already offloaded (`.offloaded`) is pushed again only for a recomputed `eval_t4_reference/` whose
+sha256 differs from `.hub_pushed.json` (`offload_runs.reference_stale`, 2026-10-13: the exact-reference evaluations of
+the 28 T4 M/L runs were recomputed after their offload — the superseded one stays local as
+`eval_t4_reference_prodtarget_wrong/` — and the Hub kept the old results until the re-push); `push_aux.py` uploads only
+changed files, so the Hub copy is replaced in place. Verify with the sha check in `tests/test_offload_reference.py`'s
+predicate over `runs/full/*_T4_[ML]_s*` before regenerating the T4 Pareto tables.
 
 
 ## 5. XL and XXL rows: scale transfer, not training (2026-09-24 22:40Z)
@@ -61,7 +114,7 @@ local `predictions/*.h5` and `last.pt`; results, config, log and best.pt stay lo
 The card defines XL and XXL as held-out-scale tiers ("XL/XXL for models trained ≤ L"); their v1.0 splits hold 228
 (XL) and 0 (XXL) training landscapes and no validation split, so the first XL training legs were degenerate (228
 samples, `val_loss` 0, early stop at epoch 9) and their single-process metrics at 1024² exceeded the 2-h leg. The
-nine XL training jobs were cancelled and moved to `runs/abandoned_xl_training/`; nothing is trained at XL.
+nine XL training jobs were cancelled and moved to `runs/abandoned_xl_training/` (deleted 2026-10-02 with owner approval); nothing is trained at XL.
 
 Instead every L-trained run is evaluated at XL and at XXL (fully convolutional models only: U-Net, FNO, GNN; the
 ViT's interpolated positional embedding stops at XL) on `test_id`, `test_ood`, `ood_region` at batch 1 with the
@@ -72,3 +125,22 @@ results, verified on the smoke predictions). Results: `<run>/results_transfer.js
 and `<run>/eval_transfer/<tag>/`, pushed to the same Hub folder as the run and listed in the baselines table as
 `<run> → XL`. Plan: 144 jobs ≈ 933 GPU-h (XF 30 jobs after P3, XF4 12 GNN transfers after P4). XXL groups: T1 22 GB,
 T4 23 GB.
+
+## 6. Outcome (2026-10-04)
+
+Plan completed 2026-10-04 15:30Z: 166 jobs — 84 official training runs (4 models × T1/T4, U-Net/FNO on T3, × S/M/L
+× 3 seeds), 12 WP4 runs, 30 zero-shot transfer legs (L-trained → XL/XXL), 6 scale-aware-target runs at L + 10
+transfers, 18 GNN runs + 12 transfers + the GNN scale-aware variant (2 + 4). Nothing was trained at XL (§5). All
+results are on the Hub under `aux/results/runs_full/<run>/` (results, config, log, best.pt, T4 reference
+evaluations, transfer metrics; predictions kept for seed-1 test_id). Measured cost: 401 GPU jobs, 430.1 GPU-h
+(`docs/tables/gpu_usage.md`) against ≈ 1,081 GPU-h nominal; calendar 11 days, of which 6 lost to the staging
+deadlock of 26 Sep – 2 Oct (§3 keepalive and watchdog added afterwards). Tables and figures:
+`scripts/paper_figures.py` → `paper/tables/`, `paper/figures/`; reports: `docs/status/latest.md`,
+`docs/wp4_data_scaling.md`, `docs/wp7_demo.md`, `paper/ood_analysis.md`.
+
+Incidents that changed the driver during the phase, for the post-mortem: evaluation legs timing out (deferral),
+host-memory OOM from an unbounded open-file cache, the per-user running-GPU cap (2-h legs), scratch quota from
+transfer predictions (drop after metrics, per-split offload, concurrency cap), staging limits below the scratch floor
+(idle 6 days; keepalive + watchdog), circular hold between pre-staging and transfer legs, concurrent XL/XXL legs
+racing on one summary file (locked merge, one leg per run), the empty transfer script committed during the quota
+incident (CI parse test).

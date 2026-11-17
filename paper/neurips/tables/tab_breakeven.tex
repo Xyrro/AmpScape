@@ -1,0 +1,19 @@
+% src: docs/tables/review_round2_threads.md
+\begin{table*}[tb]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{Like-for-like cost of the T4 surrogates at M and L (rel-L2 against the exact block-1 map in Table~\ref{tab:pareto_M} and \ref{tab:pareto_L}): GPU inference seconds per landscape (batch-amortised, official runs, seed mean) and training GPU-hours of one run against the production solver's seconds per landscape on 1 and on 24 threads (Table~\ref{tab:threads}); break-even = the number of maps from which training once plus inference costs less wall time than the solver, $N \ge T_{\mathrm{train}} / (t_{\mathrm{solver}} - t_{\mathrm{inference}})$. GPU and CPU-node hours are not priced equally; only wall time is compared.}
+\label{tab:breakeven}
+\setlength{\tabcolsep}{2.2pt}
+\begin{tabular}{llrrrrrrrr}
+\toprule
+tier & model & inference s & train GPU-h & solver s (1) & speed-up (1) & solver s (24) & speed-up (24) & break-even (1) & break-even (24) \\
+\midrule
+M & U-Net & 0.00328 & 1.97 & 76 & 23,057$\times$ & 46.7 & 14,235$\times$ & 94 & 152 \\
+M & FNO & 0.00300 & 3.13 & 76 & 25,208$\times$ & 46.7 & 15,564$\times$ & 149 & 241 \\
+L & U-Net & 0.00652 & 1.55 & 277 & 42,487$\times$ & 149.4 & 22,916$\times$ & 20 & 37 \\
+L & FNO & 0.00281 & 0.91 & 277 & 98,581$\times$ & 149.4 & 53,172$\times$ & 12 & 22 \\
+\bottomrule
+\end{tabular}
+\end{table*}

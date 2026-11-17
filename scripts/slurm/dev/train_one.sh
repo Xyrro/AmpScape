@@ -1,6 +1,6 @@
 #!/bin/bash
 # usage: sbatch ... train_one.sh <model> <task> [published_tiers]
-cd $AMPSCAPE_SCRATCH
+cd "${AMPSCAPE_SCRATCH:-${SLURM_SUBMIT_DIR:-.}}"
 source scripts/env.sh
 M=$1; T=$2; PT=${3:-S}
 echo "host=$(hostname) gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader) model=$M task=$T start=$(date -u +%FT%TZ)"

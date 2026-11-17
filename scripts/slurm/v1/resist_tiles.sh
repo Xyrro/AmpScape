@@ -1,6 +1,6 @@
 #!/bin/bash
 # merge the per-tier tile manifests and build the five resistance rasters per accepted tile (v1.0 tile set)
-cd $AMPSCAPE_SCRATCH
+cd "${AMPSCAPE_SCRATCH:-${SLURM_SUBMIT_DIR:-.}}"
 source scripts/env.sh
 python scripts/build_v1_tiles.py merge --out data/tiles/v1.0 2>&1 | grep -v Warning | tail -2
 python scripts/build_v1_tiles.py resist --out data/tiles/v1.0 2>&1 | grep -v Warning | tail -2

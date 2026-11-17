@@ -1,8 +1,8 @@
 # Run guide: generating AmpScape shards on a new Slurm cluster
 
-Audience: someone launching v1.0 generation on a cluster other than the cluster (for example a
-another university system). Everything cluster-specific lives in one profile file; the
-scripts themselves contain no paths or partition names.
+Audience: someone launching v1.0 generation on another Slurm cluster. Everything cluster-specific lives in two
+git-ignored files, the profile `configs/cluster/local.yaml` and `scripts/env.local.sh` (Slurm account, QoS,
+partitions, quota tool); the scripts themselves contain no paths, partition or account names.
 
 ## 1. What the cluster needs
 
@@ -23,8 +23,8 @@ scripts themselves contain no paths or partition names.
 
 ```bash
 git clone https://github.com/Xyrro/AmpScape.git /scratch/<you>/AmpScape && cd $_
-cp configs/cluster/template.yaml configs/cluster/<name>.yaml     # fill in scratch_root, partitions, modules
-export AMPSCAPE_SCRATCH=$PWD AMPSCAPE_CLUSTER_PROFILE=<name>
+cp configs/cluster/template.yaml configs/cluster/local.yaml      # fill in scratch_root, partitions, modules
+cp scripts/env.local.sh.example scripts/env.local.sh            # Slurm account, QoS, partitions, quota tool
 source scripts/env.sh                                            # loads modules, sets JULIA_* and UV_* on scratch
 curl -LsSf https://astral.sh/uv/install.sh | UV_INSTALL_DIR=$AMPSCAPE_SCRATCH/tools/uv/bin UV_NO_MODIFY_PATH=1 sh
 uv python install 3.11 && uv sync --extra dev                    # exact versions from uv.lock
@@ -44,7 +44,7 @@ Real tiles (Phase 2 covariate stacks) are produced on the login node with networ
 ```bash
 python scripts/generate.py plan     --dataset v1.0-S --out data/builds/v1.0-S --tier S --n-synthetic 60000 --n-real 40000 --shard-size 200
 python scripts/generate.py prepare  --build data/builds/v1.0-S            # login node; writes inputs/*.h5 (≈ 0.1 MB/landscape at S)
-python scripts/generate.py submit   --build data/builds/v1.0-S --profile <name>   # precompiles, then sbatch --array
+python scripts/generate.py submit   --build data/builds/v1.0-S --profile local   # precompiles, then sbatch --array
 python scripts/generate.py status   --build data/builds/v1.0-S
 python scripts/generate.py finalize --build data/builds/v1.0-S --quicklooks      # QC + final shards + Parquet index
 ```

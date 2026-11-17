@@ -9,6 +9,6 @@ sacctmgr show qos -P format=Name,MaxWall,MaxTRESPU,MaxJobsPU,MaxSubmitPU,GrpTRES
 echo "### partitions"
 sinfo -o "%P %a %l %D %t %G %m %c"
 scontrol show partition | grep -E "PartitionName|AllowQos|MaxTime|DefMemPerCPU|TRES="
-echo "### quota"; <quota-tool> 2>/dev/null | grep -E "Home|Scratch"
+echo "### quota"; ${AMPSCAPE_QUOTA_CMD:-quota} 2>/dev/null | grep -E "Home|Scratch"
 echo "### modules of interest"
 for m in julia python anaconda3 miniforge mamba cuda gdal; do echo "-- $m"; module -t avail "$m" 2>&1 | grep -v -E "^$|:$" | head -8; done

@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 # env: AMPSCAPE_INPUTS (h5), AMPSCAPE_BA, AMPSCAPE_BB, AMPSCAPE_OUT (json)
 set -euo pipefail
-source "${AMPSCAPE_SCRATCH:-$AMPSCAPE_SCRATCH}/scripts/env.sh"
+source "${AMPSCAPE_SCRATCH:-.}/scripts/env.sh"
 export JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}" OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 cd "$AMPSCAPE_SCRATCH/julia/AmpScapeSolve.jl"
 julia --project=. examples/omniscape_block_study.jl "$AMPSCAPE_INPUTS" "${AMPSCAPE_SID:-first}" "$AMPSCAPE_BA" "$AMPSCAPE_BB" "$AMPSCAPE_OUT"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # prepare + solve + finalize the reproducibility shards of one tier, then compare with the dev shards
-cd $AMPSCAPE_SCRATCH
+cd "${AMPSCAPE_SCRATCH:-${SLURM_SUBMIT_DIR:-.}}"
 source scripts/env.sh
 T=$1
 export JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1

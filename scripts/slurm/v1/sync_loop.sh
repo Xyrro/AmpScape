@@ -8,7 +8,7 @@
 # parallel (N workers, 2026-09-21): start N copies with 4th arg k/N, e.g. for k in 0 1 2 3; do setsid nohup .../sync_loop.sh data/v1/XL XL 120 $k/4 >/dev/null 2>&1 < /dev/null & done
 # stop:   kill $(cat $AMPSCAPE_SCRATCH/logs/sync_S.pid)   (worker k: sync_<tier>_w<k>.pid)
 BUILD=$1; TIER=$2; INT=${3:-900}; WORKER=${4:-0/1}   # 4th arg k/N: one of N parallel uploaders (2026-09-21)
-cd $AMPSCAPE_SCRATCH
+cd "${AMPSCAPE_SCRATCH:-${SLURM_SUBMIT_DIR:-.}}"
 source scripts/env.sh
 LOG="$AMPSCAPE_SCRATCH/logs/sync.log"
 if [ "$WORKER" = "0/1" ]; then TAG="$TIER"; else TAG="${TIER}_w${WORKER%%/*}"; fi

@@ -1,10 +1,10 @@
 #!/bin/bash
 # XL cost probe (owner 2026-09-21): shards 0-1 at 1 cpu and 2-3 at 4 cpus, same 16 GB, 10 h walltime.
 # Run after data/v1/XL/manifest.parquet exists. Step 1 prepares the 4 shards (Slurm), step 2 submits the solves.
-cd $AMPSCAPE_SCRATCH; source scripts/env.sh
+cd "${AMPSCAPE_SCRATCH:-${SLURM_SUBMIT_DIR:-.}}"; source scripts/env.sh
 B=data/v1/XL
 if [ "$1" = prepare ]; then
-  sbatch --parsable -A <account> -q <qos-a> -p <cpu-partition> -N1 -n1 -c1 --mem=16G -t 02:00:00 -J prep-XL-probe -o data/v1/logs/prep_XL_probe_%A_%a.out \
+  sbatch --parsable -A "$AMPSCAPE_ACCOUNT" -q "$AMPSCAPE_QOS" -p "$AMPSCAPE_CPU_PARTITION" -N1 -n1 -c1 --mem=16G -t 02:00:00 -J prep-XL-probe -o data/v1/logs/prep_XL_probe_%A_%a.out \
     --array=0-3 --wrap 'source scripts/env.sh; python scripts/generate.py prepare --build data/v1/XL --shard $SLURM_ARRAY_TASK_ID'
 elif [ "$1" = submit ]; then
   python scripts/generate.py submit --build $B --shards 0-1 --cpus 1 --mem 16G --max-concurrent 2 --skip-precompile | tail -1

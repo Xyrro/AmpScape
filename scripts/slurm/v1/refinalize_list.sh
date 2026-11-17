@@ -1,6 +1,6 @@
 #!/bin/bash
 # usage: sbatch --array=0-(K-1) refinalize_list.sh <build> <listfile> <per_task>
-cd $AMPSCAPE_SCRATCH
+cd "${AMPSCAPE_SCRATCH:-${SLURM_SUBMIT_DIR:-.}}"
 source scripts/env.sh
 B=$1; L=$2; N=$3
 arr=($(cat "$L")); LO=$((SLURM_ARRAY_TASK_ID * N)); HI=$((LO + N - 1))

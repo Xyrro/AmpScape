@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import pathlib
 import subprocess
 
@@ -81,7 +82,7 @@ def tier_summary(build: pathlib.Path) -> dict:
 
 def core_hours(since: str) -> float:
     r = subprocess.run(
-        ["sacct", "-S", since, "-u", "<user>", "-o", "JobName,ElapsedRaw,AllocCPUS", "-P", "-n"],
+        ["sacct", "-S", since, "-u", os.environ.get("USER", ""), "-o", "JobName,ElapsedRaw,AllocCPUS", "-P", "-n"],
         capture_output=True,
         text=True,
     ).stdout

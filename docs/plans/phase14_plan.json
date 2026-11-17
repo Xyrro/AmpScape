@@ -1,0 +1,302 @@
+[
+ {
+  "name": "unet_T1_M_s1_t2",
+  "model": "unet",
+  "task": "T1",
+  "tier": "M",
+  "seed": 1,
+  "tag": "RERUN_M",
+  "extra": "--variant w64",
+  "est_h": 2.06
+ },
+ {
+  "name": "unet_T1_M_s2_t2",
+  "model": "unet",
+  "task": "T1",
+  "tier": "M",
+  "seed": 2,
+  "tag": "RERUN_M",
+  "extra": "--variant w64",
+  "est_h": 2.06
+ },
+ {
+  "name": "unet_T1_M_s3_t2",
+  "model": "unet",
+  "task": "T1",
+  "tier": "M",
+  "seed": 3,
+  "tag": "RERUN_M",
+  "extra": "--variant w64",
+  "est_h": 2.06
+ },
+ {
+  "name": "unet_T4_M_s1_t2",
+  "model": "unet",
+  "task": "T4",
+  "tier": "M",
+  "seed": 1,
+  "tag": "RERUN_M",
+  "extra": "--variant w64",
+  "est_h": 2.06
+ },
+ {
+  "name": "unet_T4_M_s2_t2",
+  "model": "unet",
+  "task": "T4",
+  "tier": "M",
+  "seed": 2,
+  "tag": "RERUN_M",
+  "extra": "--variant w64",
+  "est_h": 2.06
+ },
+ {
+  "name": "unet_T4_M_s3_t2",
+  "model": "unet",
+  "task": "T4",
+  "tier": "M",
+  "seed": 3,
+  "tag": "RERUN_M",
+  "extra": "--variant w64",
+  "est_h": 2.06
+ },
+ {
+  "name": "unet_T3_M_s1_t2",
+  "model": "unet",
+  "task": "T3",
+  "tier": "M",
+  "seed": 1,
+  "tag": "RERUN_M",
+  "extra": "--variant w64",
+  "est_h": 2.06
+ },
+ {
+  "name": "unet_T3_M_s2_t2",
+  "model": "unet",
+  "task": "T3",
+  "tier": "M",
+  "seed": 2,
+  "tag": "RERUN_M",
+  "extra": "--variant w64",
+  "est_h": 2.06
+ },
+ {
+  "name": "unet_T3_M_s3_t2",
+  "model": "unet",
+  "task": "T3",
+  "tier": "M",
+  "seed": 3,
+  "tag": "RERUN_M",
+  "extra": "--variant w64",
+  "est_h": 2.06
+ },
+ {
+  "name": "fno_T1_M_s1_t2",
+  "model": "fno",
+  "task": "T1",
+  "tier": "M",
+  "seed": 1,
+  "tag": "RERUN_M",
+  "extra": "--variant w48 --extra dist",
+  "est_h": 3.02
+ },
+ {
+  "name": "fno_T1_M_s2_t2",
+  "model": "fno",
+  "task": "T1",
+  "tier": "M",
+  "seed": 2,
+  "tag": "RERUN_M",
+  "extra": "--variant w48 --extra dist",
+  "est_h": 3.02
+ },
+ {
+  "name": "fno_T1_M_s3_t2",
+  "model": "fno",
+  "task": "T1",
+  "tier": "M",
+  "seed": 3,
+  "tag": "RERUN_M",
+  "extra": "--variant w48 --extra dist",
+  "est_h": 3.02
+ },
+ {
+  "name": "fno_T4_M_s1_t2",
+  "model": "fno",
+  "task": "T4",
+  "tier": "M",
+  "seed": 1,
+  "tag": "RERUN_M",
+  "extra": "--variant w48 --extra dist",
+  "est_h": 3.02
+ },
+ {
+  "name": "fno_T4_M_s2_t2",
+  "model": "fno",
+  "task": "T4",
+  "tier": "M",
+  "seed": 2,
+  "tag": "RERUN_M",
+  "extra": "--variant w48 --extra dist",
+  "est_h": 3.02
+ },
+ {
+  "name": "fno_T4_M_s3_t2",
+  "model": "fno",
+  "task": "T4",
+  "tier": "M",
+  "seed": 3,
+  "tag": "RERUN_M",
+  "extra": "--variant w48 --extra dist",
+  "est_h": 3.02
+ },
+ {
+  "name": "fno_T3_M_s1_t2",
+  "model": "fno",
+  "task": "T3",
+  "tier": "M",
+  "seed": 1,
+  "tag": "RERUN_M",
+  "extra": "--variant w48 --extra dist",
+  "est_h": 3.02
+ },
+ {
+  "name": "fno_T3_M_s2_t2",
+  "model": "fno",
+  "task": "T3",
+  "tier": "M",
+  "seed": 2,
+  "tag": "RERUN_M",
+  "extra": "--variant w48 --extra dist",
+  "est_h": 3.02
+ },
+ {
+  "name": "fno_T3_M_s3_t2",
+  "model": "fno",
+  "task": "T3",
+  "tier": "M",
+  "seed": 3,
+  "tag": "RERUN_M",
+  "extra": "--variant w48 --extra dist",
+  "est_h": 3.02
+ },
+ {
+  "name": "vit_T1_M_s1_t2",
+  "model": "vit",
+  "task": "T1",
+  "tier": "M",
+  "seed": 1,
+  "tag": "RERUN_M",
+  "extra": "--variant p16g16",
+  "est_h": 1.07
+ },
+ {
+  "name": "vit_T1_M_s2_t2",
+  "model": "vit",
+  "task": "T1",
+  "tier": "M",
+  "seed": 2,
+  "tag": "RERUN_M",
+  "extra": "--variant p16g16",
+  "est_h": 1.07
+ },
+ {
+  "name": "vit_T1_M_s3_t2",
+  "model": "vit",
+  "task": "T1",
+  "tier": "M",
+  "seed": 3,
+  "tag": "RERUN_M",
+  "extra": "--variant p16g16",
+  "est_h": 1.07
+ },
+ {
+  "name": "vit_T4_M_s1_t2",
+  "model": "vit",
+  "task": "T4",
+  "tier": "M",
+  "seed": 1,
+  "tag": "RERUN_M",
+  "extra": "--variant p16g16",
+  "est_h": 1.07
+ },
+ {
+  "name": "vit_T4_M_s2_t2",
+  "model": "vit",
+  "task": "T4",
+  "tier": "M",
+  "seed": 2,
+  "tag": "RERUN_M",
+  "extra": "--variant p16g16",
+  "est_h": 1.07
+ },
+ {
+  "name": "vit_T4_M_s3_t2",
+  "model": "vit",
+  "task": "T4",
+  "tier": "M",
+  "seed": 3,
+  "tag": "RERUN_M",
+  "extra": "--variant p16g16",
+  "est_h": 1.07
+ },
+ {
+  "name": "gnn_T1_M_s1_t2",
+  "model": "gnn",
+  "task": "T1",
+  "tier": "M",
+  "seed": 1,
+  "tag": "RERUN_M",
+  "extra": "--variant ms8 --extra dist",
+  "est_h": 10.84
+ },
+ {
+  "name": "gnn_T1_M_s2_t2",
+  "model": "gnn",
+  "task": "T1",
+  "tier": "M",
+  "seed": 2,
+  "tag": "RERUN_M",
+  "extra": "--variant ms8 --extra dist",
+  "est_h": 10.84
+ },
+ {
+  "name": "gnn_T1_M_s3_t2",
+  "model": "gnn",
+  "task": "T1",
+  "tier": "M",
+  "seed": 3,
+  "tag": "RERUN_M",
+  "extra": "--variant ms8 --extra dist",
+  "est_h": 10.84
+ },
+ {
+  "name": "gnn_T4_M_s1_t2",
+  "model": "gnn",
+  "task": "T4",
+  "tier": "M",
+  "seed": 1,
+  "tag": "RERUN_M",
+  "extra": "--variant ms8 --extra dist",
+  "est_h": 10.84
+ },
+ {
+  "name": "gnn_T4_M_s2_t2",
+  "model": "gnn",
+  "task": "T4",
+  "tier": "M",
+  "seed": 2,
+  "tag": "RERUN_M",
+  "extra": "--variant ms8 --extra dist",
+  "est_h": 10.84
+ },
+ {
+  "name": "gnn_T4_M_s3_t2",
+  "model": "gnn",
+  "task": "T4",
+  "tier": "M",
+  "seed": 3,
+  "tag": "RERUN_M",
+  "extra": "--variant ms8 --extra dist",
+  "est_h": 10.84
+ }
+]

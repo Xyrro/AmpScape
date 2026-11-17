@@ -1,0 +1,21 @@
+% src: docs/tables/review_round3_pcg.md
+\begin{table*}[tb]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{Cheap numerical baselines against the learned models on the same \texttt{test\_id} landscapes and the same targets (T1: the cumulative map over all pairs; T3: the advanced-mode current): rel-L2 mean / median over the landscapes. AMG-preconditioned CG from zero stopped after $k$ iterations, with its cost in seconds per landscape on one CPU core (AMG setup included; T1: one setup per grounded node, all pairs), the cost of the full solve to relative residual $10^{-6}$, coarsen-$\times 4$-solve-upsample, and the official learned model with the lowest mean (seed mean per landscape; MgNO excluded as in Table~\ref{tab:results}).}
+\label{tab:cheap}
+\setlength{\tabcolsep}{2.2pt}
+\begin{tabular}{llrlllllll}
+\toprule
+task & tier & $n$ & PCG $k=2$ & s & PCG $k=4$ & PCG $k=8$ & PCG to $10^{-6}$: s & coarsen $\times 4$ & best learned \\
+\midrule
+T1 & S & 40 & 0.344 / 0.097 & 0.273 & 0.236 / 0.005 & 0.069 / 0.000 & 0.622 & 0.433 / 0.420 & 0.137 / 0.117 (U-Net) \\
+T1 & M & 30 & 0.297 / 0.163 & 0.974 & 0.161 / 0.017 & 0.069 / 0.000 & 2.961 & 0.520 / 0.570 & 0.211 / 0.192 (U-Net) \\
+T1 & L & 16 & 0.361 / 0.327 & 3.556 & 0.237 / 0.136 & 0.128 / 0.005 & 16.561 & 0.496 / 0.526 & 0.424 / 0.487 (FNO) \\
+T3 & S & 40 & 0.172 / 0.038 & 0.022 & 0.075 / 0.001 & 0.005 / 0.000 & 0.045 & 0.313 / 0.286 & 0.112 / 0.082 (U-Net) \\
+T3 & M & 30 & 0.181 / 0.048 & 0.127 & 0.083 / 0.002 & 0.030 / 0.000 & 0.280 & 0.329 / 0.304 & 0.219 / 0.180 (U-Net) \\
+T3 & L & 16 & 0.619 / 0.324 & 0.600 & 0.816 / 0.054 & 0.064 / 0.001 & 1.599 & 0.374 / 0.293 & 0.460 / 0.373 (FNO) \\
+\bottomrule
+\end{tabular}
+\end{table*}

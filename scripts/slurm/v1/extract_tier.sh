@@ -1,6 +1,6 @@
 #!/bin/bash
 # usage: sbatch ... extract_tier.sh <tier|XXL_strict> <first_accepted> [workers]
-cd $AMPSCAPE_SCRATCH
+cd "${AMPSCAPE_SCRATCH:-${SLURM_SUBMIT_DIR:-.}}"
 source scripts/env.sh
 T=$1; N=$2; W=${3:-4}
 echo "host=$(hostname) tier=$T n=$N start=$(date -u +%FT%TZ)"

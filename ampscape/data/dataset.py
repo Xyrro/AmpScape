@@ -39,7 +39,12 @@ TASK_CONFIGS = {
     "T1R": ["regions"],
     "T3": ["advanced"],
     "T4": ["omniscape"],
+    # T1V (solver-acceleration track, 2026-10-05): the first pair of each T1 `points` landscape as an advanced-mode
+    # system (ground = lowest label, source = second label, one pixel, unit current) with its pre-solved voltage from
+    # aux/t1_pair1/<tier>/<shard>.h5 (`pair1_voltage.jl`); inputs = resistance, NoData, source one-hot, ground one-hot
+    "T1V": ["points"],
 }
+AUX_T1_PAIR1 = pathlib.Path(__file__).resolve().parents[2] / "aux" / "t1_pair1"
 K_MAX = 8
 
 
@@ -71,6 +76,7 @@ class AmpScapeDataset:
         root: str | pathlib.Path = "data/builds/mini",
         subset: str | None = None,
         qc_pass_only: bool = True,
+        aux_root: str | pathlib.Path | None = None,
         trainval_only: bool | None = None,
         normalize: bool = False,
         transform: Callable | None = None,
@@ -96,6 +102,18 @@ class AmpScapeDataset:
             idx = idx[idx[ood]]
         if subset is not None and f"subset_{subset}" in idx:
             idx = idx[idx[f"subset_{subset}"]]
+        if task == "T1V":  # keep only landscapes whose first-pair voltage has been pre-solved
+            aux = pathlib.Path(aux_root) if aux_root else AUX_T1_PAIR1 / str(tier)
+            self.aux_root = aux
+            avail: dict[str, set[str]] = {}
+            for f in sorted(aux.glob("shard-*.h5")):
+                with h5py.File(f, "r") as h:
+                    avail[f.name] = set(h.keys())
+            keep = [
+                pathlib.Path(pth).name in avail and sid in avail[pathlib.Path(pth).name]
+                for pth, sid in zip(idx.path, idx.sample_id, strict=True)
+            ]
+            idx = idx[keep]
         self.index = idx.reset_index(drop=True)
         self.transform = transform
         self.normalize = normalize
@@ -148,7 +166,7 @@ class AmpScapeDataset:
         if "covariates" in gs["inputs"]:
             out["covariates"] = gs["inputs"]["covariates"][...]
         o = gc["outputs"]
-        if self.task in ("T1", "T1W", "T1R", "T2"):
+        if self.task in ("T1", "T1W", "T1R", "T2", "T1V"):
             focal = gc["inputs"]["focal_mask"][...]
             out["focal"] = focal[None]
             oh = np.zeros((K_MAX, *focal.shape), np.float32)
@@ -183,6 +201,14 @@ class AmpScapeDataset:
             out["log_resistance"] = ((out["log_resistance"] - s["mean"]) / s["std"]).astype(
                 np.float32
             )
+        if self.task == "T1V":
+            ga = self._file(str(self.aux_root / pathlib.Path(r.path).name))[r.sample_id]["points"]
+            src_label, gnd_label = int(ga.attrs["src_label"]), int(ga.attrs["gnd_label"])
+            focal = out["focal"][0]
+            out["source_strength"] = (focal == src_label).astype(np.float32)[None]
+            out["ground"] = (focal == gnd_label).astype(np.float32)[None]
+            out["voltage"] = ga["voltage"][...][None]
+
         if self.transform:
             out = self.transform(out)
         return out
@@ -301,11 +327,33 @@ def load_from_hub(
 
     group = {"T2": "T1"}.get(task, task)
     assert group in TASK_GROUPS, task
+    meta_patterns = [f"index/{tier}.parquet", "splits/**", "stats/*"]
+    subset = kw.get("subset")
+    if subset is None or subset == "full":
+        patterns = [f"data/{tier}/{group}/*", *meta_patterns]
+    else:
+        # 2026-10-15 (verification pass): the subset argument used to filter the index only, after the whole
+        # tier × group had been downloaded ("subset='mini' ≈ 0.6 GB" in the README was not true of the download).
+        # The subsets are shard prefixes, so the index names exactly the shards to fetch.
+        local = snapshot_download(
+            repo_id, repo_type="dataset", cache_dir=cache_dir, revision=revision, allow_patterns=meta_patterns
+        )
+        patterns = subset_shard_patterns(pathlib.Path(local) / "index" / f"{tier}.parquet", tier, group, subset)
+        patterns += meta_patterns
     local = snapshot_download(
-        repo_id,
-        repo_type="dataset",
-        cache_dir=cache_dir,
-        revision=revision,
-        allow_patterns=[f"data/{tier}/{group}/*", f"index/{tier}.parquet", "splits/*", "stats/*"],
+        repo_id, repo_type="dataset", cache_dir=cache_dir, revision=revision, allow_patterns=patterns
     )
     return AmpScapeDataset(task, split=split, tier=tier, root=local, **kw)
+
+
+def subset_shard_patterns(index_path: pathlib.Path, tier: str, group: str, subset: str) -> list[str]:
+    """The Hub paths (`hf_path`) of the shards of one tier × task group that hold the subset's samples — the
+    `subset_<name>` index column marks the samples, `hf_path` their shard. Raises KeyError for an unknown subset."""
+    import pandas as pd
+
+    idx = pd.read_parquet(index_path, columns=["hf_path", "task_group", f"subset_{subset}"])
+    sel = idx[idx["task_group"].eq(group) & idx[f"subset_{subset}"].astype(bool)]
+    paths = sorted(set(sel["hf_path"]))
+    if not paths:
+        raise ValueError(f"subset {subset!r} has no shards in {tier}/{group}")
+    return paths

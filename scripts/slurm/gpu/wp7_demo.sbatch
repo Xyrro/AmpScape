@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -J phase10-wp7-demo
-#SBATCH -A <account>
-#SBATCH -q <qos-a>
-#SBATCH -p <gpu-partition-a>
+# account: ampscape_sbatch (scripts/env.sh)
+# QoS: ampscape_sbatch (scripts/env.sh) or the driver's -q
+# GPU partition: ampscape_sbatch -p "$AMPSCAPE_GPU_PARTITION" (scripts/env.sh)
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH -c 6

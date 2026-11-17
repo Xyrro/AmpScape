@@ -2,7 +2,7 @@
 # usage: sbatch --array=0-9 finalize_range.sh <build> <shards_per_task>
 # Finalizes every shard of its range as soon as the solver outputs exist; polls every 5 min until all are done
 # (or the walltime ends) so it can be submitted while the solve array is still running.
-cd $AMPSCAPE_SCRATCH
+cd "${AMPSCAPE_SCRATCH:-${SLURM_SUBMIT_DIR:-.}}"
 source scripts/env.sh
 B=$1; N=$2; LO=$((SLURM_ARRAY_TASK_ID * N)); HI=$((LO + N - 1))
 while true; do

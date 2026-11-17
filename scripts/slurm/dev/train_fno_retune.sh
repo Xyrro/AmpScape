@@ -1,5 +1,5 @@
 #!/bin/bash
-cd $AMPSCAPE_SCRATCH
+cd "${AMPSCAPE_SCRATCH:-${SLURM_SUBMIT_DIR:-.}}"
 source scripts/env.sh
 echo "host=$(hostname) start=$(date -u +%FT%TZ)"
 python scripts/train.py --model fno --task T1 --tier S --root data/dev/S --out runs/dev/fno_T1_lr3e-4 --lr 3e-4 \
