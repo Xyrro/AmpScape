@@ -28,10 +28,16 @@ def partition(kind: str = "cpu") -> str | None:
     return _get("AMPSCAPE_GPU_PARTITION" if kind == "gpu" else "AMPSCAPE_CPU_PARTITION")
 
 
-def sbatch_args(kind: str = "cpu", qos_name: str | None = None, partition_name: str | None = None) -> list[str]:
+def sbatch_args(
+    kind: str = "cpu", qos_name: str | None = None, partition_name: str | None = None
+) -> list[str]:
     """`-A <account> -q <qos> -p <partition>` for sbatch, each only when set."""
     out = []
-    for flag, value in (("-A", account()), ("-q", qos_name or qos()), ("-p", partition_name or partition(kind))):
+    for flag, value in (
+        ("-A", account()),
+        ("-q", qos_name or qos()),
+        ("-p", partition_name or partition(kind)),
+    ):
         if value:
             out += [flag, value]
     return out

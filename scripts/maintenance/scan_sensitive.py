@@ -5,6 +5,7 @@ attributes and small string datasets. Reads the audit_offsite.py report; run as 
 
     python scripts/maintenance/scan_sensitive.py   # -> work/offsite_audit/sensitive_scan.json
 """
+
 import collections
 import fnmatch
 import getpass
@@ -18,23 +19,49 @@ from multiprocessing import Pool
 import h5py
 import pandas as pd
 
-UPLOAD = ["aux/review_round3/*", "aux/review_round2/*", "aux/wp7/*", "aux/scale_probe/*", "aux/t4_bs1_reference/*",
-          "aux/t4_blocksize_baselines/*", "aux/leaderboard/*", "aux/t1_pair1/*", "data/tiles/*.parquet", "data/tiles/*.json",
-          "data/v1/*", "work/precision/*", "runs/full/*warm_start*", "runs/full/gnn_T4_L_s1/*/results.*", "logs/*"]
-SKIP = ["data/v1/*corrupt*", "data/v1/*/corrupt/*", "*/quicklooks/*.png", "data/v1/*/datasets--Xirro--AmpScape/*",
-        "*.uploaded", "*.ok", "*.done", "*/.offloaded*", "*.lock"]
+UPLOAD = [
+    "aux/review_round3/*",
+    "aux/review_round2/*",
+    "aux/wp7/*",
+    "aux/scale_probe/*",
+    "aux/t4_bs1_reference/*",
+    "aux/t4_blocksize_baselines/*",
+    "aux/leaderboard/*",
+    "aux/t1_pair1/*",
+    "data/tiles/*.parquet",
+    "data/tiles/*.json",
+    "data/v1/*",
+    "work/precision/*",
+    "runs/full/*warm_start*",
+    "runs/full/gnn_T4_L_s1/*/results.*",
+    "logs/*",
+]
+SKIP = [
+    "data/v1/*corrupt*",
+    "data/v1/*/corrupt/*",
+    "*/quicklooks/*.png",
+    "data/v1/*/datasets--Xirro--AmpScape/*",
+    "*.uploaded",
+    "*.ok",
+    "*.done",
+    "*/.offloaded*",
+    "*.lock",
+]
 PAT = {
-    "hf_token": rb"hf_[A-Za-z0-9]{30,}", "github_token": rb"(gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,})",
-    "private_key": rb"-----BEGIN [A-Z ]*PRIVATE KEY", "aws_key": rb"AKIA[0-9A-Z]{16}",
+    "hf_token": rb"hf_[A-Za-z0-9]{30,}",
+    "github_token": rb"(gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,})",
+    "private_key": rb"-----BEGIN [A-Z ]*PRIVATE KEY",
+    "aws_key": rb"AKIA[0-9A-Z]{16}",
     "secret_word": rb"(?i)(password|passwd|api[_-]?key|secret[_-]?key|access[_-]?token|bearer [a-z0-9])",
     "email": rb"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.(com|edu|org|net|io|ai)\b",
     # identity patterns are never committed (owner 2026-11-16: no IDs in the public repo): the user ID and the home
     # and scratch prefixes come from the environment, everything else (institution, cluster, node names, accounts,
     # personal names) from the untracked IDENTITY_FILE as {"name": "regex", ...}
     "user_id": re.escape(getpass.getuser()).encode(),
-    "home_or_scratch_path": "|".join(re.escape(str(pathlib.Path(p).parent)) for p in
-                                     (os.path.expanduser("~"), os.environ.get("AMPSCAPE_SCRATCH", "/nonexistent/x"))
-                                     ).encode(),
+    "home_or_scratch_path": "|".join(
+        re.escape(str(pathlib.Path(p).parent))
+        for p in (os.path.expanduser("~"), os.environ.get("AMPSCAPE_SCRATCH", "/nonexistent/x"))
+    ).encode(),
 }
 IDENTITY_FILE = pathlib.Path(__file__).resolve().parents[2] / "work" / "identity_patterns.json"
 if IDENTITY_FILE.exists():
@@ -47,19 +74,25 @@ def scan(buf: bytes, where: str, found: dict):
             continue
         m = re.search(p, buf)
         if m:
-            s = buf[max(0, m.start() - 40): m.end() + 40].decode("latin-1").replace("\n", " ")
+            s = buf[max(0, m.start() - 40) : m.end() + 40].decode("latin-1").replace("\n", " ")
             if k in ("hf_token", "github_token", "private_key", "aws_key"):
-                s = re.sub(r"(hf_|gh[pousr]_|github_pat_|AKIA)[A-Za-z0-9_]{4}[A-Za-z0-9_]+", r"\1****(masked)", s)
+                s = re.sub(
+                    r"(hf_|gh[pousr]_|github_pat_|AKIA)[A-Za-z0-9_]{4}[A-Za-z0-9_]+",
+                    r"\1****(masked)",
+                    s,
+                )
             found[k] = f"{where}: ...{s}..."
 
 
 def strings_h5(f):
     out = []
+
     def visit(name, obj):
         for a, v in obj.attrs.items():
             out.append(f"{name}@{a}={v!r}"[:2000])
         if isinstance(obj, h5py.Dataset) and obj.dtype.kind in "SOU" and obj.size < 10000:
             out.append(repr(obj[()])[:20000])
+
     f.visititems(visit)
     for a, v in f.attrs.items():
         out.append(f"/@{a}={v!r}"[:2000])
@@ -94,13 +127,16 @@ def scan_file(args):
         err = f"{rel}: {type(e).__name__}: {e}"[:300]
     return group, found, err
 
+
 def tally(jobs: list[tuple[str, str]], n_proc: int) -> tuple[dict, dict, list]:
     """Scan (path, group) pairs in parallel: per pattern, files with a hit per group, a few examples, errors."""
     hits = {k: collections.Counter() for k in PAT}
     ex = {k: [] for k in PAT}
     errors = []
     with Pool(n_proc) as pool:
-        for i, (group, found, err) in enumerate(pool.imap_unordered(scan_file, jobs, chunksize=16), 1):
+        for i, (group, found, err) in enumerate(
+            pool.imap_unordered(scan_file, jobs, chunksize=16), 1
+        ):
             for k, e in found.items():
                 hits[k][group] += 1
                 if sum(1 for x in ex[k] if x.startswith(group)) < 4:
@@ -114,16 +150,41 @@ def tally(jobs: list[tuple[str, str]], n_proc: int) -> tuple[dict, dict, list]:
 
 def main() -> None:
     R = json.load(open("work/offsite_audit/report.json"))
-    up = [x["path"] for x in R["nowhere"] if any(fnmatch.fnmatch(x["path"], g) for g in UPLOAD)
-          and not any(fnmatch.fnmatch(x["path"], g) for g in SKIP)]
-    pub = [f for f in R["on_hub"] if f.endswith((".json", ".md", ".log", ".csv", ".txt", ".out", ".parquet"))]
-    print(f"upload candidates: {len(up)} files; already-public comparison set: {len(pub)} files", flush=True)
-    jobs = [(rel, "optional_solver_logs" if fnmatch.fnmatch(rel, "aux/t4_*/*/logs/*")
-             or fnmatch.fnmatch(rel, "aux/scale_probe/*/logs/*") else "upload") for rel in up]
+    up = [
+        x["path"]
+        for x in R["nowhere"]
+        if any(fnmatch.fnmatch(x["path"], g) for g in UPLOAD)
+        and not any(fnmatch.fnmatch(x["path"], g) for g in SKIP)
+    ]
+    pub = [
+        f
+        for f in R["on_hub"]
+        if f.endswith((".json", ".md", ".log", ".csv", ".txt", ".out", ".parquet"))
+    ]
+    print(
+        f"upload candidates: {len(up)} files; already-public comparison set: {len(pub)} files",
+        flush=True,
+    )
+    jobs = [
+        (
+            rel,
+            "optional_solver_logs"
+            if fnmatch.fnmatch(rel, "aux/t4_*/*/logs/*")
+            or fnmatch.fnmatch(rel, "aux/scale_probe/*/logs/*")
+            else "upload",
+        )
+        for rel in up
+    ]
     jobs += [(rel, "already_public") for rel in pub]
     hits, ex, errors = tally(jobs, int(os.environ.get("SLURM_CPUS_PER_TASK", "4")))
-    res = {"n_upload": len(up), "n_public_compared": len(pub), "hits": hits, "examples": ex, "errors": errors[:50],
-           "n_errors": len(errors)}
+    res = {
+        "n_upload": len(up),
+        "n_public_compared": len(pub),
+        "hits": hits,
+        "examples": ex,
+        "errors": errors[:50],
+        "n_errors": len(errors),
+    }
     pathlib.Path("work/offsite_audit/sensitive_scan.json").write_text(json.dumps(res, indent=1))
     print(json.dumps(hits, indent=0))
     print("errors", len(errors))

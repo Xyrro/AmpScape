@@ -36,7 +36,13 @@ def group_of(path: str) -> str:
 
 def top_of(path: str) -> str:
     parts = path.split("/")
-    return "/".join(parts[:3]) if parts[0] == "aux" and len(parts) > 3 else "/".join(parts[:2]) if len(parts) > 1 else parts[0]
+    return (
+        "/".join(parts[:3])
+        if parts[0] == "aux" and len(parts) > 3
+        else "/".join(parts[:2])
+        if len(parts) > 1
+        else parts[0]
+    )
 
 
 def main() -> None:
@@ -48,8 +54,11 @@ def main() -> None:
     from huggingface_hub import HfApi, hf_hub_download, snapshot_download
 
     api = HfApi()
-    files = [e for e in api.list_repo_tree(REPO, recursive=True, repo_type="dataset", revision=a.revision)
-             if hasattr(e, "blob_id")]
+    files = [
+        e
+        for e in api.list_repo_tree(REPO, recursive=True, repo_type="dataset", revision=a.revision)
+        if hasattr(e, "blob_id")
+    ]
     small = [e.path for e in files if not e.path.endswith((".h5", ".pt"))]
     h5 = {}
     for e in files:
@@ -57,11 +66,20 @@ def main() -> None:
             g = group_of(e.path)
             if g not in h5 or e.size < h5[g].size:
                 h5[g] = e
-    print(f"{len(files)} files; downloading {len(small)} non-HDF5 files and {len(h5)} HDF5 samples "
-          f"({sum(e.size for e in h5.values()) / 1e9:.1f} GB)", flush=True)
+    print(
+        f"{len(files)} files; downloading {len(small)} non-HDF5 files and {len(h5)} HDF5 samples "
+        f"({sum(e.size for e in h5.values()) / 1e9:.1f} GB)",
+        flush=True,
+    )
     with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as tmp:
-        snapshot_download(REPO, repo_type="dataset", revision=a.revision, local_dir=tmp,
-                          ignore_patterns=["*.h5", "*.pt"], max_workers=8)
+        snapshot_download(
+            REPO,
+            repo_type="dataset",
+            revision=a.revision,
+            local_dir=tmp,
+            ignore_patterns=["*.h5", "*.pt"],
+            max_workers=8,
+        )
         for e in h5.values():
             hf_hub_download(REPO, e.path, repo_type="dataset", revision=a.revision, local_dir=tmp)
         local = small + [e.path for e in h5.values()]
@@ -84,11 +102,23 @@ def main() -> None:
             if m:
                 commit_hits[k] += 1
                 if len(commit_ex[k]) < 4:
-                    commit_ex[k].append(f"{c.commit_id[:8]}: {text[max(0, m.start() - 40): m.end() + 40].decode()}")
-    rep = {"revision": a.revision, "files": len(files), "scanned_non_h5": len(small),
-           "h5_samples": {g: e.path for g, e in sorted(h5.items())}, "hits_by_folder": hits, "examples": ex,
-           "errors": errors[:50], "n_errors": len(errors), "missing_downloads": missing, "commits": len(commits),
-           "commit_hits": dict(commit_hits), "commit_examples": dict(commit_ex)}
+                    commit_ex[k].append(
+                        f"{c.commit_id[:8]}: {text[max(0, m.start() - 40) : m.end() + 40].decode()}"
+                    )
+    rep = {
+        "revision": a.revision,
+        "files": len(files),
+        "scanned_non_h5": len(small),
+        "h5_samples": {g: e.path for g, e in sorted(h5.items())},
+        "hits_by_folder": hits,
+        "examples": ex,
+        "errors": errors[:50],
+        "n_errors": len(errors),
+        "missing_downloads": missing,
+        "commits": len(commits),
+        "commit_hits": dict(commit_hits),
+        "commit_examples": dict(commit_ex),
+    }
     pathlib.Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     pathlib.Path(a.out).write_text(json.dumps(rep, indent=1))
     print(json.dumps({k: sum(v.values()) for k, v in hits.items()}), "commits:", dict(commit_hits))

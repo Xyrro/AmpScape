@@ -55,8 +55,14 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     changes, n_text, bad = [], 0, []
     with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as tmp:
-        snapshot_download(REPO, repo_type="dataset", revision=a.revision, local_dir=tmp, ignore_patterns=SKIP,
-                          max_workers=8)
+        snapshot_download(
+            REPO,
+            repo_type="dataset",
+            revision=a.revision,
+            local_dir=tmp,
+            ignore_patterns=SKIP,
+            max_workers=8,
+        )
         for p in sorted(pathlib.Path(tmp).rglob("*")):
             if not p.is_file() or ".cache" in p.relative_to(tmp).parts:
                 continue
@@ -81,12 +87,26 @@ def main() -> None:
             dest = out / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(new, encoding="utf-8")
-            changes.append({"path": rel, "replacements": n, "sha256_before": hashlib.sha256(raw).hexdigest(),
-                            "sha256_after": hashlib.sha256(new.encode()).hexdigest()})
+            changes.append(
+                {
+                    "path": rel,
+                    "replacements": n,
+                    "sha256_before": hashlib.sha256(raw).hexdigest(),
+                    "sha256_after": hashlib.sha256(new.encode()).hexdigest(),
+                }
+            )
     (out.parent / "changes.jsonl").write_text("".join(json.dumps(c) + "\n" for c in changes))
-    print(json.dumps({"text_files": n_text, "changed": len(changes), "replacements": sum(c["replacements"] for c in changes),
-                      "staged_gb": round(sum((out / c["path"]).stat().st_size for c in changes) / 1e9, 3),
-                      "rejected_json": bad}))
+    print(
+        json.dumps(
+            {
+                "text_files": n_text,
+                "changed": len(changes),
+                "replacements": sum(c["replacements"] for c in changes),
+                "staged_gb": round(sum((out / c["path"]).stat().st_size for c in changes) / 1e9, 3),
+                "rejected_json": bad,
+            }
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -48,15 +48,30 @@ def main() -> None:
         tmp = pathlib.Path(tmp)
 
         def get(f: str) -> pathlib.Path:
-            return pathlib.Path(hf_hub_download(REPO, f"records/{f}", repo_type="dataset", revision=a.revision,
-                                                local_dir=str(tmp / "dl")))
+            return pathlib.Path(
+                hf_hub_download(
+                    REPO,
+                    f"records/{f}",
+                    repo_type="dataset",
+                    revision=a.revision,
+                    local_dir=str(tmp / "dl"),
+                )
+            )
 
-        man = [json.loads(line) for line in get("manifest.jsonl").read_text().splitlines() if line.strip()]
+        man = [
+            json.loads(line)
+            for line in get("manifest.jsonl").read_text().splitlines()
+            if line.strip()
+        ]
         names = sorted({r["archive"][: -len(".tar.gz")] for r in man}) if a.all else a.archives
         bad = 0
         for name in names:
-            rows = {r["path"]: r for r in man if r["archive"] == f"{name}.tar.gz"
-                    and (not a.only or fnmatch.fnmatch(r["path"], a.only))}
+            rows = {
+                r["path"]: r
+                for r in man
+                if r["archive"] == f"{name}.tar.gz"
+                and (not a.only or fnmatch.fnmatch(r["path"], a.only))
+            }
             arc = get(f"{name}.tar.gz")
             ex = tmp / "x" / name
             with tarfile.open(arc) as t:
@@ -75,7 +90,9 @@ def main() -> None:
                     continue
                 dest = ROOT / path
                 if dest.exists():
-                    counts["present_identical" if sha256(dest) == r["sha256"] else "present_different"] += 1
+                    counts[
+                        "present_identical" if sha256(dest) == r["sha256"] else "present_different"
+                    ] += 1
                 else:
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(p), str(dest))

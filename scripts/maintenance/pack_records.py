@@ -21,16 +21,31 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 ARCHIVES = {  # archive: globs over scratch-relative paths ("*" crosses "/")
     "review_round3": ["aux/review_round3/*"],
     "review_round2": ["aux/review_round2/*"],
-    "aux_builds": ["aux/wp7/*", "aux/scale_probe/*", "aux/t4_bs1_reference/*", "aux/t4_blocksize_baselines/*",
-                   "aux/leaderboard/*", "aux/t1_pair1/*"],
+    "aux_builds": [
+        "aux/wp7/*",
+        "aux/scale_probe/*",
+        "aux/t4_bs1_reference/*",
+        "aux/t4_blocksize_baselines/*",
+        "aux/leaderboard/*",
+        "aux/t1_pair1/*",
+    ],
     "tiles_metadata": ["data/tiles/*.parquet", "data/tiles/*.json"],
     "data_v1_records": ["data/v1/*"],
     "precision_pass": ["work/precision/*"],
     "run_records": ["runs/full/*warm_start*", "runs/full/gnn_T4_L_s1/*/results.*"],
     "logs": ["logs/*"],
 }
-SKIP = ["data/v1/*corrupt*", "data/v1/*/corrupt/*", "*/quicklooks/*.png", "data/v1/*/datasets--Xirro--AmpScape/*",
-        "*.uploaded", "*.ok", "*.done", "*/.offloaded*", "*.lock"]
+SKIP = [
+    "data/v1/*corrupt*",
+    "data/v1/*/corrupt/*",
+    "*/quicklooks/*.png",
+    "data/v1/*/datasets--Xirro--AmpScape/*",
+    "*.uploaded",
+    "*.ok",
+    "*.done",
+    "*/.offloaded*",
+    "*.lock",
+]
 README = """# AmpScape raw records (private backup)
 
 Scratch-only raw records of the AmpScape project, backed up before a possible scratch purge (2026-11-16). They are not
@@ -87,18 +102,34 @@ def main() -> None:
         present = [p for p in sorted(paths) if (ROOT / p).is_file()]
         with tarfile.open(out / f"{name}.tar.gz", "w:gz", compresslevel=6) as t:
             for p in present:
-                rows.append({"path": p, "size": (ROOT / p).stat().st_size, "sha256": sha256(ROOT / p),
-                             "archive": f"{name}.tar.gz"})
+                rows.append(
+                    {
+                        "path": p,
+                        "size": (ROOT / p).stat().st_size,
+                        "sha256": sha256(ROOT / p),
+                        "archive": f"{name}.tar.gz",
+                    }
+                )
                 t.add(ROOT / p, arcname=p, recursive=False)
-        summary[name] = {"files": len(present), "missing_since_audit": len(paths) - len(present),
-                         "bytes": sum(r["size"] for r in rows if r["archive"] == f"{name}.tar.gz"),
-                         "archive_bytes": (out / f"{name}.tar.gz").stat().st_size}
+        summary[name] = {
+            "files": len(present),
+            "missing_since_audit": len(paths) - len(present),
+            "bytes": sum(r["size"] for r in rows if r["archive"] == f"{name}.tar.gz"),
+            "archive_bytes": (out / f"{name}.tar.gz").stat().st_size,
+        }
         print(name, summary[name], flush=True)
     (out / "manifest.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
     (out / "summary.json").write_text(json.dumps(summary, indent=1))
     (out / "README.md").write_text(README)
-    print(json.dumps({"files": len(rows), "gb": round(sum(r["size"] for r in rows) / 1e9, 3),
-                      "archive_gb": round(sum(s["archive_bytes"] for s in summary.values()) / 1e9, 3)}))
+    print(
+        json.dumps(
+            {
+                "files": len(rows),
+                "gb": round(sum(r["size"] for r in rows) / 1e9, 3),
+                "archive_gb": round(sum(s["archive_bytes"] for s in summary.values()) / 1e9, 3),
+            }
+        )
+    )
 
 
 if __name__ == "__main__":
