@@ -3709,7 +3709,7 @@ private repo". Record: `docs/offsite_audit_2026-11-16.md`.
 - Other projects' caches (owner's call): `<other-project>/tmp/hf_cache` 4.0 GB, `<other-project>/data/pip-cache` 1.3 GB.
 - Anonymised link for the double-blind submission; `neurips_2027.sty` swap when published.
 
-# Status — 2026-11-17: public repositories cleaned (steps 1-3); name kept; steps 4-5 proposed
+# Status — 2026-11-17: public repositories cleaned (steps 1-3) and verified; name kept; steps 4-5 proposed
 
 Owner: "ok then do the step 1-3. how should we do with 4 and 5?" and "for step 2, you can still use my name".
 Record: `docs/offsite_audit_2026-11-16.md`.
@@ -3726,6 +3726,21 @@ Record: `docs/offsite_audit_2026-11-16.md`.
 - **Hub, current files:** 3,427 result JSON files and the post-mortem cleaned (paths only, metrics unchanged), four
   commits, every file checked. New scan: no credentials, user ID, paths, cluster or account names in any text file.
 - Future result files record relative data roots (`ampscape.cluster.portable_path`).
+
+## Verification (owner: "check if everything is done cleanly and correct for step 1-3", 2026-11-17)
+- GitHub: `Xyrro/AmpScape` public (main + 4 tags, no forks), `Xyrro/AmpScape-history` private; Mac and cluster clones
+  at the public `main`, clean, local site files present and git-ignored.
+- Everything ever pushed to the public repo (fresh mirror clone: 12 commits, 722 file versions, commit and tag
+  messages, author identities): no credential or identifier; identities are the GitHub no-reply address only.
+- Each release snapshot equals its original tag with only the rules applied (byte-for-byte), and the snapshot of the
+  development tree equals it exactly; every removed line without an identifier is an intended code or doc change.
+- Paper: `paper/neurips/` unchanged; the 21 LaTeX tables regenerate byte-identically; `check_draft_numbers.py --tex`:
+  2,728 numbers in 22 files, 0 not found in their sources.
+- Code: 51 shell scripts parse; both drivers load the site settings; full test suite on the cluster through
+  `ampscape_sbatch`: 1,783 passed, 6 skipped; GitHub CI: Julia tests and pipeline smoke test pass, the Python job fails
+  only on the formatting/lint check that has failed since 2026-10-15.
+- Hub: since the pre-cleanup head only the four cleanup commits; 24,810 files before and after, exactly the 3,428 staged
+  files changed (no HDF5, checkpoint, parquet, card or Croissant file); the dataset stays public, the backup private.
 
 ## What remains public (by decision)
 - Compute-node hostnames (university domain) inside the HDF5 `solver_stats` attributes of the dataset files.
