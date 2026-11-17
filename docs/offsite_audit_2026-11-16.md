@@ -144,3 +144,47 @@ cleanup options and their costs are listed in `docs/status/latest.md`; the owner
 This session's own additions were scrubbed: the audit tables above and the status lines name no identifiers, and the
 scan scripts no longer contain identity patterns. They remain in the history of commits `c7b11dc`–`04e9d7f`, like the
 earlier ones.
+
+## Cleanup done (owner: "ok then do the step 1-3", 2026-11-16; name kept: "you can still use my name")
+
+**Code (GitHub, step 1).** Site settings left git: `ampscape/cluster.py` reads the Slurm account, QoS, partitions, GPU
+pools, quota tool and scratch file system from the git-ignored `scripts/env.local.sh` (template
+`scripts/env.local.sh.example`); `scripts/env.sh` takes the working copy as `AMPSCAPE_SCRATCH`, sources the local file
+and defines `ampscape_sbatch` (sbatch with the site values for that one call). Slurm scripts `cd` to the working copy
+and carry no account, QoS or partition lines; the GPU and generation drivers build their sbatch arguments from
+`ampscape.cluster`; the cluster profile is the git-ignored `configs/cluster/local.yaml`. Test suite on the cluster,
+submitted through `ampscape_sbatch`: 746 passed, 6 skipped (network tests, smoke shard), job accounting showed the
+site values.
+
+**Docs, logs, raw tables (step 1).** `scripts/maintenance/scrub_identifiers.py` applied the git-ignored rules
+(`work/identity_scrub.json`): user ID, numeric UID, home and scratch paths, login and compute node names, university,
+cluster, partition, QoS and account names, the names of the owner's other projects, and a test coordinate in the
+university's city were replaced by placeholders (`$AMPSCAPE_SCRATCH`, `<node>`, `<qos-a>`, `the cluster`, ...). A
+scan of all 523 tracked files with the credential and identity patterns finds none left (remaining hits are
+`git@github.com`, `example.org` addresses, a style-file author address and random bytes in a PNG).
+
+**Name (step 2, owner decision).** The owner's name stays as author credit in `LICENSE`, `CITATION.cff` and the
+dataset card; anonymity during review is a matter of the review links (step 5).
+
+**History (step 3).** The previous repository is private as `Xyrro/AmpScape-history` (full history). The public
+`Xyrro/AmpScape` is new: one cleaned snapshot commit per release tag (`v1.0-pipeline`, `v1.0`, `v1.0.1`, `v1.0.2`; same
+tag names and dates) and the current tree on top; every one of the five commits was scanned with no identifier found,
+and its `main` tree is byte-identical to the development tree it was built from. The URL is unchanged, so the paper
+and dataset-card links still resolve. Both working copies follow the new history (`history` remote for the old one).
+Release snapshots of old code carry placeholders such as `<account>` in Slurm headers; set them for your own cluster.
+Copies of the earlier public history made by third parties (forks: none; web archives) are outside our control.
+
+**CI.** The GitHub workflow has failed since at least 2026-10-15 on `ruff format --check` / `ruff check` (53 files,
+34 findings), unrelated to this cleanup; the files added today are formatted.
+
+**Hub (step 1).** `scripts/maintenance/scrub_hub_text.py` (Slurm job 7126211) downloaded the 5,326 text files of the
+public dataset and applied the same rules: 3,428 files changed (3,427 result JSON files under `aux/results/runs_full`,
+whose `root`/`train_root` paths now read `$AMPSCAPE_SCRATCH/...`, and `aux/generation_postmortem.md`, now identical to
+the git copy), 4,293 replacements; every changed JSON file equals the original with the rules applied to its strings,
+so no number changed. `push_aux.py` uploaded them in four commits (`4b3fe484`, `7cfcd592`, `ac91fa2e`, `c45295df`), each
+file's sha256 checked on the Hub. A new scan of the public dataset (job 7127325: all 6,087 non-HDF5 files, 97 HDF5
+samples, all commit messages) finds no credentials, user ID, paths, cluster or account names. What remains is the
+compute-node hostname inside the HDF5 `solver_stats` attributes (60 of the 97 samples: every dataset shard and result
+file sampled) and the owner's name in the dataset card (kept). Earlier versions in the Hub history keep the old paths.
+Result files written from now on record data roots relative to the working copy (`ampscape.cluster.portable_path`).
+Scratch keeps its local copies unchanged (they differ from the Hub copies only in those path strings).

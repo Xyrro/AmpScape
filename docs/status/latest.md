@@ -1,59 +1,41 @@
-# Status — 2026-11-16: raw records backed up privately and verified; public repos hold no credentials but do hold identifiers
+# Status — 2026-11-17: public repositories cleaned (steps 1-3); name kept; steps 4-5 proposed
 
-Owner: "do not have any credentials or id or any sensitive content in the public repo. yeah if possible, create a
-private repo". Record: `docs/offsite_audit_2026-11-16.md`.
+Owner: "ok then do the step 1-3. how should we do with 4 and 5?" and "for step 2, you can still use my name".
+Record: `docs/offsite_audit_2026-11-16.md`.
 
 ## Done
-- **Private backup:** `Xirro/AmpScape-records` (Hub dataset, private). 25,271 scratch-only files (3.72 GB, including the
-  optional solver logs) in eight archives (2.07 GB) plus a sha256 manifest, uploaded in commit `64bc96c`. Every
-  archive was downloaded back and all 25,271 files matched (job 7124296). Restore with
-  `scripts/maintenance/restore_records.py --archives <name>`. Nothing was added to the public repo.
-- **Public repos scanned:** no tokens, keys, passwords or personal e-mail addresses in either; GitHub commits use the
-  no-reply address; no identifiers in the 6,614 Hub commit messages.
-- This session's own docs and scan scripts no longer name any identifier (patterns live in the untracked
-  `work/identity_patterns.json`); `work/` is git-ignored.
+- **GitHub, current files:** site settings (Slurm account, QoS, partitions, GPU pools, quota tool, scratch file system)
+  moved to git-ignored `scripts/env.local.sh` / `configs/cluster/local.yaml` (`ampscape/cluster.py`, `ampscape_sbatch`);
+  docs, logs and raw tables use placeholders (`scrub_identifiers.py`, rules git-ignored). Full test suite on the
+  cluster through `ampscape_sbatch`: 746 passed, 6 skipped.
+- **GitHub, history:** old repository private as `Xyrro/AmpScape-history`; the public `Xyrro/AmpScape` (same URL) holds
+  one cleaned snapshot per release tag (`v1.0-pipeline`, `v1.0`, `v1.0.1`, `v1.0.2`) and the current tree. All five
+  commits scanned: no identifiers. Both clones follow the new history (`history` remote for the old one).
+- **Name:** kept as author credit in `LICENSE`, `CITATION.cff` and the dataset card (owner decision).
+- **Hub, current files:** 3,427 result JSON files and the post-mortem cleaned (paths only, metrics unchanged), four
+  commits, every file checked. New scan: no credentials, user ID, paths, cluster or account names in any text file.
+- Future result files record relative data roots (`ampscape.cluster.portable_path`).
 
-## Identifiers already public (cleanup needs the owner's decision)
-| Where | What |
-|---|---|
-| GitHub, ≈ 80 files (Slurm scripts, docs, status/decision logs, `CLAUDE.md`, `scripts/env.sh`) | cluster user ID, absolute scratch paths, institution, cluster, node and account names |
-| GitHub `LICENSE`, `CITATION.cff`; Hub `README.md` (BibTeX) | owner's real name |
-| Hub, 3,427 JSON files under `aux/results/` | absolute scratch paths with the user ID (`train_root`, `root`) |
-| Hub, HDF5 `solver_stats` attribute (all 97 sampled shards / result files: presumably all 18,493 files, 1.77 TB) | compute-node hostname, which names the institution |
-| Hub `aux/generation_postmortem.md` | institution, cluster, Slurm account |
-| History of both repos | all of the above, in every earlier version |
+## What remains public (by decision)
+- Compute-node hostnames (university domain) inside the HDF5 `solver_stats` attributes of the dataset files.
+- Earlier versions of files in the Hub history (old result JSON with absolute paths).
+- The owner's name as author credit.
 
-## Options
-- **A. Clean the current versions (recommended first step):** GitHub: scripts take paths and account from the
-  environment or an untracked local config, docs use placeholders (normal commits). Hub: rewrite the path fields of the
-  3,427 JSON files (≈ 3.3 GB re-upload, metrics unchanged) and the post-mortem. History still holds the old versions.
-- **B. Remove from history as well:** make both current repos private (everything stays restorable with a token) and
-  publish fresh public repos from the cleaned content. No force-push is needed, but the paper, Croissant and leaderboard
-  URLs change. Squashing the Hub history in place instead would break the restore records' pinned commits and the
-  `v1.0`/`v1.0.2` tags.
-- **C. Shard hostnames:** rewrite `solver_stats` in all 18,493 HDF5 files (1.77 TB pass through compute nodes, batch by
-  batch). This is a large job; I would estimate the cost before starting. Hostnames name the institution's cluster,
-  not a person.
-- **D. Real name:** keep it in `LICENSE`/`CITATION.cff`/card (normal for a release) or replace it with a placeholder
-  during double-blind review.
+## Proposal for step 4 (Hub history, HDF5 hostnames)
+- Leave both. Rewriting the 1.8 TB of HDF5 files would only hide the university, which the published paper names; a
+  history squash would break the restore records and the `v1.0`/`v1.0.2` tags; the free plan cannot make 1.8 TB private.
+- Small forward fix (needs a go): the Julia solver records the CPU model instead of the hostname, so any future build
+  carries no host names (the CPU model is what the reproducibility statement relies on).
 
-## Recommendation (owner asked, 2026-11-16)
-1. **A on both repos:** placeholders for the user ID, scratch paths, cluster and institution names in the current
-   files. Hub: re-upload of the 3,427 JSON files (≈ 3.3 GB, numbers unchanged) and the post-mortem (Hub push: needs
-   approval).
-2. **D for the review period:** "Anonymous" in `LICENSE`, `CITATION.cff` and the dataset-card citation; the name returns
-   at camera-ready.
-3. **GitHub history:** make the current GitHub repo private and publish the cleaned code as a fresh public repo with one
-   commit (code only, cheap, no force-push); links to it in the paper and card change.
-4. **Leave the Hub history and the 1.8 TB of HDF5 files as they are.** A free account has 100 GB of private storage
-   (huggingface.co/docs/hub/storage-limits), so the 1.8 TB dataset cannot simply go private. A squash would break
-   the restore records and the `v1.0`/`v1.0.2` tags. Rewriting every file would only hide the institution, which the
-   published paper names anyway. Residual: earlier card versions in the Hub history and the hostnames inside the
-   HDF5 files still identify name and institution for someone who digs.
-5. **Anonymity during review** is then decided by the review links (pending anonymised-link item): the paper currently
-   links the Hub repo by name.
+## Proposal for step 5 (review anonymity)
+- When the NeurIPS 2027 call is out, check whether the track is double-blind and how reviewers must get the data.
+- If double-blind: the submitted PDF links anonymous copies instead of `Xirro/AmpScape` and the GitHub repo: the code
+  through an anonymising mirror of the public repo, the data through a reviewer copy under an anonymous Hub account
+  (the lite/mini subsets, harness and Croissant file, with the hostname attribute removed from those few files);
+  real links return at camera-ready. Check the PDF metadata at the same time.
 
 ## Waiting on the owner
-- Approve steps 1-3 of the recommendation (or choose otherwise among A/B/C/D).
-- Other projects' caches (owner's call): `<other-project>/tmp/hf_cache` 4.0 GB, `<other-project>/data/pip-cache` 1.3 GB.
-- Anonymised link for the double-blind submission; `neurips_2027.sty` swap when published.
+- Go / no-go on the solver hostname change (step 4) and on preparing the reviewer copy when the call is out (step 5).
+- Other projects' caches (owner's call); `neurips_2027.sty` swap when published.
+- Scratch-only temporary copies that can go when convenient: `work/records_upload` (2.1 GB, in the private repo) and
+  `work/hub_scrub/staging` (3.3 GB, now on the Hub).
