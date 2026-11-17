@@ -31,6 +31,7 @@ from train import Items, collate, evaluate_group, predict  # noqa: E402
 
 from ampscape.data.dataset import AmpScapeDataset, load_norm_stats  # noqa: E402
 from ampscape.models import build_model  # noqa: E402
+from ampscape import cluster  # noqa: E402
 
 
 def summarise(results_json: pathlib.Path) -> dict:
@@ -188,7 +189,7 @@ def main() -> None:
                         "split": split,
                         "seed": cfg.get("seed"),
                         "notes": f"scale transfer: trained at {cfg['tier']} (run {run.name}), evaluated at {a.tier}, batch 1",
-                        "train_root": cfg.get("root", a.root),
+                        "train_root": cluster.portable_path(cfg.get("root", a.root)),
                         "source_run": run.name,
                     },
                     indent=1,

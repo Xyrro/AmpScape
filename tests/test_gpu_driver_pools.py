@@ -136,3 +136,15 @@ def test_footprint_and_committed_scratch(tmp_path, monkeypatch):
     # a stale q0 (eviction not yet in the reading) never adds more than the staged size
     monkeypatch.setattr(g, "quota_gb", lambda: 100.0)
     assert g.committed_gb({"recent_stagings": [[now - 60, 61.0, 260.0]]}, 0.0) == 161.0
+
+
+def test_portable_path_hides_site_paths_and_user(monkeypatch, tmp_path):
+    from ampscape import cluster
+
+    monkeypatch.setenv("AMPSCAPE_SCRATCH", str(tmp_path / "work"))
+    monkeypatch.setenv("TMPDIR", str(tmp_path / "node"))
+    monkeypatch.setenv("USER", "someuser")
+    assert cluster.portable_path(tmp_path / "work" / "data" / "hfcache") == "data/hfcache"
+    assert cluster.portable_path(tmp_path / "node" / "x") == "$TMPDIR/x"
+    assert cluster.portable_path("data/hfcache") == "data/hfcache"
+    assert cluster.portable_path("/tmp/ampscape_someuser/hfcache") == "/tmp/ampscape_$USER/hfcache"

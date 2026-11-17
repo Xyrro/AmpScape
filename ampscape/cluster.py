@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 
 
 def _get(name: str) -> str | None:
@@ -65,3 +66,21 @@ def scratch_fs() -> str | None:
 
 def user() -> str:
     return os.environ.get("USER", "")
+
+
+def portable_path(p) -> str:
+    """A path as recorded in published result files: relative to the working copy when inside it, `$TMPDIR/...` under
+    the node-local temp directory, other absolute paths unchanged; the user name is never written (`$USER`)."""
+    s = str(p)
+    path = pathlib.Path(s)
+    if path.is_absolute():
+        for base, label in ((os.environ.get("AMPSCAPE_SCRATCH"), ""), (os.environ.get("TMPDIR"), "$TMPDIR/")):
+            if not base:
+                continue
+            try:
+                s = label + str(path.resolve().relative_to(pathlib.Path(base).resolve()))
+                break
+            except ValueError:
+                continue
+    u = user()
+    return s.replace(u, "$USER") if u else s

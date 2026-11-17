@@ -29,6 +29,7 @@ import torch
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from ampscape import cluster  # noqa: E402
 from ampscape.data.dataset import AmpScapeDataset, compute_norm_stats, load_norm_stats  # noqa: E402
 from ampscape.models import MODEL_CONFIGS, MODEL_VARIANTS, OFFICIAL, build_model  # noqa: E402
 from ampscape.models.common import (  # noqa: E402
@@ -360,7 +361,7 @@ def main():
         "model": a.model,
         "task": a.task,
         "tier": a.tier,
-        "root": a.root,
+        "root": cluster.portable_path(a.root),
         "model_config": mcfg,
         "variant": a.variant,
         "extra_channels": list(extra),
@@ -626,7 +627,7 @@ def main():
                     "split": split,
                     "seed": a.seed,
                     "notes": "learned baseline, Phase 10",
-                    "train_root": a.root,
+                    "train_root": cluster.portable_path(a.root),
                 },
                 indent=1,
             )
