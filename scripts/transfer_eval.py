@@ -29,9 +29,9 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 from train import Items, collate, evaluate_group, predict  # noqa: E402
 
+from ampscape import cluster  # noqa: E402
 from ampscape.data.dataset import AmpScapeDataset, load_norm_stats  # noqa: E402
 from ampscape.models import build_model  # noqa: E402
-from ampscape import cluster  # noqa: E402
 
 
 def summarise(results_json: pathlib.Path) -> dict:

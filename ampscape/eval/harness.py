@@ -29,8 +29,8 @@ import h5py
 import numpy as np
 import pandas as pd
 
-from ampscape.data.dataset import _load_index
 from ampscape.cluster import portable_path
+from ampscape.data.dataset import _load_index
 from ampscape.metrics import domain, efficiency, nonsource, physics, pixel, reff
 
 KIND_TASK = {
