@@ -22,6 +22,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 from ampscape import cluster  # noqa: E402  (site settings: scripts/env.local.sh)
+
 LOGS = ROOT / "logs"
 STATE = LOGS / "driver_state.json"
 CYCLE = 600
