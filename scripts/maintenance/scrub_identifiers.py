@@ -56,7 +56,7 @@ def main() -> None:
                 per_file[str(p.relative_to(root))] += n
         if new != s and not a.dry_run:
             p.write_text(new, encoding="utf-8")
-    for i, (rx, _) in enumerate(rules):
+    for i in range(len(rules)):
         if per_rule[i]:
             print(f"rule {i:2d}: {per_rule[i]:5d} replacements")
     for f, n in sorted(per_file.items(), key=lambda kv: -kv[1]):
